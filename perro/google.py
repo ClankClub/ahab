@@ -178,3 +178,41 @@ def read_drive_file(id: str, start: int = 0) -> str:
     end = start + len(part)
     more = f"\n[...chars {start}-{end} of {len(text)}; use start={end} for more]" if end < len(text) else ""
     return f"{head}\n\n{part}{more}"
+
+
+def _create(name: str, mime: str, folder: str) -> dict:
+    """A new, empty Google file, in the folder given or at the top of Perro's Drive."""
+    body = {"name": _text(name, "title", 200).strip() or "Untitled", "mimeType": mime}
+    if folder:
+        body["parents"] = [_id(folder, "folder")]
+    return _google("drive", "files", "POST", query={"fields": "id,name,webViewLink"}, body=body)
+
+
+def _created(kind: str, f: dict, folder: str, extra: str = "") -> str:
+    where = (" in that folder (whoever can see the folder can see it)" if folder else
+             " at the top of your Drive (only your account can open it)")
+    return f'Created {kind} "{f.get("name")}" (id {f.get("id")}){where}.{extra}\nLink: {f.get("webViewLink")}'
+
+
+# --- Docs ----------------------------------------------------------------
+
+def _insert(id: str, text: str) -> None:
+    _google("docs", f"/{id}:batchUpdate", "POST", body={"requests": [
+        {"insertText": {"endOfSegmentLocation": {}, "text": text}}]})
+
+
+def create_doc(title: str, text: str = "", folder: str = "") -> str:
+    text = _text(text, "text")
+    f = _create(title, DOC, folder)
+    if text:
+        _insert(f["id"], text)
+    return _created("Google Doc", f, folder, f" It has {len(text)} chars of text." if text else "")
+
+
+def append_to_doc(id: str, text: str) -> str:
+    id, text = _id(id, "id"), _text(text, "text")
+    if not text.strip():
+        raise ValueError("text is empty.")
+    # The end of a doc is the end of its last paragraph; start a new one.
+    _insert(id, "\n" + text)
+    return f"Added {len(text)} chars to the end of the doc {id}, as a new paragraph."
