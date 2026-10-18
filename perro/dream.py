@@ -226,7 +226,20 @@ def _the_day(memory: Memory) -> tuple[list[str], bool, str]:
 def dream(memory: Memory, client: ModelClient, name: str | None) -> bool:
     """Dream once, if there's a day to dream about. Returns whether it did."""
     # Imported here because the heartbeat imports this module.
-    from perro.heartbeat import parse_reply, trim_last_result
+    from perro.heartbeat import NOT_JSON, parse_reply, reply_form, trim_last_result
+
+    # The dream's reply format, as a form for backends that take one (see
+    # reply_form). "files" is a list of path/text pairs there, since strict
+    # mode allows no free-form object; parse_reply makes it a dict again.
+    form = reply_form(list(DREAM_TOOLS), {
+        "notes": {"type": ["string", "null"], "description": "When finishing: the full new text of your notes."},
+        "dream": {"type": ["string", "null"], "description": "When finishing: your dream entry, just the prose."},
+        "files": {"type": ["array", "null"], "description": "When finishing: each file to change, with its full "
+                  "new text. [] for none.",
+                  "items": {"type": "object", "additionalProperties": False, "required": ["path", "text"],
+                            "properties": {"path": {"type": "string"}, "text": {"type": "string"}}}},
+    })
+    asked_again = False
 
     # Marked first, so a dream that fails isn't retried in a loop.
     _mark(memory.home, _slot(datetime.now()))
@@ -247,11 +260,21 @@ def dream(memory: Memory, client: ModelClient, name: str | None) -> bool:
     began = time.time()
     try:
         for _ in range(MAX_DREAM_TOOL_CALLS + 2):
-            reply = client.complete(messages, json_mode=True)
+            reply = client.complete(messages, json_mode=form)
             tokens_in += reply.prompt_tokens
             tokens_cached += reply.cached_tokens
             tokens_out += reply.completion_tokens
-            decision, _ = parse_reply(reply.text)
+            try:
+                decision, _ = parse_reply(reply.text)
+            except ValueError:  # JSONDecodeError included
+                if asked_again or not reply.text.strip():
+                    raise
+                asked_again = True
+                transcript.append(f"Not JSON, asked again: {reply.text[:2000]}")
+                messages.append({"role": "assistant", "content": reply.text})
+                messages.append({"role": "user", "content": NOT_JSON + " If it was your dream entry, "
+                                 "put it in the \"dream\" field of your final reply."})
+                continue
             transcript.append(f"Thought: {str(decision.get('thought', '')).strip() or '(empty)'}")
             if "tool" not in decision:
                 break

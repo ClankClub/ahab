@@ -99,9 +99,11 @@ assert dream.dream(m, Fake([]), "Perro") is False
 # A failed dream logs an error with what it did, and still counts as handled.
 inbox.owner_sends(m, "Morning."); inbox.deliver(m)
 dream._mark(home, slot - timedelta(days=1))
-assert dream.dream(m, Fake([{"thought": "Hmm.", "tool": "list_files", "args": {}}, "not json"]), "Perro") is False
+assert dream.dream(m, Fake([{"thought": "Hmm.", "tool": "list_files", "args": {}}, "not json", "still not"]),
+                   "Perro") is False
 err = m.recent(1)[0]
 assert err.kind == "error" and err.content.startswith("Dream failed: JSONDecodeError") and "Tool: list_files" in err.content, err
+assert "Not JSON, asked again: not json" in err.content, err
 assert dream.next_at(home) > time.time()
 dream._mark(home, slot - timedelta(days=1))
 assert dream.dream(m, Fake([{"thought": "Done", "notes": "n"}]), "Perro") is False
@@ -120,4 +122,18 @@ inbox.owner_sends(m, "Again."); inbox.deliver(m)
 dream._mark(home, slot - timedelta(days=1))
 assert dream.dream(m, Fake([{**FINAL, "notes": "y" * 5000}]), "Perro") is True
 assert m.read_notes() == FINAL["notes"] and "too long" in m.recent(1)[0].content.splitlines()[0]
+
+# One slip is asked about again (and told where the entry goes); the second try counts.
+# The form's encoding comes back as usual: null tool, files as path/text pairs.
+home = Path(tempfile.mkdtemp())
+m = Memory(home)
+ws = home / "workspace"; ws.mkdir()
+inbox.owner_sends(m, "Quiet day."); inbox.deliver(m)
+dream._mark(home, slot - timedelta(days=1))
+fake = Fake(["Today was quiet.", {"thought": "Fixed.", "tool": None, "args": None, "notes": None,
+                                  "dream": "Quiet.", "files": [{"path": "skills/quiet.md", "text": "# Quiet days"}]}])
+assert dream.dream(m, fake, "Perro") is True
+assert "Not JSON, asked again: Today was quiet." in m.recent(1)[0].content and '"dream" field' in fake.seen[1][-1]["content"]
+assert (ws / "skills" / "quiet.md").read_text(encoding="utf-8") == "# Quiet days"
+assert "Left the notes as they were" in m.recent(1)[0].content
 print("dream tests passed")

@@ -225,6 +225,48 @@ def trim_last_result(messages: list[dict]) -> None:
                            " if you need the rest.]")
 
 
+def reply_form(tool_names: list[str], finish: dict[str, dict]) -> dict:
+    """The reply format as a JSON Schema, for a backend that can hold the model
+    to one (Codex, through --output-schema). The model then can't answer in
+    prose, append its scratch thinking after the object, or name a tool that
+    doesn't exist: on 2026-10-18 three answers to the owner were lost to prose.
+
+    Codex runs OpenAI's strict mode, where every field is required (null when
+    unused) and no object can be free-form, so "args" travels as a JSON string
+    and parse_reply turns it back into an object. The prompt's own format is
+    unchanged; the descriptions here are what the model reads about the form.
+    """
+    fields = {
+        "thought": {"type": "string"},
+        "tool": {"type": ["string", "null"], "enum": [*tool_names, None],
+                 "description": "The tool to use now, or null to finish."},
+        "args": {"type": ["string", "null"],
+                 "description": "The tool's args: one JSON object written inside this string, like "
+                                '"{\\"path\\": \\"notes.txt\\"}" ("{}" for none). null when finishing.'},
+        **finish,
+    }
+    return {"type": "object", "properties": fields, "required": list(fields),
+            "additionalProperties": False}
+
+
+REPLY_FORM = reply_form(list(tools.TOOLS), {
+    "message": {"type": ["string", "null"],
+                "description": "What to send your owner as you finish, or null to send nothing. "
+                               "Only a final reply's message is sent."},
+    "notes": {"type": ["string", "null"],
+              "description": "The full new text of your notes, or null to leave them unchanged."},
+    "next_wake_minutes": {"type": ["integer", "null"],
+                          "description": "When finishing: minutes until your next wake-up. "
+                                         "null in a tool request."},
+})
+
+# Said back to the model when a reply couldn't be read at all, once per wake.
+# A backend without a form (DeepSeek's JSON mode is only "valid JSON") can
+# still slip, and the slip is usually the answer itself, written as prose.
+NOT_JSON = ("That reply wasn't the one JSON object your replies have to be, so nothing in it was used "
+            "or sent. Write it again as that JSON object.")
+
+
 def parse_reply(text: str) -> tuple[dict, str]:
     """Read the model's reply as one JSON object. Returns (object, dropped text).
 
@@ -259,7 +301,29 @@ def parse_reply(text: str) -> tuple[dict, str]:
     return _combine(objects, "")
 
 
+def _unform(reply: dict) -> dict:
+    """Undo what reply_form needed: a null tool (finishing), args as a string,
+    a null next_wake_minutes, and the dream's files as a list of pairs."""
+    if "tool" in reply and reply["tool"] is None:
+        reply.pop("tool")
+        reply.pop("args", None)
+    if isinstance(reply.get("args"), str):
+        try:
+            args = json.loads(reply["args"] or "{}")
+        except json.JSONDecodeError:
+            args = None
+        if isinstance(args, dict):
+            reply["args"] = args
+    if "next_wake_minutes" in reply and reply["next_wake_minutes"] is None:
+        reply.pop("next_wake_minutes")
+    files = reply.get("files")
+    if isinstance(files, list) and all(isinstance(f, dict) and set(f) == {"path", "text"} for f in files):
+        reply["files"] = {f["path"]: f["text"] for f in files}
+    return reply
+
+
 def _combine(objects: list[dict], rest: str) -> tuple[dict, str]:
+    objects = [_unform(o) for o in objects]
     if "tool" in objects[0]:
         dropped = [json.dumps(o, ensure_ascii=False) for o in objects[1:]] + ([rest] if rest else [])
         return objects[0], " ".join(dropped)
@@ -313,12 +377,13 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
 
     tokens_in = tokens_cached = tokens_out = 0
     tool_calls = 0
+    asked_again = False
     try:
         # Each pass is one model call. A tool request sends the result back
         # and loops; a final answer breaks out. One extra pass past the tool
         # limit lets Perro answer after being told it's out of calls.
         for _ in range(MAX_TOOL_CALLS + 2):
-            reply = client.complete(messages, json_mode=True)
+            reply = client.complete(messages, json_mode=REPLY_FORM)
             tokens_in += reply.prompt_tokens
             tokens_cached += reply.cached_tokens
             tokens_out += reply.completion_tokens
@@ -327,7 +392,20 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
                 # Kept for you to read; Perro's page only shows the header.
                 memory.record("reasoning",
                               f"Reasoned ({len(reply.reasoning)} chars).\n{reply.reasoning}")
-            decision, dropped = parse_reply(reply.text)
+            try:
+                decision, dropped = parse_reply(reply.text)
+            except ValueError:  # JSONDecodeError included
+                if asked_again or not reply.text.strip():
+                    raise
+                # Prose instead of JSON is usually the answer itself. Asking
+                # again costs one call; dropping it cost the owner a reply.
+                asked_again = True
+                memory.record("error", "Reply wasn't one JSON object, so it wasn't used; asked again "
+                              f"in the same wake-up. Reply was: {reply.text[:2000]}")
+                messages.append({"role": "assistant", "content": reply.text})
+                messages.append({"role": "user", "content": NOT_JSON + " If it was meant for your "
+                                 "owner, put it in the \"message\" field of your final reply."})
+                continue
             if dropped:
                 memory.record("error", "Reply held more than one JSON object; part of it was "
                               f"not used: {dropped[:500]}")

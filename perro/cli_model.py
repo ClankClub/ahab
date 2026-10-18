@@ -110,12 +110,18 @@ class CliClient:
 
     def complete(self, messages: list[Message], temperature: float = 0.7,
                  json_mode: bool = False) -> Reply:
-        # temperature: neither CLI takes one. json_mode: the prompt asks for
-        # JSON, and parse_reply checks it, same as with any backend.
+        # temperature: neither CLI takes one. json_mode: True means the prompt
+        # asks for JSON and parse_reply checks it, same as with any backend. A
+        # JSON Schema (heartbeat.reply_form) goes to Codex as --output-schema,
+        # which holds the answer to that shape. Claude Code's --json-schema
+        # isn't used: it works by giving the model a tool, and with a tool in
+        # hand Haiku tried calling Perro's tools natively, was refused, and
+        # decided it had none (2026-10-18).
+        schema = json_mode if isinstance(json_mode, dict) else None
         system, prompt = flatten(messages)
         total = Reply("", self.model, 0, 0)
         for _ in range(EMPTY_REPLY_ATTEMPTS):
-            reply = self._codex(system, prompt) if self.cli == "codex" else self._claude(system, prompt)
+            reply = self._codex(system, prompt, schema) if self.cli == "codex" else self._claude(system, prompt)
             total.prompt_tokens += reply.prompt_tokens
             total.completion_tokens += reply.completion_tokens
             total.cached_tokens += reply.cached_tokens
@@ -159,7 +165,7 @@ class CliClient:
         entry = {k: v for k, v in entry.items() if k not in CODEX_MODEL_DROP}
         return {**entry, **CODEX_MODEL_PLAIN}
 
-    def _codex(self, system: str, prompt: str) -> Reply:
+    def _codex(self, system: str, prompt: str, schema: dict | None = None) -> Reply:
         # Perro's system prompt replaces Codex's built-in instructions (about
         # 3,500 tokens describing a coding agent) instead of following them.
         temp = []
@@ -177,6 +183,11 @@ class CliClient:
                     json.dump({"models": [plain]}, c)
                 temp.append(c.name)
                 args += ["-c", f"model_catalog_json={json.dumps(Path(c.name).as_posix())}"]
+            if schema:
+                with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8", delete=False) as s:
+                    json.dump(schema, s)
+                temp.append(s.name)
+                args += ["--output-schema", s.name]
             for key in CODEX_CONTEXT_OFF:
                 args += ["-c", f"{key}=false"]
             for setting in CODEX_SETTINGS_OFF:

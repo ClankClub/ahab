@@ -115,6 +115,9 @@ class ModelClient:
 
         json_mode asks the server to guarantee the reply is valid JSON. The
         prompt itself must still mention JSON and describe the shape wanted.
+        It can also be the shape itself, as a JSON Schema (heartbeat.reply_form):
+        the Codex backend holds the model to it, and here it's plain JSON mode,
+        since DeepSeek takes no schema.
         """
         payload = {
             **self.extra,
