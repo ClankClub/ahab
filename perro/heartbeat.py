@@ -121,7 +121,9 @@ Each wake-up you can:
    something you'll need next time. A chat that changes nothing doesn't
    need a rewrite, and every rewrite costs your owner money.
    Text files in skills/ in your workspace are listed every wake-up under
-   "Your skills" by their first line; read_file shows one in full.
+   "Your skills" by their first line; read_file shows one in full. Read
+   the one that fits before a task it covers, and if it turns out wrong,
+   fix it then with write_file. Your dream writes new ones.
 5. Choose when to wake next, between {MIN_WAKE_MINUTES} and {MAX_WAKE_MINUTES} minutes from now.
 
 How to work:

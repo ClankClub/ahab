@@ -54,6 +54,10 @@ MAX_DREAM_TOOL_CALLS = 8
 # and was believed again every wake.
 DREAM_TOOLS = ("list_files", "read_file", "recall", "about_yourself")
 MAX_FILES_CHANGED = 6
+# A wake-up with this many tool calls is pointed out as a place a skill may be.
+BUSY_WAKE = 4
+# One skill is one how-to; past this it's a manual, and costs too much to read.
+SKILL_CHAR_LIMIT = 4_000
 # Kinds the dream doesn't need: bookkeeping, private reasoning (long, and
 # not what Perro decided), old notes (it gets the current ones), restarts.
 SKIP_KINDS = ("wake", "sleep", "reasoning", "notes", "start", "stopped")
@@ -81,8 +85,7 @@ Do these things:
    leave alone, or when, goes in PROACTIVE_PREFERENCES.md, in their words;
    never your own guess. A short lesson about getting work done here (a
    convention, a tool or site quirk, a mistake not to repeat) goes in
-   AGENTS.md; a full how-to for a task you'll do again goes in a skill file
-   in skills/ (its first line is its title). A real change in
+   AGENTS.md; a how-to goes in a skill (step 2). A real change in
    who you are goes in SOUL.md. Change only what the day gives you reason to.
    You make a change by putting the file's full new text in the "files"
    field of your final reply; that's the only way a file changes here.
@@ -90,7 +93,25 @@ Do these things:
    identity files are shown above in full; read any other file (a skill you
    want to update) before rewriting it. Keep identity files under
    {identity.limits_text()}.
-2. Rewrite your notes down to what's still open: each unfinished task with
+2. Keep your skills. Ask yourself: did you work something out today that
+   you'd otherwise have to work out again? A run of tools that got a job
+   done, a service's quirk and the way around it, the shape your owner
+   wanted for something you'll make again. "Wake-ups that took work" below
+   is where to look first. If it's a how-to for a kind of task likely to
+   come back, keep it as a skill: skills/<short-name>.md, whose first line
+   says in one sentence when to use it (awake, that line is all you see of
+   it), then the steps, the pitfalls, and how you know it worked. Only what
+   the day actually showed: a procedure you never ran isn't a skill yet.
+   Improve a skill that covers the ground before adding another (read it
+   first, then give its full new text). Then look over "Your skills": one
+   you used today that went wrong gets fixed; one that names a tool your
+   waking list doesn't have is wrong and gets fixed; two that overlap
+   become one; one that's dead gets retired, by giving its path with empty
+   text (it moves to skills/retired/, out of your list). Keep each under
+   {SKILL_CHAR_LIMIT} characters. Whatever you decide, answer the question
+   in "skill_check": what from today, if anything, was worth a skill, and
+   what you did about it. Don't make one up to fill the slot.
+3. Rewrite your notes down to what's still open: each unfinished task with
    its next step, and what you need for the coming days. Drop what's done,
    stale, or now kept in another file. If you changed SOUL.md, add a line
    to tell your owner what changed the next time you talk. If your notes or
@@ -101,7 +122,7 @@ Do these things:
    waking tools are the same every wake-up; they don't come and go. One can
    fail now and then (a refused call, a service down), which is worth noting
    as that, but a tool in the list is never "not available".
-3. Write your dream entry: a short reflection in plain prose, about three
+4. Write your dream entry: a short reflection in plain prose, about three
    paragraphs. First, what you now believe about your owner and how sure
    you are, what the day changed, with guesses marked as guesses. Then
    what's open: each thing's state and whose move it is. Last, where you
@@ -137,6 +158,7 @@ To finish the dream:
 {{"thought": "<what you're thinking>",
   "notes": "<the full new text of your notes, under {NOTES_CHAR_LIMIT} characters>",
   "dream": "<your dream entry, just the prose: its heading is added for you>",
+  "skill_check": "<one or two sentences: what from today was worth a skill, and what you did>",
   "files": {{"<path in your workspace>": "<its full new text>", ...}}}}
 "files" holds only the files you're changing (at most {MAX_FILES_CHANGED}); {{}} for none."""
 
@@ -180,6 +202,37 @@ def next_at(home: Path) -> float:
 def _cut(text: str, limit: int) -> str:
     text = " ".join(text.split())
     return text[:limit] + " [...]" if len(text) > limit else text
+
+
+def _busy_wakes(memory: Memory) -> tuple[list[str], str]:
+    """The day's wake-ups that took real work (BUSY_WAKE tool calls or more), as
+    lines with their tools in order, and where the day starts (ISO). Hermes
+    looks for a skill after a job of five or more calls; these are where one
+    is likeliest to be."""
+    last = memory.db.execute("SELECT id FROM events WHERE kind = 'dream' ORDER BY id DESC LIMIT 1").fetchone()
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=LOOK_BACK_HOURS)).isoformat(timespec="seconds")
+    rows = memory.db.execute(
+        "SELECT time, kind, content FROM events WHERE id > ? AND time >= ? AND kind IN ('wake', 'tool') "
+        "ORDER BY id", (last[0] if last else 0, cutoff)).fetchall()
+    wakes = []
+    for when, kind, content in rows:
+        if kind == "wake" or not wakes:
+            wakes.append((when, []))
+        if kind == "tool" and not content.startswith("message_owner (final reply)"):
+            wakes[-1][1].append(content.split(" ", 1)[0])
+    lines = []
+    for when, used in wakes:
+        if len(used) < BUSY_WAKE:
+            continue
+        runs = []                    # update_sheet, update_sheet, update_sheet -> update_sheet x3
+        for name in used:
+            if runs and runs[-1][0] == name:
+                runs[-1][1] += 1
+            else:
+                runs.append([name, 1])
+        steps = ", ".join(name if n == 1 else f"{name} x{n}" for name, n in runs)
+        lines.append(f"- {datetime.fromisoformat(when).astimezone():%a %H:%M}, {len(used)} tool calls: {steps}")
+    return lines, rows[0][0] if rows else cutoff
 
 
 def _the_day(memory: Memory) -> tuple[list[str], bool, str]:
@@ -234,6 +287,8 @@ def dream(memory: Memory, client: ModelClient, name: str | None) -> bool:
     form = reply_form(list(DREAM_TOOLS), {
         "notes": {"type": ["string", "null"], "description": "When finishing: the full new text of your notes."},
         "dream": {"type": ["string", "null"], "description": "When finishing: your dream entry, just the prose."},
+        "skill_check": {"type": ["string", "null"], "description": "When finishing: what from today was worth "
+                        "a skill, and what you did about it."},
         "files": {"type": ["array", "null"], "description": "When finishing: each file to change, with its full "
                   "new text. [] for none.",
                   "items": {"type": "object", "additionalProperties": False, "required": ["path", "text"],
@@ -249,10 +304,13 @@ def dream(memory: Memory, client: ModelClient, name: str | None) -> bool:
         return False
 
     now = datetime.now().astimezone()
+    busy, day_start = _busy_wakes(memory)
     page = (f"Current time: your owner's local time is {now:%A %d %B %Y, %H:%M %Z}.\n\n"
             f"{identity.describe(memory)}\n\n"
             f"## Your notes\n{memory.read_notes().strip() or '(no notes yet)'}\n\n"
-            f"## Your skills\n{skills.describe(memory)}\n\n"
+            f"## Your skills\n{skills.review(memory, day_start)}\n\n"
+            f"## Wake-ups that took work ({BUSY_WAKE} or more tool calls)\n"
+            f"{chr(10).join(busy) or '(none)'}\n\n"
             f"## The day (since {start}, your owner's local time)\n" + "\n".join(lines))
     messages = [{"role": "system", "content": _prompt(name)}, {"role": "user", "content": page}]
     transcript = []
@@ -321,6 +379,13 @@ def dream(memory: Memory, client: ModelClient, name: str | None) -> bool:
         if name_ in (f for f, _ in identity.FILES) and isinstance(text, str) and len(text) > identity.limit(name_):
             refused.append(f"{name_} (over {identity.limit(name_)} chars)")
             continue
+        if skills.is_skill(name_) and not (text or "").strip():
+            result = skills.retire(memory, name_)
+            (changed if result.startswith("retired") else refused).append(f"{name_} ({result})")
+            continue
+        if skills.is_skill(name_) and isinstance(text, str) and len(text) > SKILL_CHAR_LIMIT:
+            refused.append(f"{name_} (over {SKILL_CHAR_LIMIT} chars)")
+            continue
         # Through the same fence as write_file: inside the workspace only.
         result = tools.run(memory, "write_file", {"path": name_, "content": text})
         (changed if result.startswith(("Created", "Overwrote")) else refused).append(
@@ -338,9 +403,11 @@ def dream(memory: Memory, client: ModelClient, name: str | None) -> bool:
         except ValueError as e:
             memory.record("error", f"The dream's notes weren't saved: {e}")
             notes_said = " Its notes were too long and weren't saved."
+    check = str(decision.get("skill_check") or "").strip()
     memory.record("dream", f"Dreamed over the day since {start}; wrote dreams/{path.name}.{notes_said}{files_said}"
                            f" [{calls} tool calls, {tokens_in} in ({tokens_cached} cached), {tokens_out} out,"
-                           f" {time.time() - began:.0f}s]\n\n" + "\n\n".join(transcript))
+                           f" {time.time() - began:.0f}s]\n\n"
+                           + (f"Skill check: {check}\n\n" if check else "") + "\n\n".join(transcript))
     return True
 
 
