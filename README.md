@@ -115,7 +115,7 @@ The pairing lives in `home/telegram.json`. Delete that file and pair again to sw
 - `.\scripts\install-task.ps1` — run Perro unattended: registers two Windows scheduled tasks, "Perro heartbeat" and "Perro telegram" (the latter only if `PERRO_TELEGRAM_TOKEN` is set), that start hidden at login and restart if they crash. Output goes to `home/heartbeat.log` and `home/telegram.log`. `-Remove` uninstalls both. Stop one with `Stop-ScheduledTask "Perro telegram"`. After changing code, `py -m perro.heartbeat --restart` reloads the heartbeat; for the bridge, `Stop-ScheduledTask` then `Start-ScheduledTask`.
 - `py -m perro.heartbeat --restart` — restart the unattended heartbeat, for example to load new code.
 - `.\scripts\install-backup-task.ps1` — registers "Perro backup", which commits and pushes `home/` to its private repo every 6 hours, only while Perro is asleep (`-EveryHours N` to change, `-Remove` to uninstall). `py -m perro.backup` does one backup by hand. `home/` must be its own Git repo with a remote.
-- `scripts/install_mac.py` — the Mac equivalent of both tasks, also untested under the new name.
+- `python3 scripts/install_mac.py` — the Mac equivalent: launchd agents for the heartbeat and, once it's paired, the Telegram bridge, running with no window, at every login, restarted after a crash (`--with-backup` adds the backup, `--remove` uninstalls, `--dry-run` shows the files). Run it from a terminal where Perro already works, after stopping any copy running there with Ctrl+C: it copies that terminal's keys, settings and PATH into the agents, since launchd doesn't read `~/.zshrc`. Run it again after changing a key.
 
 ## License
 
