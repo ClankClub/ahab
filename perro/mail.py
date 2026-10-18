@@ -54,7 +54,11 @@ def settings(memory: Memory) -> tuple[str, set[str]]:
 
 def _address(value: str) -> str:
     """One plain address, lowercased, from "Name <a@b.c>" or "a@b.c"."""
-    _, found = email.utils.parseaddr(str(value))
+    value = str(value)
+    # Some Pythons read "a@x.com, b@y.com" as just the first address; say no instead.
+    if value.count("@") != 1 or re.search(r"[,;]", value):
+        raise ValueError(f"{value!r} isn't one email address.")
+    _, found = email.utils.parseaddr(value)
     found = found.strip().lower()
     if not ADDRESS.fullmatch(found):
         raise ValueError(f"{value!r} isn't one email address.")
