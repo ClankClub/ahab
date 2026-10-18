@@ -19,17 +19,27 @@ What the browser may do is set here, whatever a page asks for:
   - No logins: addresses with a user name in them are refused, and the whole
     profile (cookies, storage) is thrown away after IDLE_SECONDS idle or on
     "reset".
-  - Pages are read as text, TEXT_LIMIT characters at a time.
+  - No typing into password fields (or other sign-in and card fields), and
+    nothing that would pick a file to upload.
+  - Pages are read as text snapshots (SNAPSHOT below): headings, text, and
+    the links, buttons and fields numbered [1], [2]..., TEXT_LIMIT characters
+    at a time. The numbers are what "click" and "type" take; every snapshot
+    numbers afresh. They're kept on the elements in an attribute whose name
+    is random per session, so a page can't plant numbers of its own.
 
-Commands: {"do": "open", "url": ...}, {"do": "text", "start": n},
-{"do": "state"}, {"do": "blocked"}, {"do": "reset"}, {"do": "ping"},
-{"do": "selftest"} (checks the rules above on a real page).
+Commands: {"do": "open", "url": ...}, {"do": "look", "start": n},
+{"do": "click", "n": 3}, {"do": "type", "n": 3, "text": ..., "enter": false},
+{"do": "scroll", "direction": "down"}, {"do": "back"}, {"do": "state"},
+{"do": "blocked"}, {"do": "reset"}, {"do": "ping"}, {"do": "selftest"}
+(checks the rules above on a real page). Every command that shows a page
+also says what was stopped since the last one ("stopped").
 """
 
 import asyncio
 import json
 import os
 import re
+import secrets
 import sys
 import time
 import urllib.parse
@@ -44,6 +54,13 @@ URL_LIMIT = 2000
 CALL_TIMEOUT = 120
 ALLOWED_METHODS = {"GET", "HEAD"}
 BLOCKED_KEPT = 50
+TYPE_LIMIT = 2000
+CLICK_TIMEOUT_MS = 5_000
+# Fields never typed into: passwords, one-time codes and card details. That's
+# what "no logins" means here.
+SECRET_AUTOCOMPLETE = re.compile(r"(current-password|new-password|one-time-code|cc-)")
+TYPEABLE_INPUTS = {"text", "search", "email", "url", "tel", "number", "date", "datetime-local",
+                   "month", "week", "time", ""}
 CHROMIUM_ARGS = [
     f"--proxy-server={PROXY}",
     "--proxy-bypass-list=<-loopback>",          # even localhost goes to the proxy, which refuses it
@@ -57,6 +74,117 @@ for (const name of ["RTCPeerConnection", "webkitRTCPeerConnection", "RTCDataChan
   try { Object.defineProperty(window, name, {value: undefined, configurable: false}); } catch (e) {}
 }
 """
+# The page as text: blocks on their own lines, headings marked with #, list
+# items with -, images by their alt text, and every link, button and field
+# numbered, with the number kept on the element in the attribute named by
+# the argument. Hidden things are left out.
+SNAPSHOT = r"""(attr) => {
+  const SKIP = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "HEAD", "SVG", "CANVAS", "IFRAME",
+                        "OBJECT", "EMBED", "VIDEO", "AUDIO", "OPTION"]);
+  const BLOCK = new Set(["ADDRESS", "ARTICLE", "ASIDE", "BLOCKQUOTE", "DD", "DIV", "DL", "DT", "FIELDSET",
+                         "FIGCAPTION", "FIGURE", "FOOTER", "FORM", "H1", "H2", "H3", "H4", "H5", "H6",
+                         "HEADER", "HR", "LI", "MAIN", "NAV", "OL", "P", "PRE", "SECTION", "TABLE", "TR",
+                         "UL", "BR", "DETAILS", "CAPTION", "DIALOG"]);
+  const ROLES = ["button", "link", "tab", "menuitem", "checkbox", "radio", "switch", "option",
+                 "combobox", "textbox", "searchbox"];
+  for (const el of document.querySelectorAll("[" + attr + "]")) el.removeAttribute(attr);
+  const clip = (s, max) => {
+    s = String(s || "").replace(/\s+/g, " ").trim();
+    return s.length > max ? s.slice(0, max - 1) + "…" : s;
+  };
+  const hidden = el => {
+    if (el.getAttribute("aria-hidden") === "true" || el.hidden) return true;
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse") return true;
+    return style.display !== "contents" && el.getClientRects().length === 0;
+  };
+  const kind = el => {
+    const tag = el.tagName.toUpperCase(), role = (el.getAttribute("role") || "").toLowerCase();
+    if (tag === "A" && el.hasAttribute("href")) return "link";
+    if (tag === "BUTTON" || tag === "SUMMARY") return "button";
+    if (tag === "SELECT") return "dropdown";
+    if (tag === "TEXTAREA") return "textbox";
+    if (tag === "INPUT") {
+      const type = (el.getAttribute("type") || "text").toLowerCase();
+      if (type === "hidden") return null;
+      if (type === "password") return "password field";
+      if (type === "file") return "file picker";
+      if (type === "checkbox" || type === "radio") return type;
+      if (["submit", "button", "reset", "image"].includes(type)) return "button";
+      return type === "search" ? "searchbox" : "textbox";
+    }
+    if (el.getAttribute("contenteditable") === "true" || el.getAttribute("contenteditable") === "") return "textbox";
+    return ROLES.includes(role) ? role : null;
+  };
+  const label = el => {
+    const tag = el.tagName.toUpperCase();
+    let s = el.getAttribute("aria-label") || "";
+    if (!s && el.getAttribute("aria-labelledby"))
+      s = el.getAttribute("aria-labelledby").split(/\s+/)
+            .map(id => (document.getElementById(id) || {}).innerText || "").join(" ");
+    if (!s && el.labels && el.labels.length) s = el.labels[0].innerText;
+    if (!s && !["INPUT", "SELECT", "TEXTAREA"].includes(tag)) s = el.innerText;
+    if (!s && el.querySelector) { const img = el.querySelector("img[alt]"); if (img) s = img.alt; }
+    if (!s) s = el.getAttribute("title") || el.getAttribute("placeholder") || "";
+    if (!s && tag === "INPUT" && ["submit", "button", "reset"].includes(el.type)) s = el.value;
+    return clip(s || el.getAttribute("name") || "", 80);
+  };
+  const where = el => {
+    try {
+      const u = new URL(el.getAttribute("href"), location.href);
+      if (!/^https?:$/.test(u.protocol)) return "";
+      return clip(u.origin === location.origin ? u.pathname + u.search : u.host + u.pathname, 70);
+    } catch (e) { return ""; }
+  };
+  let n = 0;
+  const out = [];
+  const walk = node => {
+    if (node.nodeType === 3) { out.push(node.textContent); return; }
+    if (node.nodeType !== 1) return;
+    const el = node, tag = el.tagName.toUpperCase();
+    if (SKIP.has(tag)) return;
+    if (tag === "SLOT") { for (const child of el.assignedNodes()) walk(child); return; }
+    if (hidden(el)) return;
+    const k = kind(el);
+    if (k) {
+      n += 1;
+      el.setAttribute(attr, String(n));
+      let line = "[" + n + "] " + k + ' "' + label(el) + '"';
+      if (k === "link") { const w = where(el); if (w) line += " -> " + w; }
+      if ((k === "textbox" || k === "searchbox") && el.value) line += ' = "' + clip(el.value, 60) + '"';
+      if (k === "dropdown" && el.selectedOptions && el.selectedOptions[0])
+        line += ' = "' + clip(el.selectedOptions[0].text, 60) + '"';
+      if ((k === "checkbox" || k === "radio") && el.checked) line += " (checked)";
+      if (el.getAttribute("aria-expanded") === "true") line += " (open)";
+      if (el.disabled) line += " (disabled)";
+      out.push(" " + line + " ");
+      return;
+    }
+    const block = BLOCK.has(tag);
+    if (block) out.push("\n");
+    if (/^H[1-6]$/.test(tag)) out.push("#".repeat(Number(tag[1])) + " ");
+    if (tag === "LI") out.push("- ");
+    if (tag === "IMG" && el.alt) out.push(" [image: " + clip(el.alt, 80) + "] ");
+    for (const child of (el.shadowRoot || el).childNodes) walk(child);
+    if (tag === "TD" || tag === "TH") out.push(" | ");
+    if (block) out.push("\n");
+  };
+  // The main content first, so it isn't buried under menus; the rest after.
+  const main = document.querySelector("main, [role=main]");
+  if (main && !hidden(main)) {
+    walk(main);
+    out.push("\n--- Around the main content (menus, header, footer) ---\n");
+    const walkRest = node => {          // everything but main: open up only main's ancestors
+      if (node === main) return;
+      if (node.nodeType === 1 && node.contains(main)) {
+        for (const child of node.childNodes) walkRest(child);
+      } else walk(node);
+    };
+    if (document.body) walkRest(document.body);
+  } else if (document.body) walk(document.body);
+  return out.join("").replace(/[ \t ]+/g, " ").replace(/ *\n */g, "\n")
+            .replace(/\n{2,}/g, "\n").replace(/^(#+) *\n/gm, "$1 ").trim();
+}"""
 
 
 def log(**fields) -> None:
@@ -106,13 +234,16 @@ class Browser:
         self.browser = None
         self.context = None
         self.page = None
-        self.blocked: list[str] = []
+        self.blocked: list[str] = []      # everything stopped, for "blocked" and the self-test
+        self.unseen: list[str] = []       # stopped since the last page shown
+        self.attr = ""
         self.last_used = time.monotonic()
 
     def _note(self, what: str) -> None:
         log(blocked=what)
-        self.blocked.append(what)
-        del self.blocked[:-BLOCKED_KEPT]
+        for kept in (self.blocked, self.unseen):
+            kept.append(what)
+            del kept[:-BLOCKED_KEPT]
 
     async def _route(self, route) -> None:
         request = route.request
@@ -145,6 +276,7 @@ class Browser:
         self.page = await self.context.new_page()
         self.context.on("page", self._popup)
         self.page.on("dialog", lambda dialog: asyncio.ensure_future(dialog.dismiss()))
+        self.attr = "data-p" + secrets.token_hex(4)
         return self.page
 
     async def reset(self) -> None:
@@ -155,7 +287,7 @@ class Browser:
             except Exception:
                 pass
         self.context = self.page = None
-        self.blocked = []
+        self.blocked, self.unseen = [], []
 
     async def shut(self) -> None:
         await self.reset()
@@ -166,30 +298,141 @@ class Browser:
                 pass
         self.browser = None
 
-    async def state(self, start: int = 0) -> dict:
-        page = await self.tab()
-        text = await page.evaluate("() => document.body ? document.body.innerText : ''")
-        text = re.sub(r"\n{3,}", "\n\n", text or "").strip()
+    async def settle(self, pause_ms: int = 500) -> None:
+        """Give a click or a keypress time to start loading, then let it load."""
+        page = self.page
+        await page.wait_for_timeout(pause_ms)
+        for state, ms in (("domcontentloaded", NAV_TIMEOUT_MS), ("networkidle", SETTLE_MS)):
+            try:
+                await page.wait_for_load_state(state, timeout=ms)
+            except Exception:
+                pass                                 # busy pages never go idle; read what's there
+
+    def _open_page(self):
+        """The page being read, or None if nothing's open (or it was reset)."""
+        page = self.page
+        if not page or page.is_closed() or page.url in ("", "about:blank"):
+            return None
+        return page
+
+    async def look(self, start: int = 0) -> dict:
+        page = self._open_page()
+        if page is None:
+            return {"error": "No page is open (the browser forgets everything after 15 idle minutes); "
+                             "open one first."}
+        try:
+            text = await page.evaluate(SNAPSHOT, self.attr)
+        except Exception:                            # mid-navigation: wait once, then try again
+            await self.settle(0)
+            text = await page.evaluate(SNAPSHOT, self.attr)
         start = max(0, int(start or 0))
+        stopped, self.unseen = self.unseen, []
         return {"url": page.url, "title": await page.title(), "length": len(text), "start": start,
-                "text": text[start:start + TEXT_LIMIT]}
+                "text": text[start:start + TEXT_LIMIT], "stopped": stopped}
 
     async def open(self, url) -> dict:
         url, note = check_url(url)
         page = await self.tab()
+        self.unseen = []
         try:
             response = await page.goto(url, wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
         except Exception as e:
             return {"error": describe(e), "url": url}
-        try:
-            await page.wait_for_load_state("networkidle", timeout=SETTLE_MS)
-        except Exception:
-            pass                                     # busy pages never go idle; read what's there
-        result = await self.state()
+        await self.settle(0)
+        result = await self.look()
         result["status"] = response.status if response else None
         if note:
             result["note"] = note
         return result
+
+    async def _element(self, n):
+        """The numbered element, and what it is."""
+        page = self._open_page()
+        if page is None:
+            return None, {"error": "No page is open; open one first."}
+        try:
+            n = int(n)
+        except (TypeError, ValueError):
+            return None, {"error": "n is the number in square brackets, like 12 for [12]."}
+        element = page.locator(f'[{self.attr}="{n}"]').first
+        if not await element.count():
+            return None, {"error": f"There's no [{n}] on the page now; look again for fresh numbers."}
+        info = await element.evaluate("""e => ({
+            tag: e.tagName.toUpperCase(),
+            type: (e.getAttribute("type") || "").toLowerCase(),
+            autocomplete: (e.getAttribute("autocomplete") || "").toLowerCase(),
+            editable: e.isContentEditable})""")
+        return element, info
+
+    async def click(self, n) -> dict:
+        element, info = await self._element(n)
+        if element is None:
+            return info
+        if info["type"] == "file":
+            return {"error": "That picks a file to upload; the browser doesn't upload anything."}
+        # Links and forms that would open a new tab open in this one instead.
+        await element.evaluate("""e => {
+            for (const holder of [e.closest("a"), e.closest("form"), e.form])
+              if (holder) holder.removeAttribute("target");
+        }""")
+        try:
+            await element.click(timeout=CLICK_TIMEOUT_MS)
+        except Exception as e:
+            return {"error": f"[{n}] couldn't be clicked ({str(e).splitlines()[0][:200]}). "
+                             "It may be covered or gone; look again."}
+        await self.settle()
+        return await self.look()
+
+    async def type(self, n, text, enter=False) -> dict:
+        text = str(text if text is not None else "")
+        if len(text) > TYPE_LIMIT:
+            return {"error": f"That's {len(text)} characters; the limit is {TYPE_LIMIT}."}
+        element, info = await self._element(n)
+        if element is None:
+            return info
+        if info["type"] == "password" or SECRET_AUTOCOMPLETE.search(info["autocomplete"]):
+            return {"error": "That's a password, sign-in code or card field. The browser never types into "
+                             "those: no logins, no payments."}
+        if info["type"] == "file":
+            return {"error": "That picks a file to upload; the browser doesn't upload anything."}
+        try:
+            if info["tag"] == "SELECT":
+                await element.select_option(label=text, timeout=CLICK_TIMEOUT_MS)
+            elif info["tag"] == "TEXTAREA" or info["editable"] or (
+                    info["tag"] == "INPUT" and info["type"] in TYPEABLE_INPUTS):
+                await element.fill(text, timeout=CLICK_TIMEOUT_MS)
+            else:
+                return {"error": f"[{n}] isn't something to type into; click it instead."}
+            if enter:
+                await element.press("Enter", timeout=CLICK_TIMEOUT_MS)
+        except Exception as e:
+            return {"error": f"Couldn't type into [{n}] ({str(e).splitlines()[0][:200]})."}
+        await self.settle()
+        return await self.look()
+
+    async def scroll(self, direction="down") -> dict:
+        page = self._open_page()
+        if page is None:
+            return {"error": "No page is open; open one first."}
+        sign = {"down": 1, "up": -1}.get(str(direction).lower())
+        if sign is None:
+            return {"error": 'direction is "down" or "up".'}
+        await page.evaluate("s => window.scrollBy(0, s * window.innerHeight * 0.9)", sign)
+        await page.wait_for_timeout(1500)            # room for whatever loads as you go
+        return await self.look()
+
+    async def back(self) -> dict:
+        page = self._open_page()
+        if page is None:
+            return {"error": "No page is open; open one first."}
+        try:
+            response = await page.go_back(wait_until="domcontentloaded", timeout=NAV_TIMEOUT_MS)
+        except Exception as e:
+            return {"error": describe(e)}
+        if response is None and self._open_page() is None:
+            return {"error": "There's nothing to go back to."}
+        await self.settle(0)
+        return await self.look()
 
     async def selftest(self) -> dict:
         """Try each forbidden thing from inside a real page, and report."""
@@ -227,8 +470,26 @@ class Browser:
             } catch (e) { done("no worker"); }
           });
           navigator.sendBeacon("https://example.com/beacon", "x");
+          const fields = [["password", ""], ["text", "current-password"], ["text", "cc-number"],
+                          ["file", ""], ["text", ""]];
+          fields.forEach(([type, auto], i) => {
+            const input = document.createElement("input");
+            input.type = type; input.id = "perro-test-" + i;
+            if (auto) input.setAttribute("autocomplete", auto);
+            document.body.appendChild(input);
+          });
           return out;
         }""")
+        # The typing rules, on the fields just added: four refused, the plain one typed into.
+        await self.look()
+        numbers = await page.evaluate(
+            "attr => [0, 1, 2, 3, 4].map(i => document.getElementById('perro-test-' + i).getAttribute(attr))",
+            self.attr)
+        refused = [("error" in await self.type(n, "secret")) for n in numbers[:3]]
+        refused.append("error" in await self.click(numbers[3]))
+        typed = await self.type(numbers[4], "hello")
+        out["secret_fields"] = "refused" if all(refused) else f"typed into one: {refused}"
+        out["plain_field"] = "typed" if "error" not in typed and 'hello' in typed["text"] else "failed"
         await page.evaluate("""() => {
           const form = document.createElement("form");
           form.method = "post"; form.action = "https://example.com/form";
@@ -247,16 +508,24 @@ class Browser:
     async def run(self, command: dict) -> dict:
         self.last_used = time.monotonic()
         what = command.get("do")
-        log(do=what, url=str(command.get("url", ""))[:200] or None)
+        log(do=what, url=str(command.get("url", ""))[:200] or None, n=command.get("n"))
         if what == "ping":
             return {"ok": True}
         if what == "open":
             return await self.open(command.get("url"))
-        if what == "text":
-            return await self.state(command.get("start", 0))
+        if what == "look":
+            return await self.look(command.get("start", 0))
+        if what == "click":
+            return await self.click(command.get("n"))
+        if what == "type":
+            return await self.type(command.get("n"), command.get("text"), bool(command.get("enter")))
+        if what == "scroll":
+            return await self.scroll(command.get("direction", "down"))
+        if what == "back":
+            return await self.back()
         if what == "state":
-            page = await self.tab()
-            return {"url": page.url, "title": await page.title()}
+            page = self._open_page()
+            return {"url": page.url, "title": await page.title()} if page else {"url": None, "title": None}
         if what == "blocked":
             seen, self.blocked = self.blocked, []
             return {"blocked": seen}
