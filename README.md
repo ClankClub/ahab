@@ -14,8 +14,10 @@ Your PC: Perro runtime (Python)
   ├─ heartbeat      → wake, show memory, model decides, save, sleep until it chose
   ├─ inbox          → messages between you and Perro; where its instructions come from
   ├─ telegram       → bridge from a Telegram bot to the inbox, paired to your account only
-  ├─ tools          → recall, list/read/write files, set/cancel alarms, message you, read web pages
+  ├─ tools          → recall, list/read/write files, set/cancel alarms, message you, read web pages, Google
   ├─ web            → read-only: any public page as text, plus Wikipedia search
+  ├─ n8n, google    → its own Google account through your local n8n: calendar and Gmail (read),
+  │                   Drive, Docs, Sheets, Tasks, Contacts (read and write; no deleting or sharing)
   ├─ alarms         → reminders and follow-ups; the heartbeat wakes it for them
   ├─ skills         → know-how files it keeps in workspace/skills/
   ├─ backup         → commits and pushes home/ to its private repo every 6 hours, only between wakes
@@ -38,6 +40,10 @@ Check the model client works:
 ```powershell
 py -m perro.model "Say hi in five words."
 ```
+
+### Google (through n8n)
+
+Perro never signs in to Google. Your n8n (`../n8n`, in Docker) holds the sign-ins, and Perro calls its webhooks on localhost; the workflows are the `perro-*.json` files there. Every call carries a key that n8n checks, so other programs and web pages on this PC can't use them. The key is the environment variable `PERRO_N8N_KEY`, and it must match n8n's credential "Perro relay key". Restart the heartbeat after changing it. See [docs/STATUS.md](docs/STATUS.md) for what each workflow does.
 
 ### Telegram (chat from your phone)
 
