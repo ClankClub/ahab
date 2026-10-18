@@ -30,7 +30,7 @@ TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
 FILES = (("SOUL.md", "Who you are"), ("USER.md", "Your owner"),
          ("PROACTIVE_PREFERENCES.md", "What to bring up on your own"),
          ("AGENTS.md", "How you work here"))
-CHAR_LIMIT = 3000
+CHAR_LIMIT = 4000
 
 
 def seed(memory: Memory, name: str | None) -> list[str]:
