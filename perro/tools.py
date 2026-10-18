@@ -183,15 +183,24 @@ def list_files(memory: Memory, path: str = ".") -> str:
     return "\n".join(lines)
 
 
-def read_file(memory: Memory, path: str) -> str:
+def read_file(memory: Memory, path: str, start: int = 0) -> str:
+    try:
+        start = int(start)
+    except (TypeError, ValueError):
+        raise ToolError("start must be a whole number of characters.") from None
+    if start < 0:
+        raise ToolError("start can't be negative.")
     target = _resolve(memory, path)
     if not target.is_file():
         raise ToolError(f"{path!r} isn't a file." if target.exists() else f"{path!r} doesn't exist.")
     text = target.read_text(encoding="utf-8", errors="replace")
     header = f"{_relative(memory, target)} ({len(text)} chars):"
-    if len(text) > READ_CHAR_LIMIT:
-        return f"{header}\n{text[:READ_CHAR_LIMIT]}\n[...truncated; showing first {READ_CHAR_LIMIT}]"
-    return f"{header}\n{text}"
+    if start and start >= len(text):
+        return f"{header}\nIt's only {len(text)} chars long."
+    part = text[start:start + READ_CHAR_LIMIT]
+    end = start + len(part)
+    more = f"\n[...chars {start}-{end} of {len(text)}; use start={end} for more]" if end < len(text) else ""
+    return f"{header}\n{part}{more}"
 
 
 def write_file(memory: Memory, path: str, content: str) -> str:
@@ -313,7 +322,9 @@ TOOLS = {
     ),
     "read_file": (
         read_file,
-        'Read a text file in your workspace. Args: {"path": "<file>"}',
+        f'Read a text file in your workspace, {READ_CHAR_LIMIT} chars at a time; '
+        'for a longer one, the reply says which start to use next. '
+        'Args: {"path": "<file>", "start": <char offset>} (start optional)',
     ),
     "write_file": (
         write_file,
