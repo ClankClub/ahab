@@ -1,4 +1,4 @@
-// Runs the Google relay's "Check the request" code against calendar requests (and a few old ones).
+// Runs the Google relay's "Check the request" code against calendar requests, deletes, and a few old ones.
 const fs = require('fs');
 const w = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const code = w.nodes.find(n => n.name === 'Check the request').parameters.jsCode;
@@ -29,6 +29,17 @@ const cases = [
   ['events list read', { service: 'calendar', method: 'GET', url: E, query: {} }, true],
   ['tasks still work', { service: 'tasks', method: 'POST', url: 'https://tasks.googleapis.com/tasks/v1/lists/x/tasks', query: {}, body: { title: 't' } }, true],
   ['drive share still refused', { service: 'drive', method: 'POST', url: 'https://www.googleapis.com/drive/v3/files/x/permissions', body: {} }, false],
+  ['delete a task', { service: 'tasks', method: 'DELETE', url: 'https://tasks.googleapis.com/tasks/v1/lists/x/tasks/abcde', query: {} }, true],
+  ['delete a task list', { service: 'tasks', method: 'DELETE', url: 'https://tasks.googleapis.com/tasks/v1/users/@me/lists/abcde', query: {} }, true],
+  ['clear finished tasks', { service: 'tasks', method: 'POST', url: 'https://tasks.googleapis.com/tasks/v1/lists/x/clear', query: {} }, false],
+  ['delete a contact', { service: 'contacts', method: 'DELETE', url: 'https://people.googleapis.com/v1/people/c12345:deleteContact', query: {} }, true],
+  ['edit a contact', { service: 'contacts', method: 'PATCH', url: 'https://people.googleapis.com/v1/people/c12345:updateContact', query: { updatePersonFields: 'names' }, body: {} }, true],
+  ['bulk delete contacts', { service: 'contacts', method: 'POST', url: 'https://people.googleapis.com/v1/people:batchDeleteContacts', body: {} }, false],
+  ['DELETE a contact some other way', { service: 'contacts', method: 'DELETE', url: 'https://people.googleapis.com/v1/people/c12345', query: {} }, false],
+  ['delete a contact group', { service: 'contacts', method: 'DELETE', url: 'https://people.googleapis.com/v1/contactGroups/abcde', query: {} }, false],
+  ['delete a drive file', { service: 'drive', method: 'DELETE', url: 'https://www.googleapis.com/drive/v3/files/abcde', query: {} }, false],
+  ['trash a drive file', { service: 'drive', method: 'PATCH', url: 'https://www.googleapis.com/drive/v3/files/abcde', body: { trashed: true } }, false],
+  ['delete a sheet', { service: 'sheets', method: 'DELETE', url: 'https://sheets.googleapis.com/v4/spreadsheets/abcde', query: {} }, false],
 ];
 let bad = 0;
 for (const [label, req, ok] of cases) {
@@ -37,5 +48,5 @@ for (const [label, req, ok] of cases) {
   if (!pass) bad++;
   console.log((pass ? 'ok   ' : 'FAIL ') + label + (refused ? ' -> ' + refused : ''));
 }
-console.log(bad ? bad + ' failed' : 'all ' + cases.length + ' calendar relay cases ok');
+console.log(bad ? bad + ' failed' : 'all ' + cases.length + ' google relay cases ok');
 process.exit(bad ? 1 : 0);

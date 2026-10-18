@@ -133,7 +133,7 @@ assert sent[-1]["body"]["properties"] == {"Name": {"title": [{"type": "text", "t
 try: notion.update_notion(PAGE); raise SystemExit("empty update accepted")
 except ValueError: pass
 
-# nothing this module sends is a delete or an archive
+# nothing the tools above send is a delete or an archive
 for p in sent:
     assert p["method"] in ("GET", "POST", "PATCH") and "archived" not in json.dumps(p) and "in_trash" not in json.dumps(p)
 
@@ -144,5 +144,87 @@ m = Memory(pathlib.Path(tempfile.mkdtemp()))
 n8n.send = lambda path, payload: {"status": 403, "body": {"error": {"message": "The relay refused: nope"}}}
 assert tools.run(m, "search_notion", {}).startswith("search_notion refused: Notion said no (HTTP 403): The relay refused")
 assert tools.run(m, "read_notion", {"id": "zzz"}).startswith("Bad args for read_notion")
-assert len(tools.TOOLS) == 43, len(tools.TOOLS)
+
+# --- making databases, moving, rewriting, deleting -----------------------------
+PLACE = "3fd0cd27dc0480af9db4edcc6f1af1f4"
+PLACE_PAGE = {"object": "page", "id": PLACE, "parent": {"type": "workspace"},
+              "properties": {"title": {"type": "title", "title": [{"plain_text": "Pip's Place"}]}}}
+calls = []
+
+
+def fake2(path, payload):
+    calls.append(payload)
+    url, method = payload["url"][len(notion.BASE):], payload["method"]
+    if method == "GET" and url == f"pages/{PAGE}":
+        return {"status": 200, "body": ROW}
+    if method == "GET" and url == f"pages/{PLACE}":
+        return {"status": 200, "body": PLACE_PAGE}
+    if method == "GET" and url == f"databases/{DB}":
+        return {"status": 200, "body": {"object": "database", "id": DB, "title": [{"plain_text": "Tasks"}], "properties": SCHEMA}}
+    if method == "GET" and (url.startswith("pages/") or url.startswith("databases/")):
+        return {"status": 404, "body": {"message": "Could not find it"}}
+    if method == "POST" and url == "databases":
+        return {"status": 200, "body": {"id": "newdb", "url": "https://notion.so/newdb"}}
+    if method == "POST" and url == f"pages/{PAGE}/move":
+        return {"status": 200, "body": ROW}
+    if method == "GET" and url == f"blocks/{PAGE}/children":
+        return {"status": 200, "body": {"has_more": False, "results": [
+            {"id": "b1", "type": "paragraph"}, {"id": "b3", "type": "child_page"}, {"id": "b2", "type": "heading_2"}]}}
+    if method in ("PATCH", "DELETE"):
+        return {"status": 200, "body": {}}
+    raise AssertionError(f"unexpected {method} {url}")
+
+
+n8n.send = fake2
+
+out = notion.create_notion_database(PLACE, "Reading", {"Due": "date", "Status": "select: To do, Done", "Pages": "number",
+                                                       "Read?": "checkbox", "Who": "multi-select"})
+body = calls[-1]["body"]
+assert body["parent"] == {"type": "page_id", "page_id": PLACE} and body["title"][0]["text"]["content"] == "Reading"
+assert body["properties"] == {"Name": {"title": {}}, "Due": {"date": {}},
+                              "Status": {"select": {"options": [{"name": "To do"}, {"name": "Done"}]}},
+                              "Pages": {"number": {"format": "number"}}, "Read?": {"checkbox": {}},
+                              "Who": {"multi_select": {"options": []}}}, body
+assert 'Created the database "Reading" (id newdb)' in out and "Status (select)" in out, out
+for args, why in [((DB, "x"), "not inside another database"), ((PLACE, "x", {"Mood": "vibes"}), "Types:"),
+                  ((PLACE, "x", {"name": "text"}), "already"), ((PLACE, " "), "title is empty"),
+                  ((PLACE, "x", ["Due"]), "fields must be")]:
+    n = len(calls)
+    try: notion.create_notion_database(*args); raise SystemExit(f"accepted {args}")
+    except ValueError as e: assert why in str(e), (why, e)
+    assert all(c["method"] == "GET" for c in calls[n:]), args
+
+assert notion.move_notion(PAGE, PLACE) == 'Moved the row "New task" under that page.'
+assert calls[-1]["body"] == {"parent": {"type": "page_id", "page_id": PLACE}} and calls[-1]["method"] == "POST"
+for args, why in [((PAGE, DB), "only under other pages"), ((DB, PLACE), "can't move a database"),
+                  ((PAGE, PAGE), "inside itself")]:
+    try: notion.move_notion(*args); raise SystemExit(f"accepted {args}")
+    except ValueError as e: assert why in str(e), (why, e)
+
+n = len(calls)
+out = notion.rewrite_notion(PAGE, "# New\nfresh")
+writes = [(c["method"], c["url"][len(notion.BASE):]) for c in calls[n:] if c["method"] != "GET"]
+assert writes == [("PATCH", f"blocks/{PAGE}/children"), ("DELETE", "blocks/b1"), ("DELETE", "blocks/b2")], writes
+assert "2 old block(s) out, 2 new" in out, out
+try: notion.rewrite_notion(DB, "x"); raise SystemExit("rewrote a database")
+except ValueError as e: assert "database" in str(e)
+
+assert notion.delete_notion(PAGE).startswith('Moved the row "New task" (id ' + PAGE + ") to Notion's trash")
+assert (calls[-1]["method"], calls[-1]["url"][len(notion.BASE):], calls[-1]["body"]) == ("PATCH", f"pages/{PAGE}", {"in_trash": True})
+assert "rows and all" in notion.delete_notion(DB)
+assert calls[-1]["url"].endswith(f"databases/{DB}") and calls[-1]["body"] == {"in_trash": True}
+try: notion.delete_notion("0" * 32); raise SystemExit("deleted nothing")
+except ValueError as e: assert "Nothing with that id" in str(e)
+
+# through the tool layer: deletes are logged and capped at DELETE_LIMIT a day
+m2 = Memory(pathlib.Path(tempfile.mkdtemp()))
+assert tools.run(m2, "delete_notion", {"id": PAGE}).startswith("Moved the row")
+assert m2.recent(1)[0].kind == "deleted" and tools.deleted_today(m2) == 1
+for _ in range(tools.DELETE_LIMIT - 1):
+    m2.record("deleted", "filler")
+n = len(calls)
+assert "daily limit" in tools.run(m2, "rewrite_notion", {"id": PAGE, "text": "x"}) and len(calls) == n
+assert tools.run(m2, "move_notion", {"id": PAGE, "parent": PLACE}).startswith("Moved")
+
+assert len(tools.TOOLS) == 52, len(tools.TOOLS)
 print("notion tests passed")

@@ -28,11 +28,14 @@ Tools so far:
   drive_search, read_drive_file   its own Google Drive (see google.py)
   create_doc, append_to_doc       Google Docs, in that Drive
   read_sheet, create_sheet, add_rows, update_cells   Google Sheets
-  list_tasks, add_task, update_task                  Google Tasks
-  search_contacts, add_contact                       Google Contacts
+  list_tasks, add_task, update_task, delete_task,
+  create_task_list, delete_task_list                 Google Tasks
+  search_contacts, add_contact, update_contact,
+  delete_contact                                     Google Contacts
   add_event, update_event                            its own Google Calendar, no guests
   search_notion, read_notion, create_notion_page,
-  append_to_notion, update_notion                    Notion (see notion.py)
+  append_to_notion, update_notion, rewrite_notion,
+  move_notion, create_notion_database, delete_notion Notion (see notion.py)
   start_build, check_build, read_build_file          get a website built by Codex,
                                                      in a locked box (see workshop.py)
   push_site, list_repos, request_make_public         keep sites on GitHub, private
@@ -52,6 +55,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 from perro import alarms, github, google, inbox, mail, n8n, notion, vercel, web, workshop
@@ -309,6 +313,37 @@ def _relay_tool(function):
     return tool
 
 
+# Deleting in its own Notion, Tasks and Contacts is Perro's business (the
+# owner's call, 2026-10-18), with one brake: DELETE_LIMIT a day, so a planted
+# instruction in a page or an email, or a confused loop, can't empty the place
+# in one go. Each delete is logged as a "deleted" event, which is also how
+# they're counted. Rewriting a Notion page counts too, since it throws text out.
+DELETE_LIMIT = 25
+
+
+def deleted_today(memory: Memory) -> int:
+    """Deletes since midnight, local time."""
+    midnight = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
+    since = midnight.astimezone(timezone.utc).isoformat(timespec="seconds")
+    return memory.db.execute("SELECT COUNT(*) FROM events WHERE kind = 'deleted' AND time >= ?",
+                             (since,)).fetchone()[0]
+
+
+def _deleting_tool(function):
+    """A relay tool that throws something out: held to DELETE_LIMIT a day, and logged."""
+    def tool(memory: Memory, **args) -> str:
+        if deleted_today(memory) >= DELETE_LIMIT:
+            raise ToolError(f"You've deleted {DELETE_LIMIT} things today, the daily limit. It resets at "
+                            "midnight; if more really has to go today, ask your owner to do it.")
+        try:
+            result = function(**args)
+        except n8n.N8nError as e:
+            raise ToolError(str(e)) from None
+        memory.record("deleted", result)
+        return result
+    return tool
+
+
 def _workshop_tool(function):
     """The build tools (workshop.py), wrapped so a refusal reads as one."""
     def tool(memory: Memory, **args) -> str:
@@ -507,6 +542,21 @@ TOOLS = {
         'list if it isn\'t in your first one. Args: {"id": "<task id>", "done": true, '
         '"title": "...", "notes": "...", "due": "YYYY-MM-DD", "list": "<list name>"} (all but id optional)',
     ),
+    "delete_task": (
+        _deleting_tool(google.delete_task),
+        'Delete a Google Task by its id from list_tasks (a finished one is usually better '
+        f'ticked off). One of your {DELETE_LIMIT} deletes a day. '
+        'Args: {"id": "<task id>", "list": "<list name>"} (list optional)',
+    ),
+    "create_task_list": (
+        _relay_tool(google.create_task_list),
+        'Make a new Google Tasks list. Args: {"title": "<name>"}',
+    ),
+    "delete_task_list": (
+        _deleting_tool(google.delete_task_list),
+        f'Delete a Google Tasks list and every task in it. One of your {DELETE_LIMIT} deletes a day. '
+        'Args: {"list": "<list name or id>"}',
+    ),
     "add_event": (
         _relay_tool(google.add_event),
         'Add an event to your own Google Calendar, which your owner sees on their phone. '
@@ -529,7 +579,7 @@ TOOLS = {
     "search_contacts": (
         _relay_tool(google.search_contacts),
         'Search your own Google Contacts (your account\'s address book) by any part of a '
-        'name, email, phone number, workplace or note; no query lists them. '
+        'name, email, phone number, workplace or note; no query lists them. Shows ids. '
         'Args: {"query": "<text>"} (optional)',
     ),
     "add_contact": (
@@ -538,8 +588,19 @@ TOOLS = {
         'told. Args: {"name": "<name>", "email": "<address>", "phone": "<number>", '
         '"notes": "<who they are>"} (all but name optional)',
     ),
-    # Notion: your own workspace, read and write, but nothing deleted or
-    # archived (see notion.py).
+    "update_contact": (
+        _relay_tool(google.update_contact),
+        'Change a contact by its id from search_contacts. An email or phone replaces the ones it '
+        'has; "" removes them. Nobody is told. Args: {"id": "<contact id>", "name": "...", '
+        '"email": "...", "phone": "...", "notes": "..."} (all but id optional)',
+    ),
+    "delete_contact": (
+        _deleting_tool(google.delete_contact),
+        'Delete a contact by its id from search_contacts; Google keeps it in its trash for 30 '
+        f'days. One of your {DELETE_LIMIT} deletes a day. Args: {{"id": "<contact id>"}}',
+    ),
+    # Notion: Perro's own workspace, to organize as it likes. Deleting only
+    # trashes, and counts toward the daily deletes (see notion.py).
     "search_notion": (
         _relay_tool(notion.search_notion),
         'Search your Notion workspace by title; no query lists the most recently edited. '
@@ -570,6 +631,29 @@ TOOLS = {
         _relay_tool(notion.update_notion),
         'Change a Notion page\'s title, or a database row\'s fields by name ("" empties one). '
         'Args: {"id": "<page id>", "title": "<title>", "fields": {"Status": "Done"}} (title or fields)',
+    ),
+    "rewrite_notion": (
+        _deleting_tool(notion.rewrite_notion),
+        'Replace the whole text of a Notion page or row with new text, in the create_notion_page '
+        'form: to fix, trim or reorganize it (read it first). Pages and databases inside it stay. '
+        f'One of your {DELETE_LIMIT} deletes a day. Args: {{"id": "<page id>", "text": "<the new text>"}}',
+    ),
+    "move_notion": (
+        _relay_tool(notion.move_notion),
+        'Move a Notion page or row, with what\'s inside it, under another page. '
+        'Args: {"id": "<page id>", "parent": "<page id>"}',
+    ),
+    "create_notion_database": (
+        _relay_tool(notion.create_notion_database),
+        'Create a Notion database on a page. It gets a "Name" title field; add others by name and '
+        'type: text, number, select, multi_select, date, checkbox, url, email or phone ("select: '
+        'Low, High" lists options). Add rows with create_notion_page. Args: {"parent": "<page id>", '
+        '"title": "<title>", "fields": {"Due": "date", "Status": "select: To do, Doing, Done"}} (fields optional)',
+    ),
+    "delete_notion": (
+        _deleting_tool(notion.delete_notion),
+        'Move a Notion page, row or database, with everything in it, to Notion\'s trash, where it '
+        f'can be restored for 30 days. One of your {DELETE_LIMIT} deletes a day. Args: {{"id": "<id>"}}',
     ),
     # The workshop: Codex builds static sites in a locked container on the
     # owner's PC. Nothing is published (see workshop.py).

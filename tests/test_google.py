@@ -219,6 +219,7 @@ PEOPLE = {"connections": [
 out = run("search_contacts", {}, (200, PEOPLE))
 print(out, "\n")
 assert "Your 3 contact(s)" in out and "- Ann Lee | ann@x.test | (502) 555-0142 | Vet Paws Clinic\n    Rex's vet" in out
+assert "id " not in out  # no resourceName in the fake, so no id
 assert "- (no name) | nameless@z.test" in out and SEEN[0]["query"]["personFields"] == google.PERSON_FIELDS
 assert "1 contact(s) matching 'paws vet'" in run("search_contacts", {"query": "paws vet"}, (200, PEOPLE))
 assert "Ann Lee" in run("search_contacts", {"query": "502-555-0142"}, (200, PEOPLE))
@@ -234,7 +235,47 @@ run("add_contact", {"name": "Dee"}, (200, {}))
 assert SEEN[0]["body"] == {"names": [{"unstructuredName": "Dee"}]}
 for bad in ({"name": ""}, {"name": "X", "email": "not an email"}, {"name": "X", "phone": "1" * 41}):
     assert "Bad args" in run("add_contact", bad, (200, {})) and not SEEN, bad
+# ids show, so a contact can be changed or deleted by its id
+PEOPLE["connections"][1]["resourceName"] = "people/c2222222"
+assert "- Bob | bob@y.test | id c2222222" in run("search_contacts", {"query": "bob"}, (200, PEOPLE))
+assert run("add_contact", {"name": "Eve"}, (200, {"resourceName": "people/c9999999"})) == \
+    "Added Eve to your contacts (id c9999999)."
+BOB = {"resourceName": "people/c2222222", "etag": "%E1", "names": [{"displayName": "Bob"}]}
+out = run("update_contact", {"id": "c2222222", "email": "bob@new.test", "phone": ""}, routes([
+    ("GET", (200, BOB)), (":updateContact", (200, {**BOB, "emailAddresses": [{"value": "bob@new.test"}]}))]))
+assert out == "Updated: Bob | bob@new.test | id c2222222", out
+assert SEEN[1]["method"] == "PATCH" and SEEN[1]["url"].endswith("/v1/people/c2222222:updateContact")
+assert SEEN[1]["query"]["updatePersonFields"] == "emailAddresses,phoneNumbers", SEEN[1]
+assert SEEN[1]["body"] == {"emailAddresses": [{"value": "bob@new.test"}], "phoneNumbers": [], "etag": "%E1"}, SEEN[1]
+assert "Say what to change" in run("update_contact", {"id": "c2222222"}, (200, {})) and not SEEN
+assert "Bad args" in run("update_contact", {"id": "c2222222", "email": "nope"}, (200, {})) and not SEEN
+assert "Bad args" in run("update_contact", {"id": "people/c2"}, (200, {})) and not SEEN
+out = run("delete_contact", {"id": "c2222222"}, routes([("GET", (200, BOB)), ("DELETE", (200, ""))]))
+assert out.startswith("Deleted Bob (id c2222222) from your contacts."), out
+assert SEEN[1]["method"] == "DELETE" and SEEN[1]["url"].endswith("/v1/people/c2222222:deleteContact"), SEEN
+assert memory.recent(1)[0].kind == "deleted" and "Deleted Bob" in memory.recent(1)[0].content
 print("contacts tests passed")
 
-assert len(tools.TOOLS) == 43, len(tools.TOOLS)
+# tasks: delete one, make and delete lists
+TASK = {"id": "taskparent", "title": "Mail the form"}
+out = run("delete_task", {"id": "taskparent"}, routes([("GET", (200, TASK)), ("DELETE", (204, ""))]))
+assert out == 'Deleted the task "Mail the form" (id taskparent).', out
+assert SEEN[1]["method"] == "DELETE" and SEEN[1]["url"].endswith("/lists/@default/tasks/taskparent"), SEEN
+out = run("create_task_list", {"title": "Reading"}, (200, {"id": "listCCCCC"}))
+assert out == 'Made the task list "Reading" (id listCCCCC).' and SEEN[0]["body"] == {"title": "Reading"}, out
+out = run("delete_task_list", {"list": "errands"}, routes([("GET", (200, LISTS)), ("DELETE", (204, ""))]))
+assert SEEN[-1]["method"] == "DELETE" and SEEN[-1]["url"].endswith("/users/@me/lists/listBBBBB"), SEEN
+assert "Bad args" in run("delete_task_list", {"list": " "}, (200, {})) and not SEEN
+
+# the daily cap on deletes: at the limit, nothing more goes out
+assert tools.deleted_today(memory) == 3
+for _ in range(tools.DELETE_LIMIT - 3):
+    memory.record("deleted", "filler")
+out = run("delete_task", {"id": "taskparent"}, (200, TASK))
+assert "daily limit" in out and not SEEN, out
+assert "daily limit" in run("delete_contact", {"id": "c2222222"}, (200, BOB)) and not SEEN
+assert run("add_task", {"title": "Still fine"}, (200, {"id": "tasknew03"})).startswith("Added")
+print("delete tests passed")
+
+assert len(tools.TOOLS) == 52, len(tools.TOOLS)
 print(f"tool descriptions: {len(tools.describe())} chars")

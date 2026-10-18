@@ -18,7 +18,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 RELAYS = {"relay_vercel_check.js": "perro-vercel.json", "relay_google_cal_check.js": "perro-google.json",
-          "relay_email_check.js": "perro-email-send.json"}
+          "relay_email_check.js": "perro-email-send.json", "relay_notion_check.js": "perro-notion.json"}
 
 
 def main() -> int:

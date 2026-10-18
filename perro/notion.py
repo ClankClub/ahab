@@ -3,17 +3,19 @@
 Requests go through one n8n workflow, "Perro: Notion relay"
 (n8n/workflows/perro-notion.json). It holds the Notion sign-in and passes a
 request on only if it's for the parts of Notion's API used here (search,
-pages, blocks, databases), and never a delete, an archive or a trash. This
+pages, blocks, databases), and deletes only Notion's recoverable way. This
 module is the other half: it builds the requests and turns Notion's answers
 into short text.
 
 What Perro may do here, on purpose:
 - Read what its Notion connection can see: the pages and databases in its
   workspace that the connection was given.
-- Create pages (in a database, as a new row, or under another page), add
-  text to the end of a page, and change a page's title or a row's fields.
-- Not delete, archive or trash anything, and not comment. Notion has no
-  sharing through this API, so nothing here reaches another person.
+- Create pages (in a database, as a new row, or under another page) and
+  databases, add text to the end of a page or rewrite it, change a page's
+  title or a row's fields, and move pages.
+- Delete only by trashing (Notion keeps it 30 days) or removing blocks, held
+  to tools.DELETE_LIMIT a day. No comments; Notion has no sharing through
+  this API, so nothing here reaches another person.
 
 Pages here are plain text both ways. Reading flattens Notion's blocks into
 lines ("# " headings, "- " bullets, "[ ] " to-dos); writing turns those same
@@ -440,3 +442,111 @@ def update_notion(id: str, title=None, fields=None) -> str:
     page = _notion(f"pages/{id}", "PATCH", body={"properties": properties})
     fields_now = _fields(page)
     return f'Updated "{_title(page)}" (id {page.get("id")})' + (f": {fields_now}" if fields_now else ".")
+
+
+# --- making databases, moving, rewriting, deleting ---------------------------
+# Perro's own workspace, so these are its business (the owner's call,
+# 2026-10-18). Deleting only ever trashes: Notion keeps it for 30 days, and
+# tools.py holds Perro to a daily number of deletes.
+
+FIELD_TYPES = {"text": "rich_text", "number": "number", "select": "select", "multi_select": "multi_select",
+               "date": "date", "checkbox": "checkbox", "url": "url", "email": "email", "phone": "phone_number"}
+MAX_FIELDS = 30
+
+
+def _what(id: str) -> tuple[str, str]:
+    """What this id is ("page", "row" or "database"), and its title."""
+    status, page = _call(f"pages/{id}")
+    if 200 <= status < 300:
+        return ("row" if (page.get("parent") or {}).get("type") == "database_id" else "page"), _title(page)
+    if status not in (400, 404):
+        raise n8n.N8nError(f"Notion said no (HTTP {status}): {_why(page)}")
+    db = _database(id)
+    if db:
+        return "database", _title(db)
+    raise ValueError("Nothing with that id is shared with you: no page, row or database.")
+
+
+def create_notion_database(parent: str, title: str, fields=None) -> str:
+    parent = _id(parent, "parent")
+    title = _text(title, "title", 2000).strip()
+    if not title:
+        raise ValueError("title is empty.")
+    fields = {} if fields is None else fields
+    if not isinstance(fields, dict) or len(fields) > MAX_FIELDS:
+        raise ValueError(f'fields must be an object of up to {MAX_FIELDS} names and types, '
+                         'like {"Due": "date", "Status": "select: To do, Doing, Done"}.')
+    properties, shown = {"Name": {"title": {}}}, ["Name (the title)"]
+    for name, spec in fields.items():
+        name = _text(str(name), "a field name", 100).strip()
+        kind, _, options = str(spec).partition(":")
+        kind = kind.strip().lower().replace(" ", "_").replace("-", "_")
+        if not name or name.lower() == "name":
+            raise ValueError('Every database gets a "Name" title field already; name the others something else.')
+        if kind not in FIELD_TYPES:
+            raise ValueError(f"{name!r} has the type {spec!r}. Types: {', '.join(FIELD_TYPES)} "
+                             '(select and multi_select can list options: "select: Low, High").')
+        notion_kind = FIELD_TYPES[kind]
+        config = {"format": "number"} if notion_kind == "number" else {}
+        if notion_kind in ("select", "multi_select"):
+            config = {"options": [{"name": o.strip()[:100]} for o in options.split(",") if o.strip()]}
+        properties[name] = {notion_kind: config}
+        shown.append(f"{name} ({kind})")
+    if _database(parent):
+        raise ValueError("A database goes on a page, not inside another database.")
+    db = _notion("databases", "POST", body={"parent": {"type": "page_id", "page_id": parent},
+                                            "title": _rich(title), "properties": properties})
+    return (f'Created the database "{title}" (id {db.get("id")}) on that page, with the fields '
+            f'{", ".join(shown)}. Add rows with create_notion_page.\nLink: {db.get("url")}')
+
+
+def move_notion(id: str, parent: str) -> str:
+    id, parent = _id(id), _id(parent, "parent")
+    if id == parent:
+        raise ValueError("A page can't go inside itself.")
+    kind, title = _what(id)
+    if kind == "database":
+        raise ValueError("Notion's API can't move a database; move the page it's on instead.")
+    if _database(parent):
+        # Notion's API (the version the relay speaks) moves pages only under pages.
+        raise ValueError("Pages move only under other pages. To put one into a database, create a row "
+                         "there with its text (create_notion_page), then delete the old page.")
+    _notion(f"pages/{id}/move", "POST", body={"parent": {"type": "page_id", "page_id": parent}})
+    return f'Moved the {kind} "{title}" under that page.'
+
+
+def _children(id: str) -> list:
+    found, cursor = [], None
+    while True:
+        query = {"page_size": 100, **({"start_cursor": cursor} if cursor else {})}
+        answer = _notion(f"blocks/{id}/children", query=query)
+        found += answer.get("results") or []
+        cursor = answer.get("next_cursor")
+        if not answer.get("has_more") or not cursor or len(found) > BLOCK_LIMIT:
+            return found
+
+
+def rewrite_notion(id: str, text: str) -> str:
+    id, text = _id(id), _text(text, "text")
+    blocks = _to_blocks(text)
+    kind, title = _what(id)
+    if kind == "database":
+        raise ValueError("That's a database; rewrite one of its rows instead.")
+    old = [b for b in _children(id) if b.get("type") not in ("child_page", "child_database")]
+    if len(old) > BLOCK_LIMIT:
+        raise ValueError(f"That page has more than {BLOCK_LIMIT} blocks, too many to rewrite in one go.")
+    # The new text goes in first, so a failure halfway loses nothing.
+    _append(id, blocks)
+    for b in old:
+        _notion(f"blocks/{b['id']}", "DELETE")
+    return (f'Rewrote the {kind} "{title}": {len(old)} old block(s) out, {len(blocks)} new. '
+            "Pages and databases inside it stayed, above the new text.")
+
+
+def delete_notion(id: str) -> str:
+    id = _id(id)
+    kind, title = _what(id)
+    _notion(f"{'databases' if kind == 'database' else 'pages'}/{id}", "PATCH", body={"in_trash": True})
+    inside = ", rows and all" if kind == "database" else ", with whatever was inside it"
+    return (f'Moved the {kind} "{title}" (id {id}) to Notion\'s trash{inside}. It can be '
+            "restored from there for 30 days.")

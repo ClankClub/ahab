@@ -3,7 +3,8 @@
 All six go through one n8n workflow, "Perro: Google relay"
 (n8n/workflows/perro-google.json). It holds the six sign-ins and passes each
 request on to Google after a check of its own: only that service's Google
-address, and no deleting, sharing or trashing. This module is the other
+address, no sharing or trashing, and deleting only tasks, task lists and
+contacts. This module is the other
 half. It builds the requests, so the relay never needs to know what a task
 or a spreadsheet is, and it turns Google's answers into short text.
 
@@ -11,10 +12,12 @@ What Perro may do here, on purpose:
 - Read anything its account can see, including files the owner shares with it.
 - Create docs, sheets, tasks and contacts, and add to or edit them. None of
   that reaches another person.
+- Delete its own tasks, task lists and contacts (the owner's call,
+  2026-10-18: they're Perro's to keep tidy). tools.py caps deletes a day.
 - Add events to its own calendar and change them, with no guests: an
   invitation emails whoever is on it, so it waits for the approval step.
   The owner sees the calendar by adding Perro's account on their phone.
-- Not delete, trash or share anything. Sharing is how a file reaches someone
+- Not delete, trash or share anything else. Sharing is how a file reaches someone
   else, so it waits for the approval step AGENTS.md describes. For the owner
   to see what Perro makes, they share a Drive folder with Perro's account
   and Perro creates files in it.
@@ -424,8 +427,32 @@ def update_task(id: str, list: str = "", done=None, title=None, notes=None, due=
     return "Updated: " + "\n".join(_task_line(t)).lstrip("- ")
 
 
+def delete_task(id: str, list: str = "") -> str:
+    id, list_id = _id(id, "id"), _list_id(list)
+    title = _google("tasks", f"lists/{list_id}/tasks/{id}").get("title") or "(no title)"
+    _google("tasks", f"lists/{list_id}/tasks/{id}", "DELETE")
+    return f'Deleted the task "{title}" (id {id}).'
+
+
+def create_task_list(title: str) -> str:
+    title = _text(title, "title", 1000).strip()
+    if not title:
+        raise ValueError("title is empty.")
+    l = _google("tasks", "users/@me/lists", "POST", body={"title": title})
+    return f'Made the task list "{title}" (id {l.get("id")}).'
+
+
+def delete_task_list(list: str) -> str:
+    if not str(list).strip():
+        raise ValueError("Name the list to delete.")
+    list_id = _list_id(list)
+    _google("tasks", f"users/@me/lists/{list_id}", "DELETE")
+    return f"Deleted the task list {list!r}, and the tasks in it."
+
+
 # --- Contacts ------------------------------------------------------------
-# Perro's own address book. Nobody hears about being added to it.
+# Perro's own address book. Nobody hears about being added, changed or
+# deleted; Google keeps deleted contacts in its trash for 30 days.
 
 CONTACTS_SHOWN = 25
 PERSON_FIELDS = "names,emailAddresses,phoneNumbers,organizations,biographies"
@@ -440,7 +467,8 @@ def _person(p: dict) -> tuple[str, str]:
     parts = [name] + ([", ".join(emails)] if emails else []) + ([", ".join(phones)] if phones else []) \
         + [o for o in orgs if o]
     notes = _short(next((b.get("value") for b in p.get("biographies") or []), ""))
-    line = "- " + " | ".join(parts) + (f"\n    {notes}" if notes else "")
+    rid = str(p.get("resourceName") or "").removeprefix("people/")
+    line = "- " + " | ".join(parts + ([f"id {rid}"] if rid else [])) + (f"\n    {notes}" if notes else "")
     return line, " ".join(parts + [notes]).lower()
 
 
@@ -480,8 +508,45 @@ def add_contact(name: str, email: str = "", phone: str = "", notes: str = "") ->
         body["phoneNumbers"] = [{"value": phone}]
     if _text(notes, "notes", 2000).strip():
         body["biographies"] = [{"value": notes.strip(), "contentType": "TEXT_PLAIN"}]
-    _google("contacts", "people:createContact", "POST", query={"personFields": "names"}, body=body)
-    return f"Added {name} to your contacts."
+    p = _google("contacts", "people:createContact", "POST", query={"personFields": "names"}, body=body) or {}
+    rid = str(p.get("resourceName") or "").removeprefix("people/")
+    return f"Added {name} to your contacts" + (f" (id {rid})." if rid else ".")
+
+
+def update_contact(id: str, name=None, email=None, phone=None, notes=None) -> str:
+    id, body, changed = _id(id, "id"), {}, []
+    if name is not None:
+        name = _text(name, "name", 200).strip()
+        if not name:
+            raise ValueError("name can't be empty.")
+        body["names"], changed = [{"unstructuredName": name}], changed + ["names"]
+    if email is not None:
+        email = _text(email, "email", 200).strip()
+        if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            raise ValueError(f"{email!r} doesn't look like an email address.")
+        body["emailAddresses"], changed = ([{"value": email}] if email else []), changed + ["emailAddresses"]
+    if phone is not None:
+        phone = _text(phone, "phone", 40).strip()
+        body["phoneNumbers"], changed = ([{"value": phone}] if phone else []), changed + ["phoneNumbers"]
+    if notes is not None:
+        notes = _text(notes, "notes", 2000).strip()
+        body["biographies"] = [{"value": notes, "contentType": "TEXT_PLAIN"}] if notes else []
+        changed.append("biographies")
+    if not changed:
+        raise ValueError("Say what to change: name, email, phone or notes.")
+    # Google wants the contact's current etag, so two edits can't cross.
+    body["etag"] = _google("contacts", f"people/{id}", query={"personFields": "names"}).get("etag")
+    p = _google("contacts", f"people/{id}:updateContact", "PATCH",
+                query={"updatePersonFields": ",".join(changed), "personFields": PERSON_FIELDS}, body=body)
+    return "Updated: " + _person(p)[0].removeprefix("- ")
+
+
+def delete_contact(id: str) -> str:
+    id = _id(id, "id")
+    p = _google("contacts", f"people/{id}", query={"personFields": "names"})
+    name = next((n.get("displayName") for n in p.get("names") or []), None) or "(no name)"
+    _google("contacts", f"people/{id}:deleteContact", "DELETE")
+    return f"Deleted {name} (id {id}) from your contacts. Google keeps it in its trash for 30 days."
 
 
 # --- Calendar ------------------------------------------------------------

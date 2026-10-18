@@ -19,9 +19,9 @@ Your PC: Perro runtime (Python)
   ├─ tools          → about_yourself (its guide, docs/ABOUT_YOURSELF.md), recall, list/read/write files, set/cancel alarms, message you, read web pages, Google, Notion, start/check builds, GitHub, Vercel
   ├─ web            → read-only: any public page as text, plus Wikipedia search
   ├─ n8n, google    → its own Google account through your local n8n: Gmail (read; send to a list you keep),
-  │                   its calendar, Drive, Docs, Sheets, Tasks, Contacts (read and write; no deleting,
-  │                   sharing or calendar guests)
-  ├─ notion         → its own Notion workspace through the same n8n (read and write; no deleting)
+  │                   its calendar, Drive, Docs, Sheets, Tasks, Contacts (read and write; deletes only
+  │                   its own tasks and contacts, 25 deletes a day; no sharing or calendar guests)
+  ├─ notion         → its own Notion workspace through the same n8n (its to organize; deleting goes to Notion's trash)
   ├─ alarms         → reminders and follow-ups; the heartbeat wakes it for them
   ├─ workshop       → Codex builds static sites in a locked Docker box (workshop/); nothing is published
   ├─ github         → keeps those sites in private repos on its own GitHub, through n8n; public only by approval
