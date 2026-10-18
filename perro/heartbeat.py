@@ -107,17 +107,24 @@ Each wake-up you can:
    cut to its first {TRIMMED_KEEP} characters. So when a result matters, put
    what you need from it in your next "thought" before moving on. Available tools:
 {tools.describe()}
-3. Rewrite your notes, in the "notes" field of your final reply (they're not
+3. Message your owner, in the "message" field of your final reply. That's
+   the usual way to answer them: it's sent as you finish, with no extra
+   step. Use the message_owner tool only to say something before you carry
+   on working (like "on it, this will take a few wake-ups").
+4. Rewrite your notes, in the "notes" field of your final reply (they're not
    a workspace file). They're shown to you every wake-up and are capped at
-   {NOTES_CHAR_LIMIT} characters.
+   {NOTES_CHAR_LIMIT} characters. Leave them unchanged (null) unless
+   something in them changed: a task started, moved on or finished, or
+   something you'll need next time. A chat that changes nothing doesn't
+   need a rewrite, and every rewrite costs your owner money.
    Text files in skills/ in your workspace are listed every wake-up under
    "Your skills" by their first line; read_file shows one in full.
-4. Choose when to wake next, between {MIN_WAKE_MINUTES} and {MAX_WAKE_MINUTES} minutes from now.
+5. Choose when to wake next, between {MIN_WAKE_MINUTES} and {MAX_WAKE_MINUTES} minutes from now.
 
 How to work:
 - When your owner asks for something, do it. If it takes more than one
   wake-up, keep it in your notes and wake again soon to continue. When it's
-  done, tell them with message_owner. Put long results in a workspace file
+  done, tell them. Put long results in a workspace file
   and give its path (your owner finds it under home/workspace/).
 - Use your judgment. If you notice something they'd want handled, like a
   deadline, a follow-up, or a better way to do something, go ahead with
@@ -127,8 +134,9 @@ How to work:
   Ask when a wrong guess would waste the work.
 - Say plainly when you can't do something, and never claim you did
   something you didn't. A message reached your owner only when
-  message_owner returned "Sent"; a refused or failed tool call didn't
-  happen. Leave a tool call for the reply when you're running low.
+  message_owner returned "Sent", or when it went in your final reply's
+  "message" field and your log shows no error about it afterwards; a
+  refused or failed tool call didn't happen. Leave a tool call for the reply when you're running low.
 - When accuracy matters, keep what you checked apart from what you remember.
 - A message from your owner wakes you within seconds, whatever wake-up
   time you chose, so you never need to wake early just to check for one.
@@ -148,8 +156,10 @@ You'll get the result, then reply again.
 
 To finish this wake-up:
 {{"thought": "<what you're thinking>",
+  "message": "<what to send your owner now, or null to send nothing>",
   "notes": "<the full new text of your notes, or null to leave them unchanged>",
-  "next_wake_minutes": <integer>}}"""
+  "next_wake_minutes": <integer>}}
+A "message" only goes out from this final reply; in a tool request it isn't sent."""
 
 
 def system_prompt(name: str | None) -> str:
@@ -294,6 +304,10 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
             else:
                 result = tools.run(memory, name, args)
                 tool_calls += 1
+            if decision.get("message"):
+                # Written before the tool ran, so it may be out of date by now.
+                result += ("\n(The \"message\" in that reply was NOT sent: messages go out only "
+                           "from your final reply, or with the message_owner tool.)")
             first_line = result.splitlines()[0] if result else ""
             # The header (all Perro's page shows) gets a short version of the
             # args; write_file content can be huge. The full args and result
@@ -325,7 +339,22 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
         memory.record("error", f"Beat failed: {type(e).__name__}: {e}.{detail}")
         return RETRY_MINUTES
 
-    if isinstance(notes, str):
+    message = decision.get("message")
+    if message is not None and message != "":
+        # Sent the same way as message_owner, so the log reads the same.
+        # It doesn't count as a tool call: it's part of finishing.
+        args_json = json.dumps({"text": str(message)}, ensure_ascii=False)
+        result = tools.run(memory, "message_owner", {"text": str(message)})
+        memory.record("tool", f"message_owner (final reply) -> {result.splitlines()[0]}\n"
+                              f"args: {args_json}\n{result}")
+        if not result.startswith("Sent"):
+            # The owner is waiting on an answer that didn't go out: wake soon
+            # and say so, instead of sleeping on it for hours.
+            memory.record("error", f"Your final message was NOT sent ({result}). "
+                                   "Send it again, shorter if it was too long.")
+            minutes = min(minutes, RETRY_MINUTES)
+
+    if isinstance(notes, str) and notes != memory.read_notes():
         try:
             memory.write_notes(notes)
         except ValueError as e:

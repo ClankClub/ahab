@@ -9,7 +9,8 @@ wake, when it's delivered as a `message` event, right in the recent log
 Perro reads. A message sent with --now is a knock instead: the sleeping
 heartbeat notices within a few seconds and wakes Perro early.
 
-Perro answers and reports results with the message_owner tool. Both directions
+Perro answers in the "message" field of its final reply, or mid-work with the
+message_owner tool; both end up in perro_sends. Both directions
 are also logged as `message` events, so Perro can recall its conversations.
 Every wake-up page shows the latest messages under "Recent conversation"
 (describe_recent), so the thread survives busy wake-ups full of tool calls;

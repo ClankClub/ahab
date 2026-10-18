@@ -127,6 +127,9 @@ class Memory:
         log = "\n".join(
             f"[{e.time}] {e.kind}: "
             + (e.content.splitlines()[0] if e.kind in HEADER_ONLY_KINDS else e.content)
+            # A message's header alone ("From the owner (sent ...):") looked
+            # like an empty message, and Perro once reported it as a bug.
+            + (" (text under Recent conversation)" if e.kind == "message" else "")
             for e in events
         )
         return f"## Your notes\n{notes}\n\n## Recent events\n{log or '(nothing yet)'}"
