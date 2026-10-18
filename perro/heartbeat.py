@@ -27,7 +27,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from perro import alarms, identity, inbox, n8n, skills, tools
+from perro import alarms, dream, identity, inbox, n8n, skills, tools
 from perro.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from perro.model import ModelClient, ModelError
 
@@ -85,6 +85,12 @@ notes (which you wrote) and a log of recent events. That is your
 continuity. Your notes are for what's in progress: your open tasks, with
 the next step for each, and anything you need for now that isn't about who
 you or your owner are.
+
+Once a day, early in the morning, you also dream: a separate wake-up with no
+messaging or outside tools, where you look back over the past day, tidy your
+notes, move what lasts into your files, and write a short reflection in
+dreams/ in your workspace. A "dream" event in your log means it happened;
+your notes are what it left you.
 
 Your owner is the one you work for. Your conversation with them is shown
 every wake-up under "Recent conversation", where "Owner" marks what they
@@ -509,16 +515,31 @@ def main() -> None:
             show_beat(memory, before)
             if args.once:
                 break
-            wake_at = time.time() + minutes * 60
-            why = ""
-            alarm_at = alarms.next_due(memory)
-            if alarm_at is not None and alarm_at < wake_at:
-                # An alarm comes due before the wake Perro chose: wake for it.
-                wake_at, why = alarm_at, " (for an alarm)"
-            print(f"--- next beat at {datetime.fromtimestamp(wake_at):%H:%M} local{why}. "
-                  "Ctrl+C to stop. ---\n")
-            if sleep_until(wake_at, interrupt=lambda: inbox.knocked(memory)):
-                print("--- knock: the owner sent a message; waking early. ---\n")
+            beat_at = time.time() + minutes * 60
+            # Sleep until the beat Perro chose, waking early for an alarm or
+            # a knock (both mean a beat) or to dream (then back to sleep).
+            while True:
+                wake_at, why = beat_at, ""
+                alarm_at = alarms.next_due(memory)
+                if alarm_at is not None and alarm_at < wake_at:
+                    wake_at, why = alarm_at, " (for an alarm)"
+                dream_at = dream.next_at(args.home)
+                dreaming = dream_at < wake_at
+                if dreaming:
+                    wake_at, why = dream_at, " (to dream)"
+                print(f"--- next wake at {datetime.fromtimestamp(max(wake_at, time.time())):%H:%M}"
+                      f" local{why}. Ctrl+C to stop. ---\n")
+                if sleep_until(wake_at, interrupt=lambda: inbox.knocked(memory)):
+                    print("--- knock: the owner sent a message; waking early. ---\n")
+                    break
+                if not dreaming:
+                    break
+                before = last_id(memory)
+                try:
+                    dream.dream(memory, client, config["name"])
+                except Exception as e:  # a bad dream mustn't stop the heartbeat
+                    memory.record("error", f"Dream crashed: {type(e).__name__}: {e}")
+                show_beat(memory, before)
     except KeyboardInterrupt:
         memory.record("stopped", "Heartbeat stopped by the owner.")
         print("\nStopped.")
