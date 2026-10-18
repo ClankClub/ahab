@@ -8,7 +8,8 @@ The name is the joke: Lobo (`../Lobo`) is the wild wolf with a life of its own, 
 
 ```
 Your PC: Perro runtime (Python)
-  ├─ model client   → DeepSeek API, OpenRouter, or a local llama.cpp/Ollama server (all OpenAI-compatible)
+  ├─ model client   → DeepSeek API, OpenRouter, or a local llama.cpp/Ollama server (all OpenAI-compatible),
+  │                   or Codex / Claude Code run as the model only, through your subscription
   ├─ identity       → workspace/SOUL.md (who it is) + USER.md (what it knows about you) + PROACTIVE_PREFERENCES.md (what you want brought up unasked)
   │                   + AGENTS.md (its own lessons on how to work here); starters in templates/
   ├─ memory         → home/notes.md (open tasks) + home/memory.db (event log, messages)
@@ -50,7 +51,7 @@ py -m perro.model "Say hi in five words."
 
 ### Codex or Claude Code as the model (instead of an API key)
 
-Perro can think through your Codex or Claude Code subscription: backends `codex-luna` (GPT-6 Luna, high effort) and `claude-haiku` (Claude Haiku). Each CLI runs as the model only, with its own tools off, and uses a separate profile folder under `%LOCALAPPDATA%\Perro` (`PERRO_CLI_HOME` to move it), so it never sees your own CLAUDE.md, AGENTS.md, memories or plugins. Log in once per profile, in a terminal you close afterwards:
+Perro can think through your Codex or Claude Code subscription: backends `codex-luna` (GPT-6 Luna, max effort) and `claude-haiku` (Claude Haiku). Each CLI runs as the model only, with its own tools off, and uses a separate profile folder under `%LOCALAPPDATA%\Perro` (`PERRO_CLI_HOME` to move it), so it never sees your own CLAUDE.md, AGENTS.md, memories or plugins. Log in once per profile, in a terminal you close afterwards:
 
 ```powershell
 New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Perro\codex", "$env:LOCALAPPDATA\Perro\claude" | Out-Null
