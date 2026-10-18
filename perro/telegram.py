@@ -7,6 +7,9 @@ next to the heartbeat. It does two things, over and over:
        to read them (the same as `python -m perro.inbox --now "..."`)
   out  Perro's replies (message_owner) -> your Telegram chat
 
+One command is handled here instead of passed on: /talk lifts the brakes
+on Perro's email with other AI agents (see mail.py).
+
 It also carries approvals (see approvals.py): each request Perro files
 arrives as a card with Approve and Deny buttons, your tap is recorded as
 your decision, and the card is rewritten with the outcome once it's settled.
@@ -45,10 +48,12 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-from perro import approvals, inbox
+from perro import approvals, inbox, mail
 from perro.memory import DEFAULT_HOME, Memory
 
 TOKEN_ENV = "PERRO_TELEGRAM_TOKEN"
+# Sent by the owner, these lift the email brakes on agents instead of reaching Perro.
+TALK_COMMANDS = ("/talk",)
 STATE_FILE = "telegram.json"
 API = "https://api.telegram.org/bot{token}/{method}"
 # Long polling: Telegram holds each getUpdates request open up to this many
@@ -142,6 +147,14 @@ def handle_update(update: dict, state: dict, memory: Memory, bot: Bot) -> None:
     text = message.get("text")
     if not text:
         bot.send(state["owner_chat_id"], "I can only read text messages for now.")
+        return
+    if text.strip().lower() in TALK_COMMANDS:
+        # Lifting the email brakes is the owner's call, so it's done here, in
+        # code, rather than by asking Perro (see mail.py).
+        mail.lift(memory)
+        bot.send(state["owner_chat_id"], "Done: Perro can email the agents again, and anything they "
+                                         "sent that was waiting comes through now.")
+        print(f"[{_now()}] The owner lifted the email brakes.")
         return
     try:
         inbox.owner_sends(memory, text, knock=True)

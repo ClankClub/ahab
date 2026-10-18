@@ -5,7 +5,7 @@ Perro never signs in to anything. A self-hosted [n8n](https://n8n.io) on your ow
 | Workflow | Webhook | What it does |
 |---|---|---|
 | `perro-calendar.json` | GET `/webhook/perro/calendar` | Upcoming events on every calendar Perro's account can see, with their ids. |
-| `perro-email-search.json` | GET `/webhook/perro/email/search` | Gmail search: sender, subject, date, snippet. |
+| `perro-email-search.json` | GET `/webhook/perro/email/search` | Gmail search: sender, subject, date, snippet, thread id. The heartbeat also uses it once a minute to watch for mail from Perro's email list. |
 | `perro-email-read.json` | GET `/webhook/perro/email/read` | One full email. |
 | `perro-email-send.json` | POST `/webhook/perro/email/send` | Sends one plain-text email, to one address on a list, with at most one BCC also on the list, 30 a day. The list is SHA-256 hashes of the lowercased addresses, in the "Check the email" node: replace them with your own (`py -c "import hashlib; print(hashlib.sha256(b'you@example.com').hexdigest())"`), and put the same addresses in `home/email.json` (see `perro/mail.py`). The Gmail sign-in needs the send permission, which n8n's default Gmail scopes include. |
 | `perro-google.json` | POST `/webhook/perro/google` | The relay for Drive, Docs, Sheets, Tasks, Contacts and Perro's own calendar. It refuses any address outside the service's API, DELETE, and anything about sharing, permissions, trashing or clearing, so it can't share or delete even if Perro's code had a bug. For the calendar it allows only events on Perro's own calendar, only a title, times, place, notes and reminders (no guests, so no invitations), and every change with `sendUpdates=none`. |

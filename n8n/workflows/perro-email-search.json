@@ -100,7 +100,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { estimate: $('Find messages').first().json.resultSizeEstimate || 0, messages: $input.all().map(i => i.json).filter(m => m.id && m.payload).map(m => ({ id: m.id, labels: m.labelIds || [], snippet: m.snippet, headers: Object.fromEntries((m.payload.headers || []).map(h => [h.name, h.value])) })) } }}",
+        "responseBody": "={{ { estimate: $('Find messages').first().json.resultSizeEstimate || 0, messages: $input.all().map(i => i.json).filter(m => m.id && m.payload).map(m => ({ id: m.id, threadId: m.threadId, labels: m.labelIds || [], snippet: m.snippet, headers: Object.fromEntries((m.payload.headers || []).map(h => [h.name, h.value])) })) } }}",
         "options": {}
       },
       "id": "6c1d4a10-2b3c-4d5e-8f90-000000000005",

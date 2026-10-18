@@ -27,7 +27,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from perro import alarms, approvals, dream, identity, inbox, n8n, skills, tools, workshop
+from perro import alarms, approvals, dream, identity, inbox, mail, n8n, skills, tools, workshop
 from perro.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from perro.model import ModelClient, ModelError
 
@@ -292,8 +292,11 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
     approvals.run_decided(memory)
     # And builds that finished while Perro slept.
     workshop.report_finished(memory)
+    # And email from the people on its list that's done waiting (see mail.py).
+    mail.deliver(memory)
     asking = "\n\n".join(s for s in (approvals.describe_pending(memory),
-                                    workshop.describe_running(memory)) if s)
+                                    workshop.describe_running(memory),
+                                    mail.describe_waiting(memory)) if s)
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Current time: {now} (your owner's local time: "
@@ -596,8 +599,9 @@ def main() -> None:
                 print(f"--- next wake at {datetime.fromtimestamp(max(wake_at, time.time())):%H:%M}"
                       f" local{why}. Ctrl+C to stop. ---\n")
                 if sleep_until(wake_at, interrupt=lambda: inbox.knocked(memory)
-                               or approvals.waiting(memory) or workshop.waiting(memory)):
-                    print("--- knock: a message, an approval or a finished build;"
+                               or approvals.waiting(memory) or workshop.waiting(memory)
+                               or mail.waiting(memory)):
+                    print("--- knock: a message, an approval, a finished build or an email;"
                           " waking early. ---\n")
                     break
                 if not dreaming:
