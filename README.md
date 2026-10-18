@@ -113,6 +113,7 @@ The pairing lives in `home/telegram.json`. Delete that file and pair again to sw
 - `py -m perro.web <url>` — fetch a page exactly as Perro would see it (`--search <words>` for its Wikipedia search).
 - `py -m perro.dream` — have Perro dream now instead of at 7:00 (only while the heartbeat is stopped). Dreams are written to `home/workspace/dreams/`.
 - `py -m perro.days` — regenerate `home/days/` from the log.
+- `py tests/run.py` — run the tests (all offline: fake relays, fake APIs, throwaway homes; `py tests/run.py test_vercel` runs one). GitHub runs them on every push, on Linux and macOS.
 - `.\scripts\install-task.ps1` — run Perro unattended: registers two Windows scheduled tasks, "Perro heartbeat" and "Perro telegram" (the latter only if `PERRO_TELEGRAM_TOKEN` is set), that start hidden at login and restart if they crash. Output goes to `home/heartbeat.log` and `home/telegram.log`. `-Remove` uninstalls both. Stop one with `Stop-ScheduledTask "Perro telegram"`. After changing code, `py -m perro.heartbeat --restart` reloads the heartbeat; for the bridge, `Stop-ScheduledTask` then `Start-ScheduledTask`.
 - `py -m perro.heartbeat --restart` — restart the unattended heartbeat, for example to load new code.
 - `.\scripts\install-backup-task.ps1` — registers "Perro backup", which commits and pushes `home/` to its private repo every 6 hours, only while Perro is asleep (`-EveryHours N` to change, `-Remove` to uninstall). `py -m perro.backup` does one backup by hand. `home/` must be its own Git repo with a remote.

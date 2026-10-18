@@ -1,0 +1,19 @@
+import sys, tempfile
+from pathlib import Path
+ROOT = str(Path(__file__).resolve().parent.parent)
+from pathlib import Path
+sys.path.insert(0, ROOT)
+from perro import identity, heartbeat
+from perro.memory import Memory
+m = Memory(Path(tempfile.mkdtemp())); identity.seed(m, "Perro")
+ws = identity.workspace_root(m)
+(ws / "AGENTS.md").write_text("a" * 9000, encoding="utf-8")
+(ws / "SOUL.md").write_text("s" * 9000, encoding="utf-8")
+page = identity.describe(m)
+assert "a" * 9000 in page and "[cut: AGENTS.md" not in page
+assert "[cut: SOUL.md is 9000 characters, over the 4000 limit" in page
+(ws / "AGENTS.md").write_text("a" * 10_001, encoding="utf-8")
+assert "[cut: AGENTS.md is 10001 characters, over the 10000 limit" in identity.describe(m)
+sysp = heartbeat.system_prompt("Perro")
+assert "Keep each file under 4000 characters (AGENTS.md under 10000)." in sysp, sysp[:200]
+print("caps ok")
