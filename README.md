@@ -15,7 +15,7 @@ Your PC: Perro runtime (Python)
   ├─ heartbeat      → wake, show memory, model decides, save, sleep until it chose
   ├─ inbox          → messages between you and Perro; where its instructions come from
   ├─ telegram       → bridge from a Telegram bot to the inbox, paired to your account only
-  ├─ tools          → about_yourself (its guide, docs/ABOUT_YOURSELF.md), recall, list/read/write files, set/cancel alarms, message you, read web pages, Google, Notion, start/check builds, GitHub
+  ├─ tools          → about_yourself (its guide, docs/ABOUT_YOURSELF.md), recall, list/read/write files, set/cancel alarms, message you, read web pages, Google, Notion, start/check builds, GitHub, Vercel
   ├─ web            → read-only: any public page as text, plus Wikipedia search
   ├─ n8n, google    → its own Google account through your local n8n: calendar and Gmail (read),
   │                   Drive, Docs, Sheets, Tasks, Contacts (read and write; no deleting or sharing)
@@ -23,6 +23,7 @@ Your PC: Perro runtime (Python)
   ├─ alarms         → reminders and follow-ups; the heartbeat wakes it for them
   ├─ workshop       → Codex builds static sites in a locked Docker box (workshop/); nothing is published
   ├─ github         → keeps those sites in private repos on its own GitHub, through n8n; public only by approval
+  ├─ vercel         → puts them online on its own Vercel: previews behind Vercel's sign-in, public only by approval
   ├─ approvals      → outward actions wait for your Approve/Deny tap on Telegram, then run in code
   ├─ skills         → know-how files it keeps in workspace/skills/
   ├─ dream          → once a day at 7:00, a quiet wake that tidies notes and files and writes workspace/dreams/

@@ -45,6 +45,8 @@ FILE_BYTE_LIMIT = 5 * 1024 * 1024
 TOTAL_BYTE_LIMIT = 20 * 1024 * 1024
 FILE_LIMIT = 500
 MESSAGE_CHAR_LIMIT = 200
+# A 5 MB file is about 6.7 MB as base64 in JSON.
+UPLOAD_BYTE_LIMIT = 8 * 1024 * 1024
 
 
 class GitHubError(Exception):
@@ -55,7 +57,7 @@ def _call(path: str, method: str = "GET", query: dict | None = None, body: dict 
     payload = {"method": method, "url": BASE + path, "query": query or {}}
     if body is not None:
         payload["body"] = body
-    answer = n8n.send(RELAY, payload)
+    answer = n8n.send(RELAY, payload, limit=UPLOAD_BYTE_LIMIT)
     return answer.get("status") or 0, answer.get("body")
 
 

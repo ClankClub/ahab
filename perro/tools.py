@@ -35,6 +35,8 @@ Tools so far:
                                                      in a locked box (see workshop.py)
   push_site, list_repos, request_make_public         keep sites on GitHub, private
                                                      until the owner approves (github.py)
+  preview_site, list_websites, request_publish       put sites online on Vercel: protected
+                                                     previews, public by approval (vercel.py)
 
 The workspace is the first time Perro can touch the disk, so every path it
 gives goes through _resolve() below, which is the whole sandbox. Its job:
@@ -50,7 +52,7 @@ import os
 import re
 from pathlib import Path
 
-from perro import alarms, github, google, inbox, n8n, notion, web, workshop
+from perro import alarms, github, google, inbox, n8n, notion, vercel, web, workshop
 from perro.memory import Memory
 
 # What Perro can and can't do, kept in the code repo so Perro can read it but
@@ -315,12 +317,12 @@ def _workshop_tool(function):
     return tool
 
 
-def _github_tool(function):
-    """The GitHub tools (github.py), wrapped the same way."""
+def _hosting_tool(function):
+    """The GitHub and Vercel tools (github.py, vercel.py), wrapped the same way."""
     def tool(memory: Memory, **args) -> str:
         try:
             return function(memory, **args)
-        except (github.GitHubError, n8n.N8nError) as e:
+        except (github.GitHubError, vercel.VercelError, n8n.N8nError) as e:
             raise ToolError(str(e)) from None
     return tool
 
@@ -552,22 +554,45 @@ TOOLS = {
     # GitHub: your own account, private repositories; going public is an
     # approval (see github.py).
     "push_site": (
-        _github_tool(github.push_site),
+        _hosting_tool(github.push_site),
         "Save a workshop site's source to a private GitHub repository of the same name in "
         f'your account ({github.OWNER}), made on the first push. Each push is one commit of the '
         'whole site; briefs and build output stay out. '
         'Args: {"name": "<site>", "message": "<what changed>"} (message optional)',
     ),
     "list_repos": (
-        _github_tool(github.list_repos),
+        _hosting_tool(github.list_repos),
         'List the repositories in your GitHub account, private or public. No args.',
     ),
     "request_make_public": (
-        _github_tool(github.request_make_public),
+        _hosting_tool(github.request_make_public),
         'Ask your owner to make a repository public, so anyone can see its files and history. '
         'They get a card with Approve and Deny buttons; it happens only if they approve, and '
         'only for the commit it is at now. Args: {"name": "<repo>", "note": "<why, for them>"} '
         '(note optional)',
+    ),
+    # Vercel: your own account; previews behind Vercel's sign-in, public by
+    # approval (see vercel.py).
+    "preview_site": (
+        _hosting_tool(vercel.preview_site),
+        "Put a workshop site's latest finished build online as a preview on Vercel, in your own "
+        "account (a project of the same name, made the first time). Previews are behind Vercel's "
+        'sign-in: only someone signed in to your Vercel account can open them. The first preview '
+        "also gives the site its public address, showing a placeholder page until your owner approves "
+        'publishing, so the name itself is public from then on. '
+        f'{vercel.DAILY_LIMIT} deployments a day. Args: {{"name": "<site>"}}',
+    ),
+    "list_websites": (
+        _hosting_tool(vercel.list_websites),
+        "Your websites on Vercel and their public addresses; with a name, that site's recent "
+        'deployments and their ids. Args: {"name": "<site>"} (optional)',
+    ),
+    "request_publish": (
+        _hosting_tool(vercel.request_publish),
+        'Ask your owner to make a site public on Vercel. They get a card with Approve and Deny buttons '
+        'and the preview to look at; if they approve, exactly that deployment becomes the public site. '
+        'Without a deployment id, the latest ready preview. Args: {"name": "<site>", '
+        '"deployment": "<dpl_...>", "note": "<why, for them>"} (deployment, note optional)',
     ),
 }
 

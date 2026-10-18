@@ -82,10 +82,11 @@ def call(path: str, **params) -> dict:
     return _open(path, urllib.request.Request(url))
 
 
-def send(path: str, payload: dict) -> dict:
-    """POST a JSON payload to one of the owner's n8n webhooks."""
+def send(path: str, payload: dict, limit: int = REQUEST_BYTE_LIMIT) -> dict:
+    """POST a JSON payload to one of the owner's n8n webhooks. File uploads
+    (GitHub, Vercel) pass a bigger limit; n8n itself takes up to 16 MB."""
     data = json.dumps(payload).encode("utf-8")
-    if len(data) > REQUEST_BYTE_LIMIT:
+    if len(data) > limit:
         raise N8nError("That request is too big to send in one go.")
     request = urllib.request.Request(f"{_base()}/{path}", data,
                                      {"Content-Type": "application/json"}, method="POST")
