@@ -60,7 +60,7 @@ Neither email workflow marks mail as read. `perro/n8n.py` calls webhooks by fixe
 
 **Git.** Code at `silascroe/perro` (public), `home/` at `silascroe/firstborn-perro` (private), the same split as Lobo. The "Perro backup" task is installed and ran hidden successfully, push included.
 
-Not yet tested: the Mac installer (`scripts/install_mac.py`, which doesn't know about the bridge). A real reboot (2026-10-17) brought the heartbeat and bridge back on their own, with the backup still scheduled.
+`install.sh` (2026-10-18) is the Mac setup for someone without Git: it finds or installs Python 3.11+ (Homebrew, else the python.org pkg, run only if signed by the Python Software Foundation), downloads the repo zip into `~/Perro`, and never touches `home/` on a rerun. Tested in a Linux container with faked Mac tools (`uname`, `brew`, `pkgutil`, `installer`) and a real GitHub download, on Python 3.13 and 3.14; never on a real Mac. A Windows `install.ps1` is still to do. Not yet tested: the Mac task installer (`scripts/install_mac.py`, which doesn't know about the bridge). A real reboot (2026-10-17) brought the heartbeat and bridge back on their own, with the backup still scheduled.
 
 ## Next, roughly in order
 

@@ -37,6 +37,20 @@ Your PC: Perro runtime (Python)
 
 Python 3.11+, standard library only for now. Run everything from this folder. On this PC `python` isn't on the PATH, so use the `py` launcher.
 
+### On a Mac
+
+`install.sh` sets Perro up without Git or anything else: it finds Python 3.11 or newer (or, after asking, installs it with Homebrew, or with the signed python.org installer if there's no Homebrew), downloads this repo from GitHub as a zip into `~/Perro` (`--dir` to change), checks that it starts, and prints what to do next. Read it before you run it:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/silascroe/perro/main/install.sh
+```
+
+```bash
+bash install.sh
+```
+
+Running it again updates the code and leaves `home/` alone. On a Mac use `python3` where this README says `py`, and `~/.perro` where it says `%LOCALAPPDATA%\Perro`. Tested on Linux with faked Mac tools, not yet on a real Mac. A Windows version is still to come.
+
 Set your DeepSeek key as an environment variable (never in a file here), then open a new terminal, since `setx` only affects new ones:
 
 ```powershell
@@ -51,7 +65,7 @@ py -m perro.model "Say hi in five words."
 
 ### Codex or Claude Code as the model (instead of an API key)
 
-Perro can think through your Codex or Claude Code subscription: backends `codex-luna` (GPT-6 Luna, max effort) and `claude-haiku` (Claude Haiku). Each CLI runs as the model only, with its own tools off, and uses a separate profile folder under `%LOCALAPPDATA%\Perro` (`PERRO_CLI_HOME` to move it), so it never sees your own CLAUDE.md, AGENTS.md, memories or plugins. Log in once per profile, in a terminal you close afterwards:
+Perro can think through your Codex or Claude Code subscription: backends `codex-luna` (GPT-6 Luna, max effort) and `claude-haiku` (Claude Haiku). Each CLI runs as the model only, with its own tools off, and uses a separate profile folder under `%LOCALAPPDATA%\Perro` (`~/.perro` on a Mac; `PERRO_CLI_HOME` to move it), so it never sees your own CLAUDE.md, AGENTS.md, memories or plugins. Log in once per profile, in a terminal you close afterwards:
 
 ```powershell
 New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Perro\codex", "$env:LOCALAPPDATA\Perro\claude" | Out-Null
