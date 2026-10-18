@@ -6,7 +6,7 @@ sorts what piled up. A dream is that step back, the way agents like OpenClaw
 and Muse do it: one unhurried pass early each morning that
   - rewrites the notes down to what's still open,
   - moves what lasts into its files (USER.md, PROACTIVE_PREFERENCES.md,
-    skills, and SOUL.md, which it then tells the owner about),
+    AGENTS.md, skills, and SOUL.md, which it then tells the owner about),
   - and writes a short dated reflection in workspace/dreams/.
 
 The dream sees the conversation, Perro's own thoughts, one line per tool it
@@ -62,7 +62,7 @@ def _prompt(name: str | None) -> str:
 
 Once a day, early in the morning, you step back from the work and look at the
 past day as a whole. Nobody is waiting on you, and nothing you do here
-reaches your owner directly. You're shown your three identity files, your
+reaches your owner directly. You're shown your four identity files, your
 notes, your skills, and the day: your conversation with your owner, your own
 thoughts, one line for each tool you used, and anything that went wrong.
 What the tools returned (web pages, emails, files) is left out on purpose:
@@ -73,12 +73,14 @@ Do these things:
 1. Put what lasts where it belongs. What you learned about your owner goes
    in USER.md. A preference they stated about what to bring up, what to
    leave alone, or when, goes in PROACTIVE_PREFERENCES.md, in their words;
-   never your own guess. A way of doing something you'll need again goes in
-   a skill file in skills/ (its first line is its title). A real change in
+   never your own guess. A short lesson about getting work done here (a
+   convention, a tool or site quirk, a mistake not to repeat) goes in
+   AGENTS.md; a full how-to for a task you'll do again goes in a skill file
+   in skills/ (its first line is its title). A real change in
    who you are goes in SOUL.md. Change only what the day gives you reason to.
    You make a change by putting the file's full new text in the "files"
    field of your final reply; that's the only way a file changes here.
-   Saying or thinking that you changed one doesn't change it. The three
+   Saying or thinking that you changed one doesn't change it. The four
    identity files are shown above in full; read any other file (a skill you
    want to update) before rewriting it. Keep identity files under
    {identity.CHAR_LIMIT} characters.
