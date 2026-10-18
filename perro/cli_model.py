@@ -46,6 +46,16 @@ CODEX_CONTEXT_OFF = (
     "include_apps_instructions", "include_collaboration_mode_instructions",
     "include_skills_usage_instructions", "include_plugin_usage_instructions",
 )
+# Some tools come with the model, not a feature: Codex's catalog of models
+# (cached in the profile as models_cache.json) gives newer ones a JavaScript
+# "exec" box with a clock and apply_patch inside, and a team of helper agents,
+# and no switch above removes those. Seeing real tools there, and none of
+# Perro's, Perro decided its own tools didn't exist (2026-10-18). So each call
+# hands Codex a catalog of one: the model's own entry with those set to plain.
+CODEX_MODEL_PLAIN = {"tool_mode": "direct", "experimental_supported_tools": [],
+                     "apply_patch_tool_type": None}
+CODEX_MODEL_DROP = ("multi_agent_version",)
+CODEX_SETTINGS_OFF = ("tools.experimental_request_user_input.enabled=false",)
 CLI_TIMEOUT_SECONDS = 300
 EMPTY_REPLY_ATTEMPTS = 2
 
@@ -137,25 +147,48 @@ class CliClient:
             raise ModelError(f"{self.cli} failed (exit {done.returncode}): {done.stderr.strip()[-400:]}")
         return done.stdout
 
+    def _plain_model(self) -> dict | None:
+        """The model's catalog entry with its built-in tools taken away, or None
+        if Codex hasn't fetched its catalog into this profile yet (it does on
+        the first call, so only that one runs with them)."""
+        try:
+            cache = json.loads((self.home / "codex" / "models_cache.json").read_text(encoding="utf-8"))
+            entry = next(m for m in cache["models"] if m.get("slug") == self.model)
+        except (OSError, ValueError, KeyError, TypeError, StopIteration):
+            return None
+        entry = {k: v for k, v in entry.items() if k not in CODEX_MODEL_DROP}
+        return {**entry, **CODEX_MODEL_PLAIN}
+
     def _codex(self, system: str, prompt: str) -> Reply:
         # Perro's system prompt replaces Codex's built-in instructions (about
         # 3,500 tokens describing a coding agent) instead of following them.
+        temp = []
         with tempfile.NamedTemporaryFile("w", suffix=".md", encoding="utf-8", delete=False) as f:
             f.write(system or "Answer the user.")  # Codex refuses an empty file
+        temp.append(f.name)
         try:
             args = ["exec", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config",
                     "--ignore-rules", "--sandbox", "read-only", "--json", "-m", self.model,
                     "-c", 'web_search="disabled"',
                     "-c", f"model_instructions_file={json.dumps(Path(f.name).as_posix())}"]
+            plain = self._plain_model()
+            if plain:
+                with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8", delete=False) as c:
+                    json.dump({"models": [plain]}, c)
+                temp.append(c.name)
+                args += ["-c", f"model_catalog_json={json.dumps(Path(c.name).as_posix())}"]
             for key in CODEX_CONTEXT_OFF:
                 args += ["-c", f"{key}=false"]
+            for setting in CODEX_SETTINGS_OFF:
+                args += ["-c", setting]
             if self.effort:
                 args += ["-c", f'model_reasoning_effort="{self.effort}"']
             for feature in CODEX_FEATURES_OFF:
                 args += ["--disable", feature]
             out = self._run(args + ["-"], prompt, "CODEX_HOME", "codex")
         finally:
-            os.unlink(f.name)
+            for name in temp:
+                os.unlink(name)
         text, reasoning, usage, errors = "", [], {}, []
         for line in out.splitlines():
             try:
