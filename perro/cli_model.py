@@ -38,6 +38,14 @@ CODEX_FEATURES_OFF = (
     "image_generation", "view_image", "memories", "multi_agent", "hooks",
     "skill_search", "tool_suggest", "sleep_tool",
 )
+# Codex's own framing, also off: its notes on the sandbox, permissions, apps,
+# skills and plugins described a Codex session, and Perro, asked about its
+# tools, described that instead of its own.
+CODEX_CONTEXT_OFF = (
+    "include_environment_context", "include_permissions_instructions",
+    "include_apps_instructions", "include_collaboration_mode_instructions",
+    "include_skills_usage_instructions", "include_plugin_usage_instructions",
+)
 CLI_TIMEOUT_SECONDS = 300
 EMPTY_REPLY_ATTEMPTS = 2
 
@@ -130,14 +138,24 @@ class CliClient:
         return done.stdout
 
     def _codex(self, system: str, prompt: str) -> Reply:
-        args = ["exec", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config",
-                "--ignore-rules", "--sandbox", "read-only", "--json", "-m", self.model,
-                "-c", 'web_search="disabled"']
-        if self.effort:
-            args += ["-c", f'model_reasoning_effort="{self.effort}"']
-        for feature in CODEX_FEATURES_OFF:
-            args += ["--disable", feature]
-        out = self._run(args + ["-"], f"{system}\n\n{prompt}", "CODEX_HOME", "codex")
+        # Perro's system prompt replaces Codex's built-in instructions (about
+        # 3,500 tokens describing a coding agent) instead of following them.
+        with tempfile.NamedTemporaryFile("w", suffix=".md", encoding="utf-8", delete=False) as f:
+            f.write(system or "Answer the user.")  # Codex refuses an empty file
+        try:
+            args = ["exec", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config",
+                    "--ignore-rules", "--sandbox", "read-only", "--json", "-m", self.model,
+                    "-c", 'web_search="disabled"',
+                    "-c", f"model_instructions_file={json.dumps(Path(f.name).as_posix())}"]
+            for key in CODEX_CONTEXT_OFF:
+                args += ["-c", f"{key}=false"]
+            if self.effort:
+                args += ["-c", f'model_reasoning_effort="{self.effort}"']
+            for feature in CODEX_FEATURES_OFF:
+                args += ["--disable", feature]
+            out = self._run(args + ["-"], prompt, "CODEX_HOME", "codex")
+        finally:
+            os.unlink(f.name)
         text, reasoning, usage, errors = "", [], {}, []
         for line in out.splitlines():
             try:

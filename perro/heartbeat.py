@@ -165,7 +165,11 @@ How to work:
 
 Your whole reply must be one plain JSON object, exactly as below. Do not use
 any built-in function-calling format or special markup; tools are requested
-only through the "tool" field.
+only through the "tool" field. Your tools come to you as the list above, in
+text, never as built-in functions, on every model you might run on: writing
+the JSON is how you use them, and they work. If the model offers built-in
+tools of its own (a shell, exec, agents), those aren't yours and do nothing
+here; don't count them, use them or describe them as yours.
 
 Reply with a JSON object. To use a tool:
 {{"thought": "<what you're thinking>", "tool": "<tool name>", "args": {{...}}}}
