@@ -33,6 +33,8 @@ Tools so far:
   append_to_notion, update_notion                    Notion (see notion.py)
   start_build, check_build, read_build_file          get a website built by Codex,
                                                      in a locked box (see workshop.py)
+  push_site, list_repos, request_make_public         keep sites on GitHub, private
+                                                     until the owner approves (github.py)
 
 The workspace is the first time Perro can touch the disk, so every path it
 gives goes through _resolve() below, which is the whole sandbox. Its job:
@@ -48,7 +50,7 @@ import os
 import re
 from pathlib import Path
 
-from perro import alarms, google, inbox, n8n, notion, web, workshop
+from perro import alarms, github, google, inbox, n8n, notion, web, workshop
 from perro.memory import Memory
 
 # What Perro can and can't do, kept in the code repo so Perro can read it but
@@ -313,6 +315,16 @@ def _workshop_tool(function):
     return tool
 
 
+def _github_tool(function):
+    """The GitHub tools (github.py), wrapped the same way."""
+    def tool(memory: Memory, **args) -> str:
+        try:
+            return function(memory, **args)
+        except (github.GitHubError, n8n.N8nError) as e:
+            raise ToolError(str(e)) from None
+    return tool
+
+
 # name -> (function, description shown to the model)
 TOOLS = {
     "about_yourself": (
@@ -536,6 +548,26 @@ TOOLS = {
         _workshop_tool(workshop.read_build_file),
         f"Read one of a site's files, {workshop.READ_CHAR_LIMIT} chars at a time. "
         'Args: {"name": "<site>", "path": "<file>", "start": <char offset>} (start optional)',
+    ),
+    # GitHub: your own account, private repositories; going public is an
+    # approval (see github.py).
+    "push_site": (
+        _github_tool(github.push_site),
+        "Save a workshop site's source to a private GitHub repository of the same name in "
+        f'your account ({github.OWNER}), made on the first push. Each push is one commit of the '
+        'whole site; briefs and build output stay out. '
+        'Args: {"name": "<site>", "message": "<what changed>"} (message optional)',
+    ),
+    "list_repos": (
+        _github_tool(github.list_repos),
+        'List the repositories in your GitHub account, private or public. No args.',
+    ),
+    "request_make_public": (
+        _github_tool(github.request_make_public),
+        'Ask your owner to make a repository public, so anyone can see its files and history. '
+        'They get a card with Approve and Deny buttons; it happens only if they approve, and '
+        'only for the commit it is at now. Args: {"name": "<repo>", "note": "<why, for them>"} '
+        '(note optional)',
     ),
 }
 
