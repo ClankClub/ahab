@@ -28,6 +28,7 @@ Tools so far:
   create_doc, append_to_doc       Google Docs, in that Drive
   read_sheet, create_sheet, add_rows, update_cells   Google Sheets
   list_tasks, add_task, update_task                  Google Tasks
+  search_contacts, add_contact                       Google Contacts
 
 The workspace is the first time Perro can touch the disk, so every path it
 gives goes through _resolve() below, which is the whole sandbox. Its job:
@@ -400,6 +401,18 @@ TOOLS = {
         '(done=false), or change its title, notes or due date (due="" removes it). Name its '
         'list if it isn\'t in your first one. Args: {"id": "<task id>", "done": true, '
         '"title": "...", "notes": "...", "due": "YYYY-MM-DD", "list": "<list name>"} (all but id optional)',
+    ),
+    "search_contacts": (
+        _google_tool(google.search_contacts),
+        'Search your own Google Contacts (your account\'s address book) by any part of a '
+        'name, email, phone number, workplace or note; no query lists them. '
+        'Args: {"query": "<text>"} (optional)',
+    ),
+    "add_contact": (
+        _google_tool(google.add_contact),
+        'Add someone to your Google Contacts, to remember how to reach them. Nobody is '
+        'told. Args: {"name": "<name>", "email": "<address>", "phone": "<number>", '
+        '"notes": "<who they are>"} (all but name optional)',
     ),
 }
 

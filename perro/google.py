@@ -418,3 +418,63 @@ def update_task(id: str, list: str = "", done=None, title=None, notes=None, due=
         raise ValueError("Say what to change: done, title, notes or due.")
     t = _google("tasks", f"lists/{_list_id(list)}/tasks/{id}", "PATCH", body=body)
     return "Updated: " + "\n".join(_task_line(t)).lstrip("- ")
+
+
+# --- Contacts ------------------------------------------------------------
+# Perro's own address book. Nobody hears about being added to it.
+
+CONTACTS_SHOWN = 25
+PERSON_FIELDS = "names,emailAddresses,phoneNumbers,organizations,biographies"
+
+
+def _person(p: dict) -> tuple[str, str]:
+    """One contact as a line of text, and the same text for matching against."""
+    name = next((n.get("displayName") for n in p.get("names") or []), None) or "(no name)"
+    emails = [e.get("value") for e in p.get("emailAddresses") or [] if e.get("value")]
+    phones = [x.get("value") for x in p.get("phoneNumbers") or [] if x.get("value")]
+    orgs = [" ".join(filter(None, (o.get("title"), o.get("name")))) for o in p.get("organizations") or []]
+    parts = [name] + ([", ".join(emails)] if emails else []) + ([", ".join(phones)] if phones else []) \
+        + [o for o in orgs if o]
+    notes = _short(next((b.get("value") for b in p.get("biographies") or []), ""))
+    line = "- " + " | ".join(parts) + (f"\n    {notes}" if notes else "")
+    return line, " ".join(parts + [notes]).lower()
+
+
+def search_contacts(query: str = "") -> str:
+    query = str(query).strip()
+    people = _google("contacts", "people/me/connections", query={
+        "personFields": PERSON_FIELDS, "pageSize": 1000,
+        "sortOrder": "LAST_MODIFIED_DESCENDING"}).get("connections") or []
+    if not people:
+        return "Your contacts are empty."
+    words = query.lower().split()
+    digits = re.sub(r"\D", "", query)
+    found = []
+    for p in people:
+        line, haystack = _person(p)
+        if all(w in haystack for w in words) or \
+                (len(digits) >= 4 and digits in re.sub(r"\D", "", haystack)):
+            found.append(line)
+    if not found:
+        return f"No contacts match {query!r} (out of {len(people)})."
+    head = f"{len(found)} contact(s) matching {query!r}:" if query else f"Your {len(people)} contact(s), most recently changed first:"
+    more = [f"...and {len(found) - CONTACTS_SHOWN} more; search for a name."] if len(found) > CONTACTS_SHOWN else []
+    return "\n".join([head] + found[:CONTACTS_SHOWN] + more)
+
+
+def add_contact(name: str, email: str = "", phone: str = "", notes: str = "") -> str:
+    name = _text(name, "name", 200).strip()
+    email, phone = _text(email, "email", 200).strip(), _text(phone, "phone", 40).strip()
+    if not name:
+        raise ValueError("name is empty.")
+    if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise ValueError(f"{email!r} doesn't look like an email address.")
+    body = {"names": [{"unstructuredName": name}]}
+    if email:
+        body["emailAddresses"] = [{"value": email}]
+    if phone:
+        body["phoneNumbers"] = [{"value": phone}]
+    if _text(notes, "notes", 2000).strip():
+        body["biographies"] = [{"value": notes.strip(), "contentType": "TEXT_PLAIN"}]
+    _google("contacts", "people:createContact", "POST", query={"personFields": "names"}, body=body)
+    return f"Added {name} to your contacts."
