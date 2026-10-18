@@ -52,7 +52,7 @@ BACKENDS = {
     },
     # Codex or Claude Code as the model, through Perro's own logged-in profile
     # for each (see cli_model.py). No API key: the CLI holds the sign-in.
-    "codex-luna": {"cli": "codex", "model": "gpt-6-luna", "effort": "high"},
+    "codex-luna": {"cli": "codex", "model": "gpt-6-luna", "effort": "max"},
     "claude-haiku": {"cli": "claude", "model": "haiku"},
 }
 
