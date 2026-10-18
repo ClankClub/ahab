@@ -3,7 +3,8 @@
 Reading mail lives in n8n.py. Sending is an outward action, and the usual
 way for those is the approval step (approvals.py). For mail the owner chose
 a lighter fence instead: Perro may write freely, but only to addresses the
-owner listed, and the owner gets a blind copy of everything.
+owner listed. (Until 2026-10-18 the owner got a blind copy of each one; they
+asked for that to stop, since they can read Perro's Gmail any time.)
 
 The list is home/email.json, outside the workspace, so Perro's file tools
 can't add to it. The repo is public, so the real addresses live only there
@@ -14,9 +15,8 @@ can't add to it. The repo is public, so the real addresses live only there
 "agents" marks which listed addresses are AI agents rather than people.
 
 Sending (send_email):
-- One recipient per email, no CC; the owner is BCC'd unless the mail is to
-  them. A reply goes to whoever sent the original, and is refused if they
-  aren't on the list.
+- One recipient per email, no CC or BCC. A reply goes to whoever sent the
+  original, and is refused if they aren't on the list.
 - At most DAILY_LIMIT emails a day, so a confused loop can't get the
   account flagged as a spammer.
 - The relay ("Perro: email send" in n8n) checks the list again, by SHA-256
@@ -164,14 +164,11 @@ def send_email(memory: Memory, to: str = "", subject: str = "", body: str = "", 
         raise n8n.N8nError(f"You've sent {DAILY_LIMIT} emails today, the daily limit. It resets at midnight.")
 
     payload.update(to=to, subject=subject, body=body)
-    if to != owner:
-        payload["bcc"] = owner
     answer = n8n.send("perro/email/send", payload)
     if answer.get("error") or not answer.get("id"):
         raise n8n.N8nError(f"The email wasn't sent: {answer.get('error') or 'Gmail gave no id back'}.")
     memory.record("email_sent", f"To {to}: {subject} (id {answer['id']})\n{body}")
-    copy = "" if to == owner else " Your owner got a blind copy, as with every email you send."
-    return f"Sent to {to}: {subject!r} (id {answer['id']}).{copy}"
+    return f"Sent to {to}: {subject!r} (id {answer['id']})."
 
 
 # --- the mail watch --------------------------------------------------------------

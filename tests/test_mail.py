@@ -60,15 +60,15 @@ assert "hasn't set up who you may write to" in send(to="friend@example.com", sub
 (home / "email.json").write_text(json.dumps({"owner": "Owner@Example.com", "allowed": ["friend@example.com"]}))
 assert not SENT
 
-# A plain send: one recipient, owner BCC'd, logged.
+# A plain send: one recipient, nobody copied, logged.
 out = send(to="Friend <FRIEND@example.com>", subject="  Hi\nthere ", body="Hello.\r\nBye.")
-assert "Sent to friend@example.com" in out and "blind copy" in out, out
-assert SENT[-1] == {"to": "friend@example.com", "bcc": "owner@example.com", "subject": "Hi there",
+assert "Sent to friend@example.com" in out and "copy" not in out, out
+assert SENT[-1] == {"to": "friend@example.com", "subject": "Hi there",
                     "body": "Hello.\nBye."}, SENT[-1]
 logged = [e for e in m.recent(5) if e.kind == "email_sent"]
 assert logged and logged[-1].content.startswith("To friend@example.com: Hi there (id sent0001)\nHello."), logged
 
-# To the owner: no BCC.
+# To the owner: the same.
 send(to="owner@example.com", subject="Note", body="x")
 assert "bcc" not in SENT[-1], SENT[-1]
 
@@ -84,8 +84,7 @@ assert len(SENT) == n
 # A reply goes to the sender, in the thread, with Re:.
 out = send(reply_to="abc123def", body="Nice to meet you.")
 assert SENT[-1] == {"threadId": "18f2a3b4c5d6e7f8", "inReplyTo": "<m1@mail.example.com>", "to": "friend@example.com",
-                    "subject": "Re: Hello from the other agent", "body": "Nice to meet you.",
-                    "bcc": "owner@example.com"}, SENT[-1]
+                    "subject": "Re: Hello from the other agent", "body": "Nice to meet you."}, SENT[-1]
 # A Reply-To pointing at a stranger is refused, as is a bad id.
 n = len(SENT)
 assert "stranger@example.com isn't on the list" in send(reply_to="zzz999zzz", body="x")
