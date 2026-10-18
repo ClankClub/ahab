@@ -442,7 +442,7 @@ TOOLS = {
         web_search,
         'Search the web at large. Another model runs the search and reads the pages, and you get '
         'back a few results (title, address, what the page says) and, when they settle it, a short '
-        'answer. Takes 10 to 60 seconds, so one clear request in plain words beats several tries. '
+        'answer. Takes from ten seconds to several minutes, so one clear request in plain words beats several tries. '
         f'Read a result in full with fetch_page. {search.DAILY_LIMIT} a day. '
         'Args: {"query": "<what you want to find out>"}',
     ),

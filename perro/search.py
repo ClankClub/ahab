@@ -39,7 +39,7 @@ PROVIDERS = ("codex", "claude")
 MAX_RESULTS = 6
 QUERY_CHAR_LIMIT = 500
 DAILY_LIMIT = 40          # a loop guard; searches take a model run each
-TIMEOUT_SECONDS = 300
+TIMEOUT_SECONDS = 900       # max effort is slow; a small model at max took 9 minutes once
 
 ANSWER_FORM = {
     "type": "object", "additionalProperties": False, "required": ["answer", "results"],
