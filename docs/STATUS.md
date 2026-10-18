@@ -1,6 +1,6 @@
 # Status
 
-## Where it stands (2026-10-17)
+## Where it stands (2026-10-18)
 
 Forked from Lobo's runtime (`../Lobo`, commit `2076c5d`). None of Lobo's `home/` came along, so Perro's memory started empty.
 
@@ -8,7 +8,9 @@ Forked from Lobo's runtime (`../Lobo`, commit `2076c5d`). None of Lobo's `home/`
 
 **Identity files** (modelled loosely on Muse's core files, built one at a time). Two files in `home/workspace/`, both shown at the top of every wake-up page and capped at 3,000 characters each (`perro/identity.py`): `SOUL.md`, who Perro is (origin, character, voice; it tells the owner when it edits it), and `USER.md`, what it knows about the owner. Perro edits both with `write_file`. The prompt holds only the rules (trust, tools, reply format), which Perro can't edit. There's no separate IDENTITY file; it's folded into SOUL. Notes (4,000 characters) are now for open tasks and short-lived things. Generic starters live in `templates/` in the code repo (see its README); each wake-up copies in any that are missing, with the agent's name filled in, and never overwrites. Perro's own SOUL and USER were written by hand for it and live only in the private home repo. Planned next, each its own step: PROACTIVE_PREFERENCES.md (owner-edited: what to bring up, when, how often), and a read-only self-knowledge doc in the code repo describing what Perro can and can't do.
 
-**What it can do.** Take tasks and conversation through the inbox or Telegram, research on the public web and Wikipedia, write files in its workspace, set reminders, and message the owner. Nothing outside its workspace yet: no email or calendar.
+**What it can do.** Take tasks and conversation through the inbox or Telegram, research on the public web and Wikipedia, write files in its workspace, set reminders, message the owner, and read its Google calendars (`check_calendar`). No email yet.
+
+**Google, through n8n** (2026-10-18). Perro has its own Google account. A Cloud project, also named "Perro", holds an OAuth client of the Web type with redirect `http://localhost:5678/rest/oauth2-credential/callback`. Its consent screen is published, External, with no logo, so tokens don't expire weekly and no verification is triggered. The privacy-policy link points at [PRIVACY.md](../PRIVACY.md). The owner's n8n (`../n8n`, Docker, localhost only) holds signed-in credentials for Calendar, Gmail, Drive, Docs, Sheets, Tasks and Contacts; all seven answered a live API call. Only one workflow exists so far: "Perro: calendar" (`../n8n/perro-calendar.json`), a GET webhook at `/webhook/perro/calendar?days=N` that lists events from every calendar the account can see (so calendars the owner shares with it show up on their own). `perro/n8n.py` calls webhooks by fixed path only, refuses any non-local n8n address, and formats events in the owner's local time. It was tested against a fake n8n and against the real calendar, using a temporary event that was then deleted. Gotchas: n8n's production webhook only exists once the workflow is published; each Google API must be enabled separately in the Cloud project (a disabled one gives a 403 `SERVICE_DISABLED`); n8n 2.x's CLI can `import:workflow` and `publish:workflow`, but the running instance only notices after a restart.
 
 **Telegram.** `perro/telegram.py` is a bridge process. It long-polls the bot, passes the owner's messages into the inbox as knocks, and forwards Perro's replies back. A one-time pairing code locks it to the owner's account and private chat; other senders are dropped, and their text never reaches Perro. Tested against a fake Telegram API (pairing, strangers, group chats, non-text messages, splitting long replies, keeping the token out of error messages). Live since 2026-10-18 with a real bot paired to the owner; a real round trip took about 8 seconds. The heartbeat checks for knocks every 3 seconds instead of every 30.
 
@@ -35,8 +37,8 @@ Not yet tested: the Mac installer (`scripts/install_mac.py`, which doesn't know 
 
 1. **Live with it for a while.** Chat with Perro through Telegram and adjust the prompt from what it actually does. Next identity files, one at a time: PROACTIVE_PREFERENCES.md, then the self-knowledge doc.
 2. **Backend and budget.** The DeepSeek balance is small, with no auto-refill. Pick a backend deliberately before running unattended.
-3. **Its own Google account.** The owner shares calendars and docs with it, never their own login.
-4. **n8n as its hands.** n8n (`../n8n`, Docker) handles Gmail, Calendar and similar connections. Perro calls n8n webhooks instead of implementing sign-in per service, so outbound actions pass through one place where the approval step sits.
-5. **Approval before acting.** Reading and drafting run freely; sending to others, accepting, deleting and spending get the owner's OK. The first outward-acting tool builds this.
+3. **More n8n workflows, read-only first.** Reading Perro's own inbox is next; Drive, Docs, Sheets, Tasks and Contacts are connected and wait for workflows. The owner can share their calendar with Perro's account, and `check_calendar` will pick it up.
+4. **Sending mail.** Still undecided. Either the approval step (Perro asks on Telegram, the owner says yes) or a lighter version: send freely, BCC the owner on everything, and a daily send cap so a confused loop can't get the account banned. Mail to the owner's own addresses needs neither. The owner leans toward lighter, since Perro doesn't hold sensitive personal information.
+5. **Approval before acting** for anything else with outside consequences (accepting invites, deleting, spending), built by the first such tool.
 6. **Later:** a shell, only inside a container.
 
