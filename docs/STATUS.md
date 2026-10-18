@@ -79,11 +79,11 @@ Neither email workflow marks mail as read. `perro/n8n.py` calls webhooks by fixe
 
 ## Next, roughly in order
 
-1. **Live with it for a while.** Chat with Perro through Telegram and adjust the prompt from what it actually does. Watch whether the proactive defaults produce useful messages or noise. See whether AGENTS.md fills with real lessons or noise, and whether Perro reads its guide when asked about itself.
-2. **A form for the API backends too.** DeepSeek only promises valid JSON. An OpenAI or OpenRouter backend could take `reply_form` as `response_format: json_schema`, if one is ever used.
+1. **Live with it for a while.** Chat with Perro through Telegram and adjust the prompt from what it actually does. Watch whether the proactive defaults produce useful messages or noise, whether AGENTS.md fills with real lessons or noise, and whether Perro reads its guide when asked about itself. New to watch: the dream's `skill_check` lines and the skills they produce, and the watchdog's first real alert.
+2. **Web search, then a sandboxed browser** (agreed as the next run, 2026-10-18). Today Perro reads pages it's given (`fetch_page`) and searches Wikipedia, and can't search the web at large. Search first. Then a real browser for pages that need JavaScript, inside a container like the workshop.
 3. **Backend.** Running on `codex-luna` since 2026-10-18; compare it with `claude-haiku` and DeepSeek on real use (replies, tool use, the dream) before settling.
 4. **Small Google gaps:** no editing contacts, no find-and-replace in Docs.
 5. **Mail to anyone off the list**, if it's ever wanted: through the approval step rather than a longer list.
 6. **Codex, GitHub and Vercel**, in phases on top of the approval step: the workshop, the GitHub relay and the Vercel relay (all done, above). Left: Perro telling the owner a site is ready (it can, with message_owner and the preview link). Other outside actions (accepting invites, deleting, spending) reuse the approval step as they come.
-7. **Later:** a Windows `install.ps1`; voice messages on Telegram (transcribed; low priority); a shell, only inside a container.
-
+7. **A form for the API backends too**, only if one is used: DeepSeek only promises valid JSON, but an OpenAI or OpenRouter backend could take `reply_form` as `response_format: json_schema`.
+8. **Later:** a Windows `install.ps1`; voice messages on Telegram (transcribed; low priority); a shell, only inside a container; a model ladder and a spend cap (parked 2026-10-18: on the CLI subscriptions the cost hasn't been noticeable).
