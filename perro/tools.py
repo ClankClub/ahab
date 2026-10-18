@@ -39,11 +39,17 @@ for text files, not for a shell (that needs a container or VM).
 
 from __future__ import annotations
 
+import json
 import os
+import re
 from pathlib import Path
 
 from perro import alarms, google, inbox, n8n, web
 from perro.memory import Memory
+
+# What Perro can and can't do, kept in the code repo so Perro can read it but
+# never edit it. Read a section at a time, so it costs nothing until needed.
+GUIDE = Path(__file__).resolve().parent.parent / "docs" / "ABOUT_YOURSELF.md"
 
 # Long log entries (old notes, long thoughts) get cut to this in results,
 # so one search can't flood the model's page.
@@ -62,6 +68,36 @@ class ToolError(Exception):
 
 
 # --- recall --------------------------------------------------------------
+
+def about_yourself(memory: Memory, section: str = "") -> str:
+    intro, *parts = re.split(r"^## ", GUIDE.read_text(encoding="utf-8"), flags=re.M)
+    sections = {p.split("\n", 1)[0].strip(): p.rstrip() for p in parts}
+    wanted = str(section).strip().lower()
+    if not wanted:
+        intro = intro.split("\n", 1)[-1].strip()  # drop the title line
+        return f"{intro}\n\nSections: {', '.join(sections)}."
+    found = [t for t in sections if t.lower() == wanted] or [t for t in sections if wanted in t.lower()]
+    if not found:
+        return f"No section called {section!r}. Sections: {', '.join(sections)}."
+    text = f"## {sections[found[0]]}"
+    if found[0] == "Your mind":
+        text += f"\n\nThis home runs you on: {_this_mind(memory)}."
+    return text
+
+
+def _this_mind(memory: Memory) -> str:
+    """The backend this home's home.json picks, read fresh each time."""
+    from perro.model import BACKENDS
+    try:
+        name = json.loads((memory.home / "home.json").read_text(encoding="utf-8")).get("backend")
+    except (OSError, ValueError):
+        name = None
+    name = name or "deepseek"
+    config = BACKENDS.get(name, {})
+    via = {"codex": "through Codex", "claude": "through Claude Code"}.get(config.get("cli"), "through an API")
+    effort = f", reasoning effort {config['effort']}" if config.get("effort") else ""
+    return f"backend {name!r}, model {config.get('model', 'unknown')}{effort}, {via}"
+
 
 def recall(memory: Memory, query: str, limit: int = 10) -> str:
     query = str(query).strip()
@@ -255,6 +291,13 @@ def _google_tool(function):
 
 # name -> (function, description shown to the model)
 TOOLS = {
+    "about_yourself": (
+        about_yourself,
+        'Read the guide to how you work: how you run, your memory, your messages, '
+        'your files, the outside world, what you can\'t do, the model you run on. '
+        'No section gives the list of sections. '
+        'Args: {"section": "<section name>"} (optional)',
+    ),
     "recall": (
         recall,
         'Search your entire permanent log (every past wake, thought, and notes '

@@ -15,7 +15,7 @@ Your PC: Perro runtime (Python)
   ├─ heartbeat      → wake, show memory, model decides, save, sleep until it chose
   ├─ inbox          → messages between you and Perro; where its instructions come from
   ├─ telegram       → bridge from a Telegram bot to the inbox, paired to your account only
-  ├─ tools          → recall, list/read/write files, set/cancel alarms, message you, read web pages, Google
+  ├─ tools          → about_yourself (its guide, docs/ABOUT_YOURSELF.md), recall, list/read/write files, set/cancel alarms, message you, read web pages, Google
   ├─ web            → read-only: any public page as text, plus Wikipedia search
   ├─ n8n, google    → its own Google account through your local n8n: calendar and Gmail (read),
   │                   Drive, Docs, Sheets, Tasks, Contacts (read and write; no deleting or sharing)
