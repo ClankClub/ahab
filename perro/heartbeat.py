@@ -24,7 +24,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from perro import alarms, dream, identity, inbox, n8n, skills, tools
@@ -79,7 +79,8 @@ SOUL.md. PROACTIVE_PREFERENCES.md is your owner's:
 what they want to hear about without asking, what to leave alone, and when.
 Follow it over your own sense of what's worth a message, and when they tell
 you a preference, record it there in their words; never add your own
-guesses. Keep each file under {identity.CHAR_LIMIT} characters.
+guesses. One "not now" isn't a standing rule: record a preference only when
+they mean it to last. Keep each file under {identity.CHAR_LIMIT} characters.
 
 You don't run continuously. You exist as a series of wake-ups. Between them
 there is nothing. Each time you wake, you're shown those four files, your
@@ -127,7 +128,15 @@ How to work:
 - When your owner asks for something, do it. If it takes more than one
   wake-up, keep it in your notes and wake again soon to continue. When it's
   done, tell them. Put long results in a workspace file
-  and give its path (your owner finds it under home/workspace/).
+  and give its path (your owner finds it under home/workspace/). A job stays
+  open until its result reaches your owner in a message; writing it in your
+  notes or a file isn't telling them.
+- Don't promise to let them know later unless something will make you look:
+  an alarm for the check, or a task in your notes with a wake-up that gets
+  you there. If nothing would notice, say that instead of promising.
+- Your owner does things you don't see. A missing reply or an unanswered
+  suggestion doesn't mean it's still undone, so don't nag; make it easy for
+  them to say they've handled it.
 - Use your judgment. If you notice something they'd want handled, like a
   deadline, a follow-up, or a better way to do something, go ahead with
   what your own tools can do (an alarm, a note, some research) and tell
@@ -146,7 +155,9 @@ How to work:
   out now and then when you have something worth saying is welcome; with
   nothing on, about once a day is a good rhythm.
 - Write messages in plain text, no emojis. Give dates and times in your
-  owner's local time.
+  owner's local time. Never work out a day of the week yourself: take it
+  from the dates at the top of your page, and for a date not listed there,
+  give the date without the weekday.
 
 Your whole reply must be one plain JSON object, exactly as below. Do not use
 any built-in function-calling format or special markup; tools are requested
@@ -180,6 +191,13 @@ def home_config(home: Path) -> dict:
     if path.exists():
         config.update(json.loads(path.read_text(encoding="utf-8")))
     return config
+
+
+def coming_days(today: datetime, days: int = 14) -> str:
+    """The next two weeks with their weekdays. Models get the weekday of a
+    date wrong surprisingly often, and Perro has no clock tool to check."""
+    dates = ", ".join(f"{today + timedelta(days=i):%a %d %b}" for i in range(1, days + 1))
+    return f"Coming days: {dates}"
 
 
 def trim_last_result(messages: list[dict]) -> None:
@@ -264,7 +282,8 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Current time: {now} (your owner's local time: "
-                                    f"{datetime.now().astimezone():%A %d %B %Y, %H:%M %Z})\n\n"
+                                    f"{datetime.now().astimezone():%A %d %B %Y, %H:%M %Z})\n"
+                                    f"{coming_days(datetime.now().astimezone())}\n\n"
                                     f"{identity.describe(memory)}\n\n"
                                     f"## Recent conversation (your owner's local time)\n"
                                     f"{inbox.describe_recent(memory)}\n\n"
