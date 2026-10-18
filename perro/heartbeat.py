@@ -399,7 +399,10 @@ def start_message(home: Path, once: bool, scheduled: bool) -> str:
     if once:
         return "Woken manually by the owner."
     if restarted or not scheduled:
-        return "Heartbeat restarted by the owner; woke immediately."
+        # Usually the owner's coding agent loading new code, not a poke: Perro
+        # took restarts as a nudge and messaged the owner about each one.
+        return ("Heartbeat restarted (by the owner or the agent that helps them build you,"
+                " usually to load new code); woke immediately. Nothing to answer by itself.")
     scheduler = "Windows Task Scheduler" if sys.platform == "win32" else "launchd"
     return (f"Heartbeat started automatically by {scheduler} (at login, or after the "
             "previous heartbeat crashed); woke immediately.")
