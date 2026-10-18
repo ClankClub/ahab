@@ -27,6 +27,7 @@ Tools so far:
   drive_search, read_drive_file   its own Google Drive (see google.py)
   create_doc, append_to_doc       Google Docs, in that Drive
   read_sheet, create_sheet, add_rows, update_cells   Google Sheets
+  list_tasks, add_task, update_task                  Google Tasks
 
 The workspace is the first time Perro can touch the disk, so every path it
 gives goes through _resolve() below, which is the whole sandbox. Its job:
@@ -380,6 +381,25 @@ TOOLS = {
         'Overwrite cells in a sheet, starting at the top-left of the range. Values go in '
         'exactly as written; formulas are off. '
         'Args: {"id": "<sheet id>", "range": "Sheet1!B2", "rows": [["done"]]}',
+    ),
+    "list_tasks": (
+        _google_tool(google.list_tasks),
+        'See the Google Tasks in your account, list by list: open ones, or with done=true '
+        'the finished ones too. Your owner can see these if they add your account to their '
+        'Google Tasks app. Args: {"done": <true/false>} (optional)',
+    ),
+    "add_task": (
+        _google_tool(google.add_task),
+        'Add a Google Task. Due dates are a day, not a time (for a time, use set_alarm). '
+        'Goes in your first list unless you name another. '
+        'Args: {"title": "<text>", "notes": "<text>", "due": "YYYY-MM-DD", "list": "<list name>"} (all but title optional)',
+    ),
+    "update_task": (
+        _google_tool(google.update_task),
+        'Change a Google Task by its id from list_tasks: tick it off (done=true), reopen it '
+        '(done=false), or change its title, notes or due date (due="" removes it). Name its '
+        'list if it isn\'t in your first one. Args: {"id": "<task id>", "done": true, '
+        '"title": "...", "notes": "...", "due": "YYYY-MM-DD", "list": "<list name>"} (all but id optional)',
     ),
 }
 

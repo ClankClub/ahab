@@ -324,3 +324,97 @@ def update_cells(id: str, range: str, rows) -> str:
     answer = _google("sheets", f"/{id}/values/{_range(range)}", "PUT",
                      query={"valueInputOption": "RAW"}, body={"values": rows})
     return f"Updated {answer.get('updatedCells', '?')} cell(s) at {answer.get('updatedRange', range)}."
+
+
+# --- Tasks ---------------------------------------------------------------
+# Google Tasks only keeps a due date, never a time.
+
+MAX_LISTS = 10
+TASKS_SHOWN = 100
+
+
+def _lists() -> list:
+    return _google("tasks", "users/@me/lists", query={"maxResults": MAX_LISTS}).get("items") or []
+
+
+def _list_id(list: str) -> str:
+    list = str(list).strip()
+    if not list:
+        return "@default"
+    lists = _lists()
+    for l in lists:
+        if list == l.get("id") or list.lower() == str(l.get("title")).lower():
+            return _id(l["id"], "list")
+    raise ValueError(f"You have no task list called {list!r}. Yours: "
+                     + ", ".join(f'"{l.get("title")}"' for l in lists))
+
+
+def _due(due: str):
+    due = str(due).strip()
+    if not due:
+        return None
+    try:
+        return f"{datetime.strptime(due, '%Y-%m-%d'):%Y-%m-%d}T00:00:00.000Z"
+    except ValueError:
+        raise ValueError("due must be a date like 2026-10-20.") from None
+
+
+def _task_line(t: dict, indent: str = "") -> list:
+    line = f"{indent}- {t.get('title') or '(no title)'} | id {t.get('id')}"
+    if t.get("due"):
+        line += f" | due {datetime.strptime(t['due'][:10], '%Y-%m-%d'):%a %d %b %Y}"
+    if t.get("status") == "completed":
+        line += " | done"
+    notes = _short(t.get("notes"))
+    return [line] + ([f"{indent}    {notes}"] if notes else [])
+
+
+def list_tasks(done: bool = False) -> str:
+    if not isinstance(done, bool):
+        raise ValueError("done must be true or false.")
+    lists = _lists()
+    if not lists:
+        return "You have no task lists."
+    lines = []
+    for l in lists:
+        items = _google("tasks", f"lists/{_id(l['id'], 'list')}/tasks", query={
+            "showCompleted": done, "showHidden": done, "maxResults": TASKS_SHOWN}).get("items") or []
+        lines.append(f'List "{l.get("title")}" ({len(items)} {"task(s)" if done else "open task(s)"}):')
+        by_position = sorted(items, key=lambda t: t.get("position", ""))
+        for t in by_position:
+            if not t.get("parent"):
+                lines += _task_line(t)
+                for child in by_position:
+                    if child.get("parent") == t.get("id"):
+                        lines += _task_line(child, "    ")
+    return "\n".join(lines)
+
+
+def add_task(title: str, notes: str = "", due: str = "", list: str = "") -> str:
+    title = _text(title, "title", 1000).strip()
+    if not title:
+        raise ValueError("title is empty.")
+    body = {"title": title, "notes": _text(notes, "notes", 8000)}
+    if _due(due):
+        body["due"] = _due(due)
+    t = _google("tasks", f"lists/{_list_id(list)}/tasks", "POST", body=body)
+    when = f", due {due}" if body.get("due") else ""
+    return f'Added the task "{title}" (id {t.get("id")}){when} to {repr(list) if list else "your first list"}.'
+
+
+def update_task(id: str, list: str = "", done=None, title=None, notes=None, due=None) -> str:
+    id, body = _id(id, "id"), {}
+    if done is not None:
+        if not isinstance(done, bool):
+            raise ValueError("done must be true or false.")
+        body.update({"status": "completed"} if done else {"status": "needsAction", "completed": None})
+    if title is not None:
+        body["title"] = _text(title, "title", 1000)
+    if notes is not None:
+        body["notes"] = _text(notes, "notes", 8000)
+    if due is not None:
+        body["due"] = _due(due)  # "" clears it
+    if not body:
+        raise ValueError("Say what to change: done, title, notes or due.")
+    t = _google("tasks", f"lists/{_list_id(list)}/tasks/{id}", "PATCH", body=body)
+    return "Updated: " + "\n".join(_task_line(t)).lstrip("- ")
