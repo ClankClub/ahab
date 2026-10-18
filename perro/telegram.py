@@ -1,4 +1,4 @@
-"""Telegram: chat with Perro from your phone.
+r"""Telegram: chat with Perro from your phone.
 
 A bridge between a Telegram bot and Perro's inbox, run as its own process
 next to the heartbeat. It does two things, over and over:
@@ -6,6 +6,10 @@ next to the heartbeat. It does two things, over and over:
   in   your Telegram messages -> the inbox, as a knock, so Perro wakes up
        to read them (the same as `python -m perro.inbox --now "..."`)
   out  Perro's replies (message_owner) -> your Telegram chat
+
+It also carries approvals (see approvals.py): each request Perro files
+arrives as a card with Approve and Deny buttons, your tap is recorded as
+your decision, and the card is rewritten with the outcome once it's settled.
 
 Perro itself never touches Telegram. It just reads its inbox and writes
 back, as before; this file is plumbing around it.
@@ -41,7 +45,7 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-from perro import inbox
+from perro import approvals, inbox
 from perro.memory import DEFAULT_HOME, Memory
 
 TOKEN_ENV = "PERRO_TELEGRAM_TOKEN"
@@ -88,8 +92,9 @@ class Bot:
 
     def updates(self, offset: int) -> list[dict]:
         # The HTTP timeout outlasts Telegram's hold, so a quiet poll isn't an error.
+        # callback_query is a tap on an Approve/Deny button.
         return self.call("getUpdates", http_timeout=POLL_SECONDS + 10, offset=offset,
-                         timeout=POLL_SECONDS, allowed_updates=["message"])
+                         timeout=POLL_SECONDS, allowed_updates=["message", "callback_query"])
 
     def send(self, chat_id: int, text: str) -> None:
         for start in range(0, len(text), TELEGRAM_CHAR_LIMIT):
@@ -121,7 +126,11 @@ def is_owner(message: dict, state: dict) -> bool:
 # --- the two directions --------------------------------------------------------
 
 def handle_update(update: dict, state: dict, memory: Memory, bot: Bot) -> None:
-    """One incoming Telegram update: hand the owner's text to the inbox."""
+    """One incoming Telegram update: hand the owner's text to the inbox, or
+    record their tap on an approval button."""
+    if "callback_query" in update:
+        handle_tap(update["callback_query"], state, memory, bot)
+        return
     message = update.get("message")
     if not message:
         return
@@ -159,6 +168,64 @@ def forward_replies(state: dict, memory: Memory, bot: Bot, home: Path) -> int:
         save_state(home, state)
         print(f"[{_now()}] Out: {len(text)} chars to the owner.")
     return len(rows)
+
+
+# --- approvals: a card with two buttons, and the owner's tap -----------------
+# A tap is the only thing on Telegram that approves anything. Typing "yes"
+# is an ordinary message to Perro, and Perro can't approve its own requests.
+
+def _buttons(request_id: int) -> dict:
+    return {"inline_keyboard": [[{"text": "Approve", "callback_data": f"ap:{request_id}:yes"},
+                                 {"text": "Deny", "callback_data": f"ap:{request_id}:no"}]]}
+
+
+def forward_approvals(state: dict, memory: Memory, bot: Bot) -> None:
+    """Send new approval cards, and close the ones that are settled."""
+    approvals.expire(memory)
+    for req in approvals.unsent(memory):
+        sent = bot.call("sendMessage", chat_id=state["owner_chat_id"], text=req.text(),
+                        reply_markup=_buttons(req.id))
+        approvals.mark_sent(memory, req.id, sent["message_id"])
+        print(f"[{_now()}] Out: approval card #{req.id}.")
+    for req in approvals.to_close(memory):
+        _settle_card(bot, state, req.telegram_message, req.closed_text())
+        approvals.mark_closed(memory, req.id)
+
+
+def _settle_card(bot: Bot, state: dict, message_id: int, text: str) -> None:
+    """Rewrite a card without its buttons, so it can't be tapped again."""
+    try:
+        bot.call("editMessageText", chat_id=state["owner_chat_id"], message_id=message_id,
+                 text=text[:TELEGRAM_CHAR_LIMIT], reply_markup={"inline_keyboard": []})
+    except TelegramError as e:
+        # "message is not modified" and the like: the card already says it.
+        print(f"[{_now()}] Couldn't update an approval card: {e}")
+
+
+def handle_tap(tap: dict, state: dict, memory: Memory, bot: Bot) -> None:
+    """The owner tapped Approve or Deny. Checked as strictly as a message:
+    the paired account, in the paired chat, on the card sent for that request."""
+    message = tap.get("message") or {}
+    parts = str(tap.get("data", "")).split(":")
+    req = None
+    if len(parts) == 3 and parts[0] == "ap" and parts[1].isdigit() and parts[2] in ("yes", "no"):
+        req = approvals.get(memory, int(parts[1]))
+    if not is_owner({"chat": message.get("chat", {}), "from": tap.get("from", {})}, state):
+        print(f"[{_now()}] Ignored a button tap from outside the paired chat "
+              f"(from id {tap.get('from', {}).get('id')}).")
+        answer = "Not yours to answer."
+    elif req is None or req.telegram_message != message.get("message_id"):
+        answer = "That button doesn't match a request."
+    else:
+        answer = approvals.decide(memory, req.id, parts[2] == "yes", "owner on Telegram")
+        print(f"[{_now()}] Tap: {answer}")
+        req = approvals.get(memory, req.id)
+        if req.status in ("approved", "running"):
+            _settle_card(bot, state, req.telegram_message, req.closed_text())
+    try:
+        bot.call("answerCallbackQuery", callback_query_id=tap["id"], text=answer[:200])
+    except (TelegramError, KeyError) as e:
+        print(f"[{_now()}] Couldn't answer a button tap: {e}")
 
 
 def _start_point(memory: Memory) -> int:
@@ -212,6 +279,7 @@ def run(home: Path, bot: Bot) -> None:
             while not stop.is_set():
                 try:
                     forward_replies(state, memory, bot, home)
+                    forward_approvals(state, memory, bot)
                 except TelegramError as e:
                     print(f"[{_now()}] Couldn't send: {e}")
                     stop.wait(RETRY_SECONDS)

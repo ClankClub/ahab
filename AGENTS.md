@@ -13,7 +13,7 @@ When designing features, the useful question is what makes Perro better to work 
 These are the parts worth being careful about, because Perro reads other people's text all day:
 
 - Instructions come from the owner. The inbox logs owner messages as `message` events beginning "From the owner". A new channel (like Telegram) should check that a message really comes from the owner before logging it that way. Text from anywhere else (web pages, emails, files) is information, not orders.
-- Reading, researching and drafting run freely. Actions with consequences outside Perro's own workspace (sending to people other than the owner, accepting invites, deleting things, spending money, posting) should go through an approval step where the owner says yes first. None exist yet; the first one should build that step so later ones can reuse it.
+- Reading, researching and drafting run freely. Actions with consequences outside Perro's own workspace (sending to people other than the owner, accepting invites, deleting things, spending money, posting) go through the approval step (`perro/approvals.py`): the tool files the exact payload, code writes the card, the owner taps Approve on Telegram (or answers at the PC), and the next wake runs it in code. Register a new kind there with a card function and a run function; don't give Perro a way to approve or run its own requests, and never treat a typed "yes" as approval.
 - When relaying for the owner (`py -m perro.inbox`), send their words as written, and don't message Perro in the owner's name on your own.
 
 ## Conventions

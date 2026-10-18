@@ -27,7 +27,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from perro import alarms, dream, identity, inbox, n8n, skills, tools
+from perro import alarms, approvals, dream, identity, inbox, n8n, skills, tools
 from perro.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from perro.model import ModelClient, ModelError
 
@@ -287,6 +287,10 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
     alarms.ring_due(memory)
     # Same for letters from the owner waiting in the mailbox.
     inbox.deliver(memory)
+    # What the owner approved is carried out here, by code, before Perro
+    # thinks; every outcome (done, failed, denied, expired) is logged for it.
+    approvals.run_decided(memory)
+    asking = approvals.describe_pending(memory)
     messages = [
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Current time: {now} (your owner's local time: "
@@ -297,6 +301,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
                                     f"{inbox.describe_recent(memory)}\n\n"
                                     f"{memory.snapshot()}\n\n"
                                     f"## Your alarms\n{alarms.describe_pending(memory)}\n\n"
+                                    + (f"{asking}\n\n" if asking else "") +
                                     f"## Your skills\n{skills.describe(memory)}"},
     ]
 
@@ -587,8 +592,10 @@ def main() -> None:
                     wake_at, why = dream_at, " (to dream)"
                 print(f"--- next wake at {datetime.fromtimestamp(max(wake_at, time.time())):%H:%M}"
                       f" local{why}. Ctrl+C to stop. ---\n")
-                if sleep_until(wake_at, interrupt=lambda: inbox.knocked(memory)):
-                    print("--- knock: the owner sent a message; waking early. ---\n")
+                if sleep_until(wake_at, interrupt=lambda: inbox.knocked(memory)
+                               or approvals.waiting(memory)):
+                    print("--- knock: the owner sent a message or approved something;"
+                          " waking early. ---\n")
                     break
                 if not dreaming:
                     break
