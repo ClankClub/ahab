@@ -1,0 +1,26 @@
+# n8n for Perro, self-hosted in Docker. From this folder:
+#   docker compose up -d     start (and create on first run)
+#   docker compose down      stop (data stays in the n8n_data volume)
+#   docker compose pull      fetch a newer n8n, then `up -d` to switch to it
+# Editor: http://localhost:5678
+# Timezone: set N8N_TIMEZONE (an IANA name like Europe/Berlin) before `up`; default UTC.
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n
+    restart: unless-stopped
+    ports:
+      # 127.0.0.1 = reachable from this computer only, not the rest of the network.
+      - "127.0.0.1:5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=${N8N_TIMEZONE:-UTC}
+      - TZ=${N8N_TIMEZONE:-UTC}
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+    volumes:
+      # Workflows, credentials (the sign-ins) and settings live here, not in
+      # this folder. `docker compose down -v` deletes it; don't.
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  n8n_data:

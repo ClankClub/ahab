@@ -4,7 +4,8 @@ Perro never signs in to Google itself. The owner's n8n (a separate program,
 running in Docker on this computer) holds those sign-ins, and each thing
 Perro may do there is a workflow behind a webhook: a local web address that
 runs the workflow and answers with JSON. This module calls those addresses.
-The workflows themselves live in n8n (copies in ../n8n/*.json).
+The workflows themselves live in n8n, exported to n8n/workflows/ in this
+repo (setup in n8n/README.md).
 
 Three fences:
 - Perro never picks the address. Each tool names a fixed webhook path here,

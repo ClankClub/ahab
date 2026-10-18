@@ -1,7 +1,7 @@
 """Google Drive, Docs, Sheets, Tasks and Contacts, in Perro's own Google account.
 
 All five go through one n8n workflow, "Perro: Google relay"
-(../n8n/perro-google.json). It holds the five sign-ins and passes each
+(n8n/workflows/perro-google.json). It holds the five sign-ins and passes each
 request on to Google after a check of its own: only that service's Google
 address, and no deleting, sharing or trashing. This module is the other
 half. It builds the requests, so the relay never needs to know what a task

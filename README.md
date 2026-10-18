@@ -57,7 +57,7 @@ If `codex` isn't on your PATH, the desktop app's copy is under `~\.codex\package
 
 ### Google (through n8n)
 
-Perro never signs in to Google. Your n8n (`../n8n`, in Docker) holds the sign-ins, and Perro calls its webhooks on localhost; the workflows are the `perro-*.json` files there. Every call carries a key that n8n checks, so other programs and web pages on this PC can't use them. The key is the environment variable `PERRO_N8N_KEY`, and it must match n8n's credential "Perro relay key". Restart the heartbeat after changing it. See [docs/STATUS.md](docs/STATUS.md) for what each workflow does.
+Perro never signs in to Google. Your own n8n, in Docker, holds the sign-ins, and Perro calls its webhooks on localhost. Everything to set it up is in [n8n/](n8n/README.md): the Docker setup, the workflows, and which sign-ins to create. Every call carries a key that n8n checks, so other programs and web pages on this PC can't use them. The key is the environment variable `PERRO_N8N_KEY`, and it must match n8n's credential "Perro relay key". Restart the heartbeat after changing it. See [docs/STATUS.md](docs/STATUS.md) for what each workflow does.
 
 ### Telegram (chat from your phone)
 

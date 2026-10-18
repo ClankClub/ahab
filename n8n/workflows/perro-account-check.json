@@ -1,0 +1,275 @@
+{
+ "id": "PerroAcctCheck01",
+ "name": "Perro: account check",
+ "nodes": [
+  {
+   "parameters": {
+    "httpMethod": "GET",
+    "path": "perro/account-check",
+    "authentication": "headerAuth",
+    "responseMode": "responseNode",
+    "options": {}
+   },
+   "id": "7c3e0d00-1a2b-4c5d-8e9f-000000000000",
+   "name": "Check accounts",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2.2,
+   "position": [
+    0,
+    300
+   ],
+   "webhookId": "7c3e0d00-1a2b-4c5d-8e9f-0000000000aa",
+   "credentials": {
+    "httpHeaderAuth": {
+     "id": "PerroRelayKey001",
+     "name": "Perro relay key"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "method": "GET",
+    "url": "https://api.github.com/user",
+    "options": {
+     "response": {
+      "response": {
+       "fullResponse": true,
+       "neverError": true
+      }
+     }
+    },
+    "authentication": "predefinedCredentialType",
+    "nodeCredentialType": "githubApi"
+   },
+   "id": "7c3e0d00-1a2b-4c5d-8e9f-000000000001",
+   "name": "GitHub",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    220,
+    300
+   ],
+   "onError": "continueRegularOutput",
+   "credentials": {
+    "githubApi": {
+     "id": "nMR12kxS2OZmJRCn",
+     "name": "Perro Github"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "method": "GET",
+    "url": "https://api.vercel.com/v2/user",
+    "options": {
+     "response": {
+      "response": {
+       "fullResponse": true,
+       "neverError": true
+      }
+     }
+    },
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpBearerAuth"
+   },
+   "id": "7c3e0d00-1a2b-4c5d-8e9f-000000000002",
+   "name": "Vercel",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    440,
+    300
+   ],
+   "onError": "continueRegularOutput",
+   "credentials": {
+    "httpBearerAuth": {
+     "id": "zKxRMoisZ1urOaAJ",
+     "name": "Perro Vercel"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "method": "GET",
+    "url": "https://api.notion.com/v1/users/me",
+    "options": {
+     "response": {
+      "response": {
+       "fullResponse": true,
+       "neverError": true
+      }
+     }
+    },
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpBearerAuth",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Notion-Version",
+       "value": "2022-06-28"
+      }
+     ]
+    }
+   },
+   "id": "7c3e0d00-1a2b-4c5d-8e9f-000000000003",
+   "name": "Notion",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    660,
+    300
+   ],
+   "onError": "continueRegularOutput",
+   "credentials": {
+    "httpBearerAuth": {
+     "id": "nAYBOkyxydQQE0Km",
+     "name": "Perro Notion"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.notion.com/v1/search",
+    "options": {
+     "response": {
+      "response": {
+       "fullResponse": true,
+       "neverError": true
+      }
+     }
+    },
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpBearerAuth",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "Notion-Version",
+       "value": "2022-06-28"
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "{\"page_size\": 100}"
+   },
+   "id": "7c3e0d00-1a2b-4c5d-8e9f-000000000004",
+   "name": "Notion search",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    880,
+    300
+   ],
+   "onError": "continueRegularOutput",
+   "credentials": {
+    "httpBearerAuth": {
+     "id": "nAYBOkyxydQQE0Km",
+     "name": "Perro Notion"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "jsCode": "const g = $('GitHub').first().json, v = $('Vercel').first().json, n = $('Notion').first().json, s = $('Notion search').first().json;\nconst h = g.headers || {};\nreturn [{ json: {\n  github: { status: g.statusCode, login: g.body?.login ?? null, scopes: h['x-oauth-scopes'] ?? null, expires: h['github-authentication-token-expiration'] ?? null, error: g.body?.message ?? null },\n  vercel: { status: v.statusCode, username: v.body?.user?.username ?? null, error: v.body?.error?.message ?? null },\n  notion: { status: n.statusCode, bot: n.body?.name ?? null, workspace: n.body?.bot?.workspace_name ?? null, error: n.body?.message ?? null,\n            sees: s.body?.results?.length ?? null, more: s.body?.has_more ?? null,\n            kinds: (s.body?.results || []).map(r => r.object) }\n} }];"
+   },
+   "id": "7c3e0d00-1a2b-4c5d-8e9f-000000000005",
+   "name": "Sum up",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1100,
+    300
+   ]
+  },
+  {
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ $json }}",
+    "options": {}
+   },
+   "id": "7c3e0d00-1a2b-4c5d-8e9f-000000000006",
+   "name": "Answer",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.5,
+   "position": [
+    1320,
+    300
+   ]
+  }
+ ],
+ "connections": {
+  "Check accounts": {
+   "main": [
+    [
+     {
+      "node": "GitHub",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "GitHub": {
+   "main": [
+    [
+     {
+      "node": "Vercel",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Vercel": {
+   "main": [
+    [
+     {
+      "node": "Notion",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Notion": {
+   "main": [
+    [
+     {
+      "node": "Notion search",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Notion search": {
+   "main": [
+    [
+     {
+      "node": "Sum up",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Sum up": {
+   "main": [
+    [
+     {
+      "node": "Answer",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1"
+ },
+ "active": false
+}
