@@ -112,7 +112,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { events: $input.all().flatMap(i => (i.json.items || []).map(e => ({ calendar: i.json.summary, summary: e.summary, start: e.start, end: e.end, location: e.location, description: e.description }))).sort((a, b) => String(a.start.dateTime || a.start.date).localeCompare(String(b.start.dateTime || b.start.date))) } }}",
+        "responseBody": "={{ { events: $input.all().flatMap(i => (i.json.items || []).map(e => ({ calendar: i.json.summary, id: e.id, summary: e.summary, start: e.start, end: e.end, location: e.location, description: e.description }))).sort((a, b) => String(a.start.dateTime || a.start.date).localeCompare(String(b.start.dateTime || b.start.date))) } }}",
         "options": {}
       },
       "id": "5b0c3f0e-1a2b-4c3d-8e9f-000000000003",

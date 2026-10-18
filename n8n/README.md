@@ -4,10 +4,10 @@ Perro never signs in to anything. A self-hosted [n8n](https://n8n.io) on your ow
 
 | Workflow | Webhook | What it does |
 |---|---|---|
-| `perro-calendar.json` | GET `/webhook/perro/calendar` | Upcoming events on every calendar Perro's account can see. |
+| `perro-calendar.json` | GET `/webhook/perro/calendar` | Upcoming events on every calendar Perro's account can see, with their ids. |
 | `perro-email-search.json` | GET `/webhook/perro/email/search` | Gmail search: sender, subject, date, snippet. |
 | `perro-email-read.json` | GET `/webhook/perro/email/read` | One full email. |
-| `perro-google.json` | POST `/webhook/perro/google` | The relay for Drive, Docs, Sheets, Tasks and Contacts. It refuses any address outside the service's API, DELETE, and anything about sharing, permissions, trashing or clearing, so it can't share or delete even if Perro's code had a bug. |
+| `perro-google.json` | POST `/webhook/perro/google` | The relay for Drive, Docs, Sheets, Tasks, Contacts and Perro's own calendar. It refuses any address outside the service's API, DELETE, and anything about sharing, permissions, trashing or clearing, so it can't share or delete even if Perro's code had a bug. For the calendar it allows only events on Perro's own calendar, only a title, times, place, notes and reminders (no guests, so no invitations), and every change with `sendUpdates=none`. |
 | `perro-notion.json` | POST `/webhook/perro/notion` | The relay for Notion. It passes only the search, pages, blocks and databases parts of Notion's API, refuses DELETE and anything that archives or trashes, so it can't delete even if Perro's code had a bug. |
 | `perro-github.json` | POST `/webhook/perro/github` | The relay for GitHub, in Perro's own account. An allowlist: reading, making private repositories, and adding commits (blobs, trees, commits, unforced branch moves). The one setting it changes is making a repository public, which Perro's code only asks for after you approve. It refuses deleting, collaborators, hooks, keys, secrets, Actions and files under `.github/`. |
 | `perro-vercel.json` | POST `/webhook/perro/vercel` | The relay for Vercel, in Perro's own account. An allowlist: reading, making a project, uploading files, preview deployments of static files (no target, no build, no Git, nothing that runs code on Vercel), and redeploying one existing deployment as production, unchanged, which Perro's code only asks for after you approve. It refuses deleting, domains, aliases, environment variables and protection settings. |

@@ -1,7 +1,7 @@
-"""Google Drive, Docs, Sheets, Tasks and Contacts, in Perro's own Google account.
+"""Google Drive, Docs, Sheets, Tasks, Contacts and Calendar, in Perro's own Google account.
 
-All five go through one n8n workflow, "Perro: Google relay"
-(n8n/workflows/perro-google.json). It holds the five sign-ins and passes each
+All six go through one n8n workflow, "Perro: Google relay"
+(n8n/workflows/perro-google.json). It holds the six sign-ins and passes each
 request on to Google after a check of its own: only that service's Google
 address, and no deleting, sharing or trashing. This module is the other
 half. It builds the requests, so the relay never needs to know what a task
@@ -11,6 +11,9 @@ What Perro may do here, on purpose:
 - Read anything its account can see, including files the owner shares with it.
 - Create docs, sheets, tasks and contacts, and add to or edit them. None of
   that reaches another person.
+- Add events to its own calendar and change them, with no guests: an
+  invitation emails whoever is on it, so it waits for the approval step.
+  The owner sees the calendar by adding Perro's account on their phone.
 - Not delete, trash or share anything. Sharing is how a file reaches someone
   else, so it waits for the approval step AGENTS.md describes. For the owner
   to see what Perro makes, they share a Drive folder with Perro's account
@@ -25,7 +28,7 @@ from __future__ import annotations
 import json
 import re
 import urllib.parse
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from perro import n8n
 
@@ -36,6 +39,7 @@ BASES = {
     "sheets": "https://sheets.googleapis.com/v4/spreadsheets",
     "tasks": "https://tasks.googleapis.com/tasks/v1/",
     "contacts": "https://people.googleapis.com/v1/",
+    "calendar": "https://www.googleapis.com/calendar/v3/calendars/primary/events",
 }
 
 READ_CHAR_LIMIT = 8_000
@@ -478,3 +482,110 @@ def add_contact(name: str, email: str = "", phone: str = "", notes: str = "") ->
         body["biographies"] = [{"value": notes.strip(), "contentType": "TEXT_PLAIN"}]
     _google("contacts", "people:createContact", "POST", query={"personFields": "names"}, body=body)
     return f"Added {name} to your contacts."
+
+
+# --- Calendar ------------------------------------------------------------
+# Perro's own calendar only. No guests and no deleting (see the top); changes
+# go out with sendUpdates=none, so nobody is emailed about them.
+
+EVENT_TEXT_LIMIT = 8000
+QUIET = {"sendUpdates": "none"}
+
+
+def _moment(value, what: str) -> dict:
+    """'2026-10-20 14:30' (the owner's local time) or '2026-10-20' (all day), as Google takes it."""
+    value = str(value).strip().replace("T", " ")
+    try:
+        if len(value) == 10:
+            return {"date": date.fromisoformat(value).isoformat()}
+        if len(value) not in (16, 19):
+            raise ValueError
+        moment = datetime.strptime(value[:16], "%Y-%m-%d %H:%M")
+    except ValueError:
+        raise ValueError(f"{what} must be like 2026-10-20 14:30, or 2026-10-20 for a whole day.") from None
+    return {"dateTime": moment.astimezone().isoformat(timespec="seconds")}
+
+
+def _span(start: dict, end, length: timedelta | None = None) -> dict:
+    """The end Google wants: an hour (or the event's old length) after a time, the next
+    day after a date; a given end must be the same kind and come after the start."""
+    if end in (None, ""):
+        if "date" in start:
+            days = max(1, length.days) if length else 1
+            return {"date": (date.fromisoformat(start["date"]) + timedelta(days=days)).isoformat()}
+        moved = datetime.fromisoformat(start["dateTime"]) + (length or timedelta(hours=1))
+        return {"dateTime": moved.isoformat(timespec="seconds")}
+    end = _moment(end, "end")
+    if ("date" in start) != ("date" in end):
+        raise ValueError("start and end must both be times or both be dates.")
+    if "date" in end:  # the last day, given; Google wants the day after it
+        end = {"date": (date.fromisoformat(end["date"]) + timedelta(days=1)).isoformat()}
+        if end["date"] <= start["date"]:
+            raise ValueError("end is before start.")
+    elif datetime.fromisoformat(end["dateTime"]) <= datetime.fromisoformat(start["dateTime"]):
+        raise ValueError("end must be after start.")
+    return end
+
+
+def _length(event: dict) -> timedelta:
+    s, e = event.get("start") or {}, event.get("end") or {}
+    if "date" in s:
+        return date.fromisoformat(e.get("date") or s["date"]) - date.fromisoformat(s["date"]) or timedelta(days=1)
+    return datetime.fromisoformat(e["dateTime"]) - datetime.fromisoformat(s["dateTime"])
+
+
+def _reminder(minutes) -> dict:
+    if isinstance(minutes, bool) or not isinstance(minutes, int) or not 0 <= minutes <= 40320:
+        raise ValueError("remind_minutes must be a number of minutes before, 0 to 40320 (4 weeks).")
+    return {"useDefault": False, "overrides": [{"method": "popup", "minutes": minutes}]}
+
+
+def _event_line(e: dict) -> str:
+    line = f'"{e.get("summary") or "(no title)"}", {n8n._when(e.get("start") or {}, e.get("end") or {})}'
+    if e.get("location"):
+        line += f" @ {e['location']}"
+    return line + f" (id {e.get('id')})"
+
+
+def add_event(title: str, start: str, end: str = "", location: str = "", notes: str = "",
+              remind_minutes=None) -> str:
+    title = _text(title, "title", 1000).strip()
+    if not title:
+        raise ValueError("title is empty.")
+    begins = _moment(start, "start")
+    body = {"summary": title, "start": begins, "end": _span(begins, end)}
+    if _text(location, "location", 1000).strip():
+        body["location"] = location.strip()
+    if _text(notes, "notes", EVENT_TEXT_LIMIT).strip():
+        body["description"] = notes.strip()
+    if remind_minutes is not None:
+        body["reminders"] = _reminder(remind_minutes)
+    e = _google("calendar", "", "POST", query=QUIET, body=body)
+    return f"Added to your calendar: {_event_line(e)}."
+
+
+def update_event(id: str, title=None, start=None, end=None, location=None, notes=None,
+                 remind_minutes=None) -> str:
+    id = _id(id, "id")
+    body = {}
+    if title is not None:
+        if not _text(title, "title", 1000).strip():
+            raise ValueError("title is empty.")
+        body["summary"] = title.strip()
+    if location is not None:
+        body["location"] = _text(location, "location", 1000).strip()  # "" clears it
+    if notes is not None:
+        body["description"] = _text(notes, "notes", EVENT_TEXT_LIMIT).strip()
+    if remind_minutes is not None:
+        body["reminders"] = _reminder(remind_minutes)
+    if start not in (None, "") or end not in (None, ""):
+        old = _google("calendar", f"/{id}")
+        begins = _moment(start, "start") if start not in (None, "") else old.get("start") or {}
+        # Moving only the start keeps the event's length; moving only the end keeps its start.
+        same_kind = ("date" in begins) == ("date" in (old.get("start") or {}))
+        body["start"] = begins
+        body["end"] = _span(begins, end, _length(old) if same_kind else None)
+    if not body:
+        raise ValueError("Say what to change: title, start, end, location, notes or remind_minutes.")
+    e = _google("calendar", f"/{id}", "PATCH", query=QUIET, body=body)
+    return f"Updated: {_event_line(e)}."

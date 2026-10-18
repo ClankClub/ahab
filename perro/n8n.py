@@ -152,6 +152,8 @@ def check_calendar(days: int = 7) -> str:
         if event.get("location"):
             line += f" @ {event['location']}"
         line += f"  [{event.get('calendar', '?')}]"
+        if event.get("id"):
+            line += f" (id {event['id']})"
         description = " ".join(str(event.get("description") or "").split())
         if description:
             if len(description) > DESCRIPTION_CHAR_LIMIT:

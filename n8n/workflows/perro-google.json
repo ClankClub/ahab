@@ -28,7 +28,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// The second fence (Perro's Python code is the first): only Google API\n// addresses for the service named, no deleting, no sharing, no trashing.\nconst r = $input.first().json.body || {};\nconst prefixes = {\n  drive: ['https://www.googleapis.com/drive/v3/', 'https://www.googleapis.com/upload/drive/v3/'],\n  docs: ['https://docs.googleapis.com/v1/documents'],\n  sheets: ['https://sheets.googleapis.com/v4/spreadsheets'],\n  tasks: ['https://tasks.googleapis.com/tasks/v1/'],\n  contacts: ['https://people.googleapis.com/v1/'],\n};\nconst method = String(r.method || 'GET').toUpperCase();\nconst url = String(r.url || '');\nconst bodyText = r.body === undefined || r.body === null ? '' : JSON.stringify(r.body);\nlet refused = '';\nif (!prefixes[r.service]) refused = 'unknown service ' + JSON.stringify(r.service);\nelse if (!prefixes[r.service].some(p => url.startsWith(p))) refused = 'that address is not a ' + r.service + ' address';\nelse if (!['GET', 'POST', 'PATCH', 'PUT'].includes(method)) refused = method + ' is not allowed (nothing gets deleted through Perro)';\nelse if (/[?#]|\\.\\.|permissions|batchDelete|deleteContact|\\/clear|emptyTrash|transferOwnership/i.test(url)) refused = 'that kind of request is not allowed (no sharing or deleting)';\nelse if (/\"trashed\"|\"permissions\"/.test(bodyText)) refused = 'trashing and sharing are not allowed';\nreturn [{ json: { service: r.service, method, url, query: r.query || {}, body: r.body ?? {}, write: method !== 'GET', refused } }];"
+        "jsCode": "// The second fence (Perro's Python code is the first): only Google API\n// addresses for the service named, no deleting, no sharing, no trashing.\n// Calendar: events on Perro's own calendar only, with no guests (an invite\n// emails people), and every change sent with sendUpdates=none.\nconst r = $input.first().json.body || {};\nconst prefixes = {\n  drive: ['https://www.googleapis.com/drive/v3/', 'https://www.googleapis.com/upload/drive/v3/'],\n  docs: ['https://docs.googleapis.com/v1/documents'],\n  sheets: ['https://sheets.googleapis.com/v4/spreadsheets'],\n  tasks: ['https://tasks.googleapis.com/tasks/v1/'],\n  contacts: ['https://people.googleapis.com/v1/'],\n  calendar: ['https://www.googleapis.com/calendar/v3/calendars/primary/events'],\n};\nconst EVENT_KEYS = ['summary', 'description', 'location', 'start', 'end', 'reminders'];\nconst method = String(r.method || 'GET').toUpperCase();\nconst url = String(r.url || '');\nconst bodyText = r.body === undefined || r.body === null ? '' : JSON.stringify(r.body);\nlet refused = '';\nif (!prefixes[r.service]) refused = 'unknown service ' + JSON.stringify(r.service);\nelse if (!prefixes[r.service].some(p => url.startsWith(p))) refused = 'that address is not a ' + r.service + ' address';\nelse if (!['GET', 'POST', 'PATCH', 'PUT'].includes(method)) refused = method + ' is not allowed (nothing gets deleted through Perro)';\nelse if (/[?#]|\\.\\.|permissions|batchDelete|deleteContact|\\/clear|emptyTrash|transferOwnership/i.test(url)) refused = 'that kind of request is not allowed (no sharing or deleting)';\nelse if (/\"trashed\"|\"permissions\"/.test(bodyText)) refused = 'trashing and sharing are not allowed';\nelse if (r.service === 'calendar') {\n  const rest = url.slice(prefixes.calendar[0].length);\n  const body = r.body ?? {};\n  const query = r.query || {};\n  if (!/^(\\/[A-Za-z0-9_-]{5,200})?$/.test(rest)) refused = \"only events on Perro's own calendar\";\n  else if (method === 'PUT') refused = 'events are changed with PATCH';\n  else if (method === 'POST' && rest) refused = 'new events are made with POST to the events list';\n  else if (method === 'PATCH' && !rest) refused = 'name the event to change';\n  else if (method === 'GET' && Object.keys(query).length) refused = 'reading one event takes no options';\n  else if (method !== 'GET' && !(Object.keys(query).length === 1 && query.sendUpdates === 'none')) refused = 'calendar changes must tell nobody (sendUpdates=none, nothing else)';\n  else if (method !== 'GET' && !(body && typeof body === 'object' && !Array.isArray(body) && Object.keys(body).every(k => EVENT_KEYS.includes(k)))) refused = 'events take only a title, times, place, notes and reminders: no guests';\n}\nreturn [{ json: { service: r.service, method, url, query: r.query || {}, body: r.body ?? {}, write: method !== 'GET', refused } }];"
       },
       "id": "5a1f0c00-7e2b-4c11-9d40-000000000002",
       "name": "Check the request",
@@ -42,8 +42,8 @@
     {
       "parameters": {
         "mode": "expression",
-        "numberOutputs": 11,
-        "output": "={{ $json.refused ? 10 : ['drive', 'docs', 'sheets', 'tasks', 'contacts'].indexOf($json.service) * 2 + ($json.write ? 1 : 0) }}"
+        "numberOutputs": 13,
+        "output": "={{ $json.refused ? 12 : ['drive', 'docs', 'sheets', 'tasks', 'contacts', 'calendar'].indexOf($json.service) * 2 + ($json.write ? 1 : 0) }}"
       },
       "id": "5a1f0c00-7e2b-4c11-9d40-000000000003",
       "name": "Which service",
@@ -53,6 +53,77 @@
         480,
         700
       ]
+    },
+    {
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify($json.query) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "perro-google-calendar-read",
+      "name": "Calendar read",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        1600
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "QBv2AzLSpLisNkTP",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify($json.query) }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "perro-google-calendar-write",
+      "name": "Calendar write",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        1740
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "QBv2AzLSpLisNkTP",
+          "name": "Google Calendar account"
+        }
+      }
     },
     {
       "parameters": {
@@ -522,6 +593,20 @@
         ],
         [
           {
+            "node": "Calendar read",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Calendar write",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Answer Perro",
             "type": "main",
             "index": 0
@@ -629,6 +714,28 @@
       ]
     },
     "Contacts write": {
+      "main": [
+        [
+          {
+            "node": "Answer Perro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar read": {
+      "main": [
+        [
+          {
+            "node": "Answer Perro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar write": {
       "main": [
         [
           {
