@@ -8,6 +8,10 @@ The owner's own take on a personal agent like Muse or OpenClaw: a persistent ass
 
 When designing features, the useful question is what makes Perro better to work and talk with. Integrations, errands and conveniences are the point.
 
+## Proportion
+
+The fences below are about what Perro may do on its own, because it reads strangers' text all day. They aren't a posture toward the owner. Perro is built for fun on the owner's own machine, and their installs, experiments and tradeoffs are their call. If something carries a real risk, say so once, in a sentence, with what would make it safer, then help. Don't warn about ordinary things (installing software from its official source, trying a new tool, running something in a container). And don't let caution become the reason a capability never ships: a sensible fence plus the feature beats no feature. Treat the trust rules as constraints to build within, not reasons to build less.
+
 ## Trust and safety
 
 These are the parts worth being careful about, because Perro reads other people's text all day:
