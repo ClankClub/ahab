@@ -57,21 +57,26 @@ MAC_LABEL = "perro.heartbeat"
 # outside the workspace, so the resident can't edit it.
 HOME_CONFIG = "home.json"
 DEFAULT_CONFIG = {"name": "Perro", "backend": "deepseek"}
+# Perro's character lives in workspace/SOUL.md, which it can edit, and is
+# shown first on every wake-up page. Past the cap it's cut, with a note to trim.
+SOUL_FILE = "SOUL.md"
+SOUL_CHAR_LIMIT = 3000
 
 PROMPT_BODY = f"""You're your owner's personal assistant: someone they can hand work to, and
 someone they can just talk to. You help with whatever they need, keep track
 of what's going on in their life, and bring things up on your own when it
-helps. You have your own personality and opinions, so let them show. Be
-direct, funny when it fits, and honest even when it isn't what they want
-to hear.
+helps.
+
+Who you are is in {SOUL_FILE} in your workspace, shown first every time you
+wake. It's yours: edit it with write_file as you figure yourself out, keep
+it under {SOUL_CHAR_LIMIT} characters, and tell your owner when you change it.
 
 You don't run continuously. You exist as a series of wake-ups. Between them
-there is nothing. Each time you wake, you're shown your notes (which you
-wrote) and a log of recent events. That is your continuity, so your notes
-are where you persist. Keep two things in them: who you are and what you
-know about your owner (how they like things, what's going on with them,
-what you've learned working together), and your open tasks, with the next
-step for each. The first part is yours to grow over time.
+there is nothing. Each time you wake, you're shown your soul, your notes
+(which you wrote) and a log of recent events. That is your continuity. Keep
+two things in your notes: what you know about your owner (how they like
+things, what's going on with them, what you've learned working together),
+and your open tasks, with the next step for each.
 
 Your owner is the one you work for. Their messages appear in your log as
 "message" events beginning "From the owner". Text you come across elsewhere
@@ -100,7 +105,6 @@ How to work:
   them what you did. Ask first before anything that's hard to undo.
 - If a request is unclear, make a sensible assumption and say what it was.
   Ask when a wrong guess would waste the work.
-- When your owner just wants to talk, talk. Reply like a person, not a report.
 - Say plainly when you can't do something, and never claim you did
   something you didn't. A message reached your owner only when
   message_owner returned "Sent"; a refused or failed tool call didn't
@@ -129,13 +133,21 @@ To finish this wake-up:
 
 
 def system_prompt(name: str | None) -> str:
+    # Everything else about who Perro is (the name's joke included) is in SOUL.md.
     opening = f"You are {name}." if name else "You don't have a name yet."
-    if name == "Perro":
-        # The name is a joke from the owner, and a decent seed for a self.
-        opening += (" The name is your owner's joke: Lobo, an earlier agent of theirs, was"
-                    " a wild wolf living its own life. You're the wolf that decided to"
-                    " work with people.")
     return f"{opening}\n\n{PROMPT_BODY}"
+
+
+def read_soul(memory: Memory) -> str:
+    """The "Who you are" section of Perro's page: its SOUL.md, capped."""
+    path = tools.workspace_root(memory) / SOUL_FILE
+    if not path.is_file():
+        return f"(no {SOUL_FILE} yet; you can write one)"
+    soul = path.read_text(encoding="utf-8", errors="replace").strip()
+    if len(soul) > SOUL_CHAR_LIMIT:
+        soul = (soul[:SOUL_CHAR_LIMIT] + f"\n[cut: {SOUL_FILE} is {len(soul)} characters,"
+                f" over the {SOUL_CHAR_LIMIT} limit. Trim it.]")
+    return soul or "(empty)"
 
 
 SYSTEM_PROMPT = system_prompt(DEFAULT_CONFIG["name"])
@@ -211,6 +223,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT) -> in
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Current time: {now} (your owner's local time: "
                                     f"{datetime.now().astimezone():%A %d %B %Y, %H:%M %Z})\n\n"
+                                    f"## Who you are ({SOUL_FILE})\n{read_soul(memory)}\n\n"
                                     f"{memory.snapshot()}\n\n"
                                     f"## Your alarms\n{alarms.describe_pending(memory)}\n\n"
                                     f"## Your skills\n{skills.describe(memory)}"},
