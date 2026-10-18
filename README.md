@@ -44,7 +44,7 @@ py -m perro.model "Say hi in five words."
 
 ### Codex or Claude Code as the model (instead of an API key)
 
-Perro can think through your Codex or Claude Code subscription: backends `codex-luna` (GPT-6 Luna, low effort) and `claude-haiku` (Claude Haiku). Each CLI runs as the model only, with its own tools off, and uses a separate profile folder under `%LOCALAPPDATA%\Perro` (`PERRO_CLI_HOME` to move it), so it never sees your own CLAUDE.md, AGENTS.md, memories or plugins. Log in once per profile, in a terminal you close afterwards:
+Perro can think through your Codex or Claude Code subscription: backends `codex-luna` (GPT-6 Luna, high effort) and `claude-haiku` (Claude Haiku). Each CLI runs as the model only, with its own tools off, and uses a separate profile folder under `%LOCALAPPDATA%\Perro` (`PERRO_CLI_HOME` to move it), so it never sees your own CLAUDE.md, AGENTS.md, memories or plugins. Log in once per profile, in a terminal you close afterwards:
 
 ```powershell
 New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Perro\codex", "$env:LOCALAPPDATA\Perro\claude" | Out-Null
