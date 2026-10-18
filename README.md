@@ -15,10 +15,11 @@ Your PC: Perro runtime (Python)
   ├─ heartbeat      → wake, show memory, model decides, save, sleep until it chose
   ├─ inbox          → messages between you and Perro; where its instructions come from
   ├─ telegram       → bridge from a Telegram bot to the inbox, paired to your account only
-  ├─ tools          → about_yourself (its guide, docs/ABOUT_YOURSELF.md), recall, list/read/write files, set/cancel alarms, message you, read web pages, Google
+  ├─ tools          → about_yourself (its guide, docs/ABOUT_YOURSELF.md), recall, list/read/write files, set/cancel alarms, message you, read web pages, Google, Notion
   ├─ web            → read-only: any public page as text, plus Wikipedia search
   ├─ n8n, google    → its own Google account through your local n8n: calendar and Gmail (read),
   │                   Drive, Docs, Sheets, Tasks, Contacts (read and write; no deleting or sharing)
+  ├─ notion         → its own Notion workspace through the same n8n (read and write; no deleting)
   ├─ alarms         → reminders and follow-ups; the heartbeat wakes it for them
   ├─ skills         → know-how files it keeps in workspace/skills/
   ├─ dream          → once a day at 7:00, a quiet wake that tidies notes and files and writes workspace/dreams/
@@ -55,9 +56,9 @@ $env:CLAUDE_CONFIG_DIR = "$env:LOCALAPPDATA\Perro\claude"; claude auth login
 
 If `codex` isn't on your PATH, the desktop app's copy is under `~\.codex\packages\standalone\releases\<version>\bin\codex.exe` (Perro finds it there on its own, or set `PERRO_CODEX_BIN`). Then put `{"backend": "codex-luna"}` in `home/home.json` and restart the heartbeat.
 
-### Google (through n8n)
+### Google and Notion (through n8n)
 
-Perro never signs in to Google. Your own n8n, in Docker, holds the sign-ins, and Perro calls its webhooks on localhost. Everything to set it up is in [n8n/](n8n/README.md): the Docker setup, the workflows, and which sign-ins to create. Every call carries a key that n8n checks, so other programs and web pages on this PC can't use them. The key is the environment variable `PERRO_N8N_KEY`, and it must match n8n's credential "Perro relay key". Restart the heartbeat after changing it. See [docs/STATUS.md](docs/STATUS.md) for what each workflow does.
+Perro never signs in to Google or Notion. Your own n8n, in Docker, holds the sign-ins, and Perro calls its webhooks on localhost. Everything to set it up is in [n8n/](n8n/README.md): the Docker setup, the workflows, and which sign-ins to create. Every call carries a key that n8n checks, so other programs and web pages on this PC can't use them. The key is the environment variable `PERRO_N8N_KEY`, and it must match n8n's credential "Perro relay key". Restart the heartbeat after changing it. See [docs/STATUS.md](docs/STATUS.md) for what each workflow does.
 
 ### Telegram (chat from your phone)
 

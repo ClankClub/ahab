@@ -1,0 +1,234 @@
+{
+  "id": "PerroNotionRelay",
+  "name": "Perro: Notion relay",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "perro/notion",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "6b2e0d00-3c4d-4e5f-8a90-000000000001",
+      "name": "Perro asks",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "6b2e0d00-3c4d-4e5f-8a90-0000000000aa",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PerroRelayKey001",
+          "name": "Perro relay key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// The second fence (Perro's Python code is the first): only the Notion API\n// paths Perro uses, no deleting, no archiving or trashing.\nconst r = $input.first().json.body || {};\nconst method = String(r.method || 'GET').toUpperCase();\nconst url = String(r.url || '');\nconst bodyText = r.body === undefined || r.body === null ? '' : JSON.stringify(r.body);\nlet refused = '';\nif (!/^https:\\/\\/api\\.notion\\.com\\/v1\\/(search|pages|blocks|databases)(\\/|$)/.test(url)) refused = 'that address is not one of the Notion API paths Perro uses';\nelse if (!['GET', 'POST', 'PATCH'].includes(method)) refused = method + ' is not allowed (nothing gets deleted through Perro)';\nelse if (/[?#]|\\.\\./.test(url)) refused = 'that kind of address is not allowed (options go in query)';\nelse if (/\"(archived|in_trash|is_archived)\"/.test(bodyText)) refused = 'archiving and trashing are not allowed';\nreturn [{ json: { method, url, query: r.query || {}, body: r.body ?? {}, write: method !== 'GET', refused } }];"
+      },
+      "id": "6b2e0d00-3c4d-4e5f-8a90-000000000002",
+      "name": "Check the request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 3,
+        "output": "={{ $json.refused ? 2 : ($json.write ? 1 : 0) }}"
+      },
+      "id": "6b2e0d00-3c4d-4e5f-8a90-000000000003",
+      "name": "Read or write",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.refused ? { status: 403, body: { error: { message: 'The relay refused: ' + $json.refused } } } : { status: $json.statusCode || 500, body: $json.body ?? $json.data ?? ($json.error ? { error: { message: String($json.error.message || $json.error) } } : null) } }}",
+        "options": {}
+      },
+      "id": "6b2e0d00-3c4d-4e5f-8a90-000000000004",
+      "name": "Answer Perro",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1040,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify($json.query) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "6b2e0d00-3c4d-4e5f-8a90-000000000100",
+      "name": "Notion read",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        160
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "nAYBOkyxydQQE0Km",
+          "name": "Perro Notion"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "={{ $json.url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify($json.query) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "6b2e0d00-3c4d-4e5f-8a90-000000000101",
+      "name": "Notion write",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        300
+      ],
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "nAYBOkyxydQQE0Km",
+          "name": "Perro Notion"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Perro asks": {
+      "main": [
+        [
+          {
+            "node": "Check the request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check the request": {
+      "main": [
+        [
+          {
+            "node": "Read or write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read or write": {
+      "main": [
+        [
+          {
+            "node": "Notion read",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notion write",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Answer Perro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion read": {
+      "main": [
+        [
+          {
+            "node": "Answer Perro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion write": {
+      "main": [
+        [
+          {
+            "node": "Answer Perro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

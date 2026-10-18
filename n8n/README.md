@@ -8,6 +8,7 @@ Perro never signs in to anything. A self-hosted [n8n](https://n8n.io) on your ow
 | `perro-email-search.json` | GET `/webhook/perro/email/search` | Gmail search: sender, subject, date, snippet. |
 | `perro-email-read.json` | GET `/webhook/perro/email/read` | One full email. |
 | `perro-google.json` | POST `/webhook/perro/google` | The relay for Drive, Docs, Sheets, Tasks and Contacts. It refuses any address outside the service's API, DELETE, and anything about sharing, permissions, trashing or clearing, so it can't share or delete even if Perro's code had a bug. |
+| `perro-notion.json` | POST `/webhook/perro/notion` | The relay for Notion. It passes only the search, pages, blocks and databases parts of Notion's API, refuses DELETE and anything that archives or trashes, so it can't delete even if Perro's code had a bug. |
 | `perro-account-check.json` | GET `/webhook/perro/account-check` | Optional. Asks GitHub, Vercel and Notion who Perro is, to see whether a sign-in has lapsed. No Perro tool uses it yet. |
 
 Every webhook checks a header key, so other programs and web pages on your computer can't use them.
@@ -45,7 +46,9 @@ In n8n, add one credential per service, named exactly as below, each with that O
 | `Google Tasks account` | Google Tasks OAuth2 API |
 | `Google Contacts account` | Google Contacts OAuth2 API |
 
-For the optional account check: `Perro Github` (GitHub API, a token), and `Perro Vercel` and `Perro Notion` (Bearer Auth, each service's token).
+**3b. Notion (optional).** Give Perro its own Notion workspace. At notion.so/profile/integrations, make an internal integration for that workspace with read, update and insert content, and copy its secret. In n8n, add a **Bearer Auth** credential named exactly `Perro Notion` with that secret. The integration sees only the pages and databases you connect to it: on each top-level one, the menu, then "Connections", then the integration (whatever's inside comes along).
+
+For the optional account check: `Perro Github` (GitHub API, a token) and `Perro Vercel` (Bearer Auth, its token), plus `Perro Notion` from above.
 
 **4. Import the workflows.** In n8n: "Create workflow", then the menu, then "Import from file", once per file in `workflows/`. Open each one; if a node shows a credential warning, pick the matching credential from step 2 or 3. Then switch each workflow to active (published). Or from a terminal:
 
