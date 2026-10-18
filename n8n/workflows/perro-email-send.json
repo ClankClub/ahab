@@ -1,0 +1,218 @@
+{
+  "name": "Perro: email send",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "perro/email/send",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "5c3b2a10-7e6f-4d8c-9b1a-000000000001",
+      "name": "Perro asks",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "5c3b2a10-7e6f-4d8c-9b1a-0000000000aa",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "PerroRelayKey001",
+          "name": "Perro relay key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ String(($json.body || {}).to || '').trim().toLowerCase() }}",
+        "dataPropertyName": "toHash",
+        "encoding": "hex"
+      },
+      "id": "5c3b2a10-7e6f-4d8c-9b1a-000000000002",
+      "name": "Hash the recipient",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{ String(($json.body || {}).bcc || '').trim().toLowerCase() }}",
+        "dataPropertyName": "bccHash",
+        "encoding": "hex"
+      },
+      "id": "5c3b2a10-7e6f-4d8c-9b1a-000000000003",
+      "name": "Hash the bcc",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The second fence for Perro's email (the first is perro/mail.py). Perro may\n// write to one person at a time, from a short list kept here only as SHA-256\n// hashes of the addresses (this file is in a public repo), at most DAILY a day.\n// The message itself is built here, so nothing but these headers can go out.\nconst ALLOWED = [\"261682eabf66e077a16962386cdd869a5ed3fa395ed03b81b48ba11ad218d58d\", \"3d9a1a17ecdbd8a0ca4274e322bf93b0b14d52fbd5c28dca908f45250416a102\", \"635a0ed5736e9a98c3c5dbf8aafb553193cea19bae1998955f93d472848fe691\", \"9fc8937fc21a846eca9dd4e8a2719a9d3e4380ebebf4875a8422c5726a44ed25\", \"c251b97316bff2051229866ce97f4dcbda4f023df867ef81a23803398678c251\", \"eaf0a0f4af18ad0ff741ba617a21e0d714dbc54488fdca7347ab5034a773da83\", \"ee928e056e831d62d6ab92d3312c80edd7eb6d890feb3b1ce0f19361c6d9b56d\"];\nconst DAILY = 30;\nconst FIELDS = ['to', 'bcc', 'subject', 'body', 'threadId', 'inReplyTo'];\nconst ADDRESS = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$/;\nconst j = $input.first().json;\nconst b = j.body || {};\nconst refuse = (why) => [{ json: { refused: why } }];\n\nif (typeof b !== 'object' || Array.isArray(b)) return refuse('the body must be an object');\nfor (const k of Object.keys(b)) if (!FIELDS.includes(k)) return refuse('unexpected field ' + k);\nif (typeof b.to !== 'string' || !ADDRESS.test(b.to)) return refuse('to must be one address');\nif (!ALLOWED.includes(j.toHash)) return refuse('that address is not on the list');\nif (b.bcc !== undefined) {\n  if (typeof b.bcc !== 'string' || !ADDRESS.test(b.bcc)) return refuse('bcc must be one address');\n  if (!ALLOWED.includes(j.bccHash)) return refuse('the bcc address is not on the list');\n}\nif (typeof b.subject !== 'string' || !b.subject || b.subject.length > 200 || /[\\x00-\\x1f\\x7f]/.test(b.subject))\n  return refuse('the subject must be one line, up to 200 characters');\nif (typeof b.body !== 'string' || !b.body || b.body.length > 20000) return refuse('the body must be 1 to 20000 characters');\nif (b.threadId !== undefined && (typeof b.threadId !== 'string' || !/^[0-9a-f]{6,40}$/.test(b.threadId)))\n  return refuse('bad threadId');\nif (b.inReplyTo !== undefined && (typeof b.inReplyTo !== 'string' || !/^<[^<>\\s]{3,300}>$/.test(b.inReplyTo)))\n  return refuse('bad inReplyTo');\n\nconst seen = $getWorkflowStaticData('global');\nconst today = new Date().toISOString().slice(0, 10);\nif (seen.day !== today) { seen.day = today; seen.count = 0; }\nif (seen.count >= DAILY) return refuse('the daily limit is reached');\nseen.count += 1;\n\nconst b64 = (t) => Buffer.from(t, 'utf8').toString('base64');\nconst headers = ['To: ' + b.to];\nif (b.bcc) headers.push('Bcc: ' + b.bcc);\nheaders.push('Subject: =?UTF-8?B?' + b64(b.subject) + '?=', 'MIME-Version: 1.0',\n             'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64');\nif (b.inReplyTo) headers.push('In-Reply-To: ' + b.inReplyTo, 'References: ' + b.inReplyTo);\nconst text = b64(b.body.replace(/\\r?\\n/g, '\\r\\n')).replace(/(.{76})/g, '$1\\r\\n');\nconst raw = Buffer.from(headers.join('\\r\\n') + '\\r\\n\\r\\n' + text, 'utf8').toString('base64')\n  .replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\nconst send = { raw };\nif (b.threadId) send.threadId = b.threadId;\nreturn [{ json: { send } }];\n"
+      },
+      "id": "5c3b2a10-7e6f-4d8c-9b1a-000000000004",
+      "name": "Check the email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 2,
+        "output": "={{ $json.refused ? 1 : 0 }}"
+      },
+      "id": "5c3b2a10-7e6f-4d8c-9b1a-000000000005",
+      "name": "Send or refuse",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.send) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "5c3b2a10-7e6f-4d8c-9b1a-000000000006",
+      "name": "Gmail send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        200
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "or2O9yfQudisXUxX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.refused ? { error: 'The relay refused: ' + $json.refused } : ($json.statusCode === 200 && $json.body && $json.body.id ? { id: $json.body.id, threadId: $json.body.threadId } : { error: 'Gmail said ' + $json.statusCode + ': ' + String((($json.body || {}).error || {}).message || 'no reason given') }) }}",
+        "options": {}
+      },
+      "id": "5c3b2a10-7e6f-4d8c-9b1a-000000000007",
+      "name": "Answer Perro",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1200,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Perro asks": {
+      "main": [
+        [
+          {
+            "node": "Hash the recipient",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hash the recipient": {
+      "main": [
+        [
+          {
+            "node": "Hash the bcc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hash the bcc": {
+      "main": [
+        [
+          {
+            "node": "Check the email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check the email": {
+      "main": [
+        [
+          {
+            "node": "Send or refuse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send or refuse": {
+      "main": [
+        [
+          {
+            "node": "Gmail send",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Answer Perro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail send": {
+      "main": [
+        [
+          {
+            "node": "Answer Perro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "id": "PerroEmailSend01"
+}

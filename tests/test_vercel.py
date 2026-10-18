@@ -213,5 +213,5 @@ assert "- dpl_D8: publish attempt, error" in out and "- dpl_D5: public, ready" i
 # Vercel saying no reads as a refusal.
 n8n.send = lambda path, payload, limit=None: {"status": 403, "body": {"error": {"message": "The relay refused: nope"}}}
 assert run("list_websites", {}) == "list_websites refused: Vercel said no (HTTP 403): The relay refused: nope"
-assert len(tools.TOOLS) == 42
+assert len(tools.TOOLS) == 43
 print("vercel ok")

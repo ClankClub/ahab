@@ -236,5 +236,5 @@ for bad in ({"name": ""}, {"name": "X", "email": "not an email"}, {"name": "X", 
     assert "Bad args" in run("add_contact", bad, (200, {})) and not SEEN, bad
 print("contacts tests passed")
 
-assert len(tools.TOOLS) == 42, len(tools.TOOLS)
+assert len(tools.TOOLS) == 43, len(tools.TOOLS)
 print(f"tool descriptions: {len(tools.describe())} chars")

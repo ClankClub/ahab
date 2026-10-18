@@ -144,5 +144,5 @@ m = Memory(pathlib.Path(tempfile.mkdtemp()))
 n8n.send = lambda path, payload: {"status": 403, "body": {"error": {"message": "The relay refused: nope"}}}
 assert tools.run(m, "search_notion", {}).startswith("search_notion refused: Notion said no (HTTP 403): The relay refused")
 assert tools.run(m, "read_notion", {"id": "zzz"}).startswith("Bad args for read_notion")
-assert len(tools.TOOLS) == 42, len(tools.TOOLS)
+assert len(tools.TOOLS) == 43, len(tools.TOOLS)
 print("notion tests passed")

@@ -18,7 +18,7 @@ Your PC: Perro runtime (Python)
   ├─ telegram       → bridge from a Telegram bot to the inbox, paired to your account only
   ├─ tools          → about_yourself (its guide, docs/ABOUT_YOURSELF.md), recall, list/read/write files, set/cancel alarms, message you, read web pages, Google, Notion, start/check builds, GitHub, Vercel
   ├─ web            → read-only: any public page as text, plus Wikipedia search
-  ├─ n8n, google    → its own Google account through your local n8n: Gmail (read),
+  ├─ n8n, google    → its own Google account through your local n8n: Gmail (read; send to a list you keep),
   │                   its calendar, Drive, Docs, Sheets, Tasks, Contacts (read and write; no deleting,
   │                   sharing or calendar guests)
   ├─ notion         → its own Notion workspace through the same n8n (read and write; no deleting)
