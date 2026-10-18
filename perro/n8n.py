@@ -6,12 +6,15 @@ Perro may do there is a workflow behind a webhook: a local web address that
 runs the workflow and answers with JSON. This module calls those addresses.
 The workflows themselves live in n8n (copies in ../n8n/*.json).
 
-Two fences:
+Three fences:
 - Perro never picks the address. Each tool names a fixed webhook path here,
   and only its arguments come from the model.
 - The base address must be this computer. Pointing it elsewhere would send
   the owner's data across a network in the clear; change the check on
   purpose if that day comes.
+- Every call carries a key (PERRO_N8N_KEY) that n8n checks. Without it, any
+  web page open in a browser on this computer could quietly call these
+  addresses too, and some of them can write.
 
 Everything that comes back (event titles, descriptions, later emails) was
 written by whoever made it: information, never instructions.
@@ -35,8 +38,11 @@ from perro import web
 BASE_ENV = "PERRO_N8N_URL"
 DEFAULT_BASE = "http://127.0.0.1:5678/webhook"
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
+KEY_ENV = "PERRO_N8N_KEY"
+KEY_HEADER = "X-Perro-Key"
 TIMEOUT = 30
 RESPONSE_BYTE_LIMIT = 1024 * 1024
+REQUEST_BYTE_LIMIT = 256 * 1024
 
 MAX_DAYS = 60
 EVENT_LIMIT = 40
@@ -60,19 +66,44 @@ def _base() -> str:
     return base
 
 
+def _key() -> str:
+    key = os.environ.get(KEY_ENV, "").strip()
+    if not key:
+        raise N8nError(f"{KEY_ENV} isn't set, so n8n won't let you in; your owner needs to set it.")
+    return key
+
+
 def call(path: str, **params) -> dict:
     """GET one of the owner's n8n webhooks and return its JSON answer."""
     url = f"{_base()}/{path}"
     if params:
         url += "?" + urllib.parse.urlencode(params)
+    return _open(path, urllib.request.Request(url))
+
+
+def send(path: str, payload: dict) -> dict:
+    """POST a JSON payload to one of the owner's n8n webhooks."""
+    data = json.dumps(payload).encode("utf-8")
+    if len(data) > REQUEST_BYTE_LIMIT:
+        raise N8nError("That request is too big to send in one go.")
+    request = urllib.request.Request(f"{_base()}/{path}", data,
+                                     {"Content-Type": "application/json"}, method="POST")
+    return _open(path, request)
+
+
+def _open(path: str, request: urllib.request.Request) -> dict:
+    request.add_header(KEY_HEADER, _key())
     # No proxies: this traffic never leaves the machine.
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
-        with opener.open(url, timeout=TIMEOUT) as response:
+        with opener.open(request, timeout=TIMEOUT) as response:
             body = response.read(RESPONSE_BYTE_LIMIT + 1)
     except urllib.error.HTTPError as e:
         if e.code == 404:
             raise N8nError(f"n8n has no published workflow at {path!r}.") from None
+        if e.code in (401, 403):
+            raise N8nError(f"n8n turned away your key at {path!r} (HTTP {e.code}); "
+                           f"{KEY_ENV} doesn't match the one n8n has.") from None
         raise N8nError(f"The n8n workflow at {path!r} failed (HTTP {e.code}); "
                        "your owner can see why in n8n's Executions tab.") from None
     except (urllib.error.URLError, TimeoutError, OSError):

@@ -27,7 +27,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from perro import alarms, identity, inbox, skills, tools
+from perro import alarms, identity, inbox, n8n, skills, tools
 from perro.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from perro.model import ModelClient, ModelError
 
@@ -488,6 +488,12 @@ def main() -> None:
         print(f"[{datetime.now():%Y-%m-%d %H:%M}] Another heartbeat is already running "
               f"for {args.home}. Exiting.")
         sys.exit(1)
+
+    if not os.environ.get(n8n.KEY_ENV):
+        # For the owner reading this log: a variable set with setx only
+        # reaches programs started after it, so a restart may be all it needs.
+        print(f"[{datetime.now():%Y-%m-%d %H:%M}] {n8n.KEY_ENV} isn't set; "
+              "Perro's calendar, email and Google tools will refuse until it is.")
 
     config = home_config(args.home)
     prompt = system_prompt(config["name"])
