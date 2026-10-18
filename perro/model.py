@@ -4,6 +4,9 @@ Every backend Perro might use (DeepSeek, OpenAI, a local llama.cpp or Ollama
 server) speaks the same "OpenAI-compatible chat completions" protocol:
 POST a JSON list of messages to <base_url>/chat/completions, get JSON back.
 So swapping models means changing a URL and a model name, nothing else.
+The exceptions are the CLI backends (codex-luna, claude-haiku), which run
+Codex or Claude Code as the model instead; they live in cli_model.py and
+answer the same complete() call.
 
 This module knows nothing about memory, heartbeats, or tools. It takes a
 conversation in and gives a reply out. Everything else is built on top.
@@ -47,6 +50,10 @@ BACKENDS = {
         # every option. This makes it skip hosts that would ignore JSON mode.
         "extra": {"provider": {"require_parameters": True}},
     },
+    # Codex or Claude Code as the model, through Perro's own logged-in profile
+    # for each (see cli_model.py). No API key: the CLI holds the sign-in.
+    "codex-luna": {"cli": "codex", "model": "gpt-6-luna", "effort": "low"},
+    "claude-haiku": {"cli": "claude", "model": "haiku"},
 }
 
 # How many times to ask when JSON mode comes back empty or with leaked markup.
@@ -92,6 +99,9 @@ class ModelClient:
         if name not in BACKENDS:
             raise ModelError(f"Unknown backend {name!r}; known: {', '.join(BACKENDS)}")
         config = dict(BACKENDS[name])
+        if "cli" in config:
+            from perro.cli_model import CliClient  # imports Reply from here
+            return CliClient(**{**config, **overrides})
         key_env = config.pop("api_key_env")
         api_key = os.environ.get(key_env) if key_env else None
         if key_env and not api_key:

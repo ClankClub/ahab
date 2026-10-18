@@ -42,6 +42,18 @@ Check the model client works:
 py -m perro.model "Say hi in five words."
 ```
 
+### Codex or Claude Code as the model (instead of an API key)
+
+Perro can think through your Codex or Claude Code subscription: backends `codex-luna` (GPT-6 Luna, low effort) and `claude-haiku` (Claude Haiku). Each CLI runs as the model only, with its own tools off, and uses a separate profile folder under `%LOCALAPPDATA%\Perro` (`PERRO_CLI_HOME` to move it), so it never sees your own CLAUDE.md, AGENTS.md, memories or plugins. Log in once per profile, in a terminal you close afterwards:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Perro\codex", "$env:LOCALAPPDATA\Perro\claude" | Out-Null
+$env:CODEX_HOME = "$env:LOCALAPPDATA\Perro\codex"; codex login
+$env:CLAUDE_CONFIG_DIR = "$env:LOCALAPPDATA\Perro\claude"; claude auth login
+```
+
+If `codex` isn't on your PATH, the desktop app's copy is under `~\.codex\packages\standalone\releases\<version>\bin\codex.exe` (Perro finds it there on its own, or set `PERRO_CODEX_BIN`). Then put `{"backend": "codex-luna"}` in `home/home.json` and restart the heartbeat.
+
 ### Google (through n8n)
 
 Perro never signs in to Google. Your n8n (`../n8n`, in Docker) holds the sign-ins, and Perro calls its webhooks on localhost; the workflows are the `perro-*.json` files there. Every call carries a key that n8n checks, so other programs and web pages on this PC can't use them. The key is the environment variable `PERRO_N8N_KEY`, and it must match n8n's credential "Perro relay key". Restart the heartbeat after changing it. See [docs/STATUS.md](docs/STATUS.md) for what each workflow does.
