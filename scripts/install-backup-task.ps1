@@ -1,0 +1,45 @@
+# Registers a scheduled task that backs up Perro's home (commit + push to its
+# private repo) every few hours, hidden. No admin needed.
+#
+#   .\scripts\install-backup-task.ps1                 every 6 hours
+#   .\scripts\install-backup-task.ps1 -EveryHours 2   a different interval
+#   .\scripts\install-backup-task.ps1 -Remove         uninstall
+#
+# Run it now by hand:  Start-ScheduledTask "Perro backup"
+# Its output goes to home\backup.log.
+param(
+    [switch]$Remove,
+    [int]$EveryHours = 6,
+    [string]$Pythonw = (Join-Path (Split-Path (Get-Command python).Source) "pythonw.exe")
+)
+
+$TaskName = "Perro backup"
+
+if ($Remove) {
+    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+    Write-Host "Removed '$TaskName'."
+    return
+}
+
+$repo = Split-Path -Parent $PSScriptRoot
+if (-not (Test-Path $Pythonw)) { throw "pythonw.exe not found at $Pythonw" }
+
+$action = New-ScheduledTaskAction -Execute $Pythonw `
+    -Argument "-X utf8 -m perro.backup --log" -WorkingDirectory $repo
+
+# Repeat every N hours, starting a minute from now, for ~10 years.
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
+    -RepetitionInterval (New-TimeSpan -Hours $EveryHours) `
+    -RepetitionDuration (New-TimeSpan -Days 3650)
+
+# StartWhenAvailable: if the PC was off or asleep at a scheduled time, run as
+# soon as it's back. A backup is quick, so cap it at 10 minutes.
+$settings = New-ScheduledTaskSettingsSet `
+    -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 10) -MultipleInstances IgnoreNew
+
+Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
+    -Settings $settings -Force `
+    -Description "Commits and pushes Perro's home/ to its private backup repo." | Out-Null
+
+Write-Host "Installed '$TaskName': every $EveryHours hours, first run in about a minute."
