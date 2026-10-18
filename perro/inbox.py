@@ -11,6 +11,9 @@ heartbeat notices within a few seconds and wakes Perro early.
 
 Perro answers and reports results with the message_owner tool. Both directions
 are also logged as `message` events, so Perro can recall its conversations.
+Every wake-up page shows the latest messages under "Recent conversation"
+(describe_recent), so the thread survives busy wake-ups full of tool calls;
+the event log then shows message events by their header line only.
 
   python -m perro.inbox "hello"          leave a letter (read at next wake)
   python -m perro.inbox --now "hello"    knock: wake Perro to read it
@@ -28,6 +31,9 @@ from pathlib import Path
 from perro.memory import DEFAULT_HOME, Memory
 
 MESSAGE_CHAR_LIMIT = 4000
+# How much of the conversation Perro's page shows every wake-up.
+RECENT_LIMIT = 16
+RECENT_CHAR_LIMIT = 4000
 
 
 def _table(memory: Memory) -> None:
@@ -77,6 +83,34 @@ def conversation(memory: Memory, limit: int = 20) -> list[tuple]:
         (limit,),
     ).fetchall()
     return list(reversed(rows))
+
+
+def describe_recent(memory: Memory, limit: int = RECENT_LIMIT,
+                    char_limit: int = RECENT_CHAR_LIMIT) -> str:
+    """The "Recent conversation" section of Perro's page, oldest first.
+
+    Shown apart from the event log so tool calls and reasoning can't push the
+    conversation off the page. Owner messages count once Perro has been given
+    them (read_at set); a letter still waiting in the mailbox isn't shown.
+    Newest messages win the space; the newest one is always shown in full.
+    """
+    _table(memory)
+    rows = memory.db.execute(
+        "SELECT time, sender, text FROM messages "
+        "WHERE sender = 'perro' OR read_at IS NOT NULL ORDER BY id DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    lines, used = [], 0
+    for sent, sender, text in rows:
+        when = datetime.fromisoformat(sent).astimezone().strftime("%a %d %b %H:%M")
+        line = f"[{when}] {'Owner' if sender == 'owner' else 'You'}: {text}"
+        if lines and used + len(line) > char_limit:
+            break
+        lines.append(line)
+        used += len(line)
+    if not lines:
+        return "(no messages yet)"
+    return "\n\n".join(reversed(lines))
 
 
 def owner_reads(memory: Memory) -> None:

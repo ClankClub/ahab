@@ -32,8 +32,9 @@ DEFAULT_HOME = Path(__file__).resolve().parent.parent / "home"
 NOTES_CHAR_LIMIT = 4000
 
 # Event kinds whose full text is too long for the page; snapshot() shows only
-# their first line.
-HEADER_ONLY_KINDS = ("notes", "tool", "reasoning")
+# their first line. Messages are shown in full in their own section instead
+# (inbox.describe_recent), so here they'd only be a second copy.
+HEADER_ONLY_KINDS = ("notes", "tool", "reasoning", "message")
 
 
 @dataclass
