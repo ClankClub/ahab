@@ -31,6 +31,8 @@ Tools so far:
   search_contacts, add_contact                       Google Contacts
   search_notion, read_notion, create_notion_page,
   append_to_notion, update_notion                    Notion (see notion.py)
+  start_build, check_build, read_build_file          get a website built by Codex,
+                                                     in a locked box (see workshop.py)
 
 The workspace is the first time Perro can touch the disk, so every path it
 gives goes through _resolve() below, which is the whole sandbox. Its job:
@@ -46,7 +48,7 @@ import os
 import re
 from pathlib import Path
 
-from perro import alarms, google, inbox, n8n, notion, web
+from perro import alarms, google, inbox, n8n, notion, web, workshop
 from perro.memory import Memory
 
 # What Perro can and can't do, kept in the code repo so Perro can read it but
@@ -301,6 +303,16 @@ def _relay_tool(function):
     return tool
 
 
+def _workshop_tool(function):
+    """The build tools (workshop.py), wrapped so a refusal reads as one."""
+    def tool(memory: Memory, **args) -> str:
+        try:
+            return function(memory, **args)
+        except workshop.WorkshopError as e:
+            raise ToolError(str(e)) from None
+    return tool
+
+
 # name -> (function, description shown to the model)
 TOOLS = {
     "about_yourself": (
@@ -503,6 +515,27 @@ TOOLS = {
         _relay_tool(notion.update_notion),
         'Change a Notion page\'s title, or a database row\'s fields by name ("" empties one). '
         'Args: {"id": "<page id>", "title": "<title>", "fields": {"Status": "Done"}} (title or fields)',
+    ),
+    # The workshop: Codex builds static sites in a locked container on the
+    # owner's PC. Nothing is published (see workshop.py).
+    "start_build": (
+        _workshop_tool(workshop.start_build),
+        'Have a small static website built (by Codex, a coding agent, in a sandbox on your '
+        "owner's PC; it stays there, unpublished). Write the brief as you would for a "
+        'designer: purpose, audience, pages, content, look. The same name again changes that '
+        f'site. Runs in the background up to {workshop.BUILD_MINUTES + workshop.CHECK_MINUTES} min '
+        f'and wakes you when done; one at a time, {workshop.DAILY_LIMIT} a day. '
+        f'Args: {{"name": "<short-name-like-this>", "brief": "<up to {workshop.BRIEF_CHAR_LIMIT} chars>"}}',
+    ),
+    "check_build": (
+        _workshop_tool(workshop.check_build),
+        "See a site's latest build: how it went, Codex's report, its files. No name lists "
+        'your sites. Args: {"name": "<site>"} (optional)',
+    ),
+    "read_build_file": (
+        _workshop_tool(workshop.read_build_file),
+        f"Read one of a site's files, {workshop.READ_CHAR_LIMIT} chars at a time. "
+        'Args: {"name": "<site>", "path": "<file>", "start": <char offset>} (start optional)',
     ),
 }
 

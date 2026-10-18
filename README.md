@@ -15,12 +15,13 @@ Your PC: Perro runtime (Python)
   ├─ heartbeat      → wake, show memory, model decides, save, sleep until it chose
   ├─ inbox          → messages between you and Perro; where its instructions come from
   ├─ telegram       → bridge from a Telegram bot to the inbox, paired to your account only
-  ├─ tools          → about_yourself (its guide, docs/ABOUT_YOURSELF.md), recall, list/read/write files, set/cancel alarms, message you, read web pages, Google, Notion
+  ├─ tools          → about_yourself (its guide, docs/ABOUT_YOURSELF.md), recall, list/read/write files, set/cancel alarms, message you, read web pages, Google, Notion, start/check builds
   ├─ web            → read-only: any public page as text, plus Wikipedia search
   ├─ n8n, google    → its own Google account through your local n8n: calendar and Gmail (read),
   │                   Drive, Docs, Sheets, Tasks, Contacts (read and write; no deleting or sharing)
   ├─ notion         → its own Notion workspace through the same n8n (read and write; no deleting)
   ├─ alarms         → reminders and follow-ups; the heartbeat wakes it for them
+  ├─ workshop       → Codex builds static sites in a locked Docker box (workshop/); nothing is published
   ├─ approvals      → outward actions wait for your Approve/Deny tap on Telegram, then run in code
   ├─ skills         → know-how files it keeps in workspace/skills/
   ├─ dream          → once a day at 7:00, a quiet wake that tidies notes and files and writes workspace/dreams/
@@ -61,6 +62,17 @@ If `codex` isn't on your PATH, the desktop app's copy is under `~\.codex\package
 
 Perro never signs in to Google or Notion. Your own n8n, in Docker, holds the sign-ins, and Perro calls its webhooks on localhost. Everything to set it up is in [n8n/](n8n/README.md): the Docker setup, the workflows, and which sign-ins to create. Every call carries a key that n8n checks, so other programs and web pages on this PC can't use them. The key is the environment variable `PERRO_N8N_KEY`, and it must match n8n's credential "Perro relay key". Restart the heartbeat after changing it. See [docs/STATUS.md](docs/STATUS.md) for what each workflow does.
 
+### The workshop (Codex builds sites, in Docker)
+
+Perro can have small static websites built: it writes a brief, and Codex builds the site in a locked container on this PC (see `perro/workshop.py` for exactly how it's locked down). Nothing is published. It needs Docker Desktop running and a Codex login of the builder's own, separate from Perro's model profile:
+
+```powershell
+py -m perro.workshop --setup     # builds the image, starts the allowlist proxy
+py -m perro.workshop --login     # once; add --device-auth to sign in with a code on your phone
+```
+
+Everything lives in `~\.perro\workshop` (`PERRO_WORKSHOP_HOME` to move it): `sites\<name>` is each site's folder, `runs\<id>` each build's logs and Codex's report, `codex-builder` the login. Open `sites\<name>\dist\index.html` to look at a finished site. It's deliberately not in AppData: a packaged Windows app (the Claude desktop app is one) gets AppData writes redirected into a private copy that Docker can't see.
+
 ### Telegram (chat from your phone)
 
 Perro itself never talks to Telegram. A small bridge (`perro/telegram.py`) runs next to the heartbeat, passes your messages into the inbox, which wakes Perro within seconds, and sends Perro's replies back to your phone. It also brings approval requests as cards with Approve and Deny buttons; only a tap counts as a yes.
@@ -78,6 +90,7 @@ The pairing lives in `home/telegram.json`. Delete that file and pair again to sw
 - `py -m perro.heartbeat` — run Perro in this terminal, printing each wake-up; Ctrl+C stops it. `--once` runs a single wake-up. Only one heartbeat can run per home.
 - `py -m perro.telegram` — run the Telegram bridge (`--pair` links it to your account first; see above).
 - `py -m perro.approvals` — list what Perro is waiting on you to approve; `--yes N` / `--no N` answers at the PC, and `--test "text"` sends a harmless test card to check the path.
+- `py -m perro.workshop` — list Perro's sites and how their latest builds went (`--setup`, `--login`: see above).
 - `py -m perro.memory` — print what Perro sees of its memory. `py -m perro.memory search <text>` searches the full log.
 - `py -m perro.web <url>` — fetch a page exactly as Perro would see it (`--search <words>` for its Wikipedia search).
 - `py -m perro.dream` — have Perro dream now instead of at 7:00 (only while the heartbeat is stopped). Dreams are written to `home/workspace/dreams/`.
