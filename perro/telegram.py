@@ -48,7 +48,7 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-from perro import approvals, inbox, mail
+from perro import approvals, inbox, mail, watchdog
 from perro.memory import DEFAULT_HOME, Memory
 
 TOKEN_ENV = "PERRO_TELEGRAM_TOKEN"
@@ -283,6 +283,7 @@ def run(home: Path, bot: Bot) -> None:
     state = load_state(home)
     if "owner_chat_id" not in state:
         sys.exit("Not paired yet. Run: python -m perro.telegram --pair")
+    watchdog.keep_alive(home, "telegram")
     stop = threading.Event()
 
     def outbox_loop() -> None:

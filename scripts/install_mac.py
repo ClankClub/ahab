@@ -5,7 +5,8 @@ launchd is macOS's built-in service manager. A "LaunchAgent" is a small
 launchd starts it at login and (here) restarts it if it crashes.
 
   python3 scripts/install_mac.py                 install the heartbeat, and the
-                                                 Telegram bridge if it's paired
+                                                 Telegram bridge and the watchdog
+                                                 if the bridge is paired
   python3 scripts/install_mac.py --with-backup   also back up home/ every 6 hours
                                                  (needs home/ to be a Git repo
                                                  with a remote; see README)
@@ -16,7 +17,8 @@ Run it from a terminal where Perro already works: launchd doesn't read your
 shell's startup files, so the keys and settings Perro needs (and your PATH,
 so it can find codex) are copied from that terminal into the plists. They're
 stored as plain text, readable only by you, like `setx` on Windows.
-Output goes to home/heartbeat.log, home/telegram.log and home/backup.log.
+Output goes to home/heartbeat.log, home/telegram.log, home/watchdog.log and
+home/backup.log.
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ AGENTS = Path.home() / "Library" / "LaunchAgents"
 HEARTBEAT = "perro.heartbeat"
 TELEGRAM = "perro.telegram"
 BACKUP = "perro.backup"
+WATCHDOG = "perro.watchdog"
 # What Perro reads from the environment; whichever are set get copied.
 PASSED_ON = ("DEEPSEEK_API_KEY", "OPENROUTER_API_KEY", "PERRO_TELEGRAM_TOKEN", "PERRO_N8N_KEY",
              "PERRO_BACKEND", "PERRO_CLI_HOME", "PERRO_CODEX_BIN", "PERRO_WORKSHOP_HOME")
@@ -71,6 +74,12 @@ def telegram_plist() -> bytes:
     return plist(TELEGRAM, ["perro.telegram", "--log"], {
         "RunAtLoad": True,
         "KeepAlive": {"Crashed": True},
+    })
+
+
+def watchdog_plist() -> bytes:
+    return plist(WATCHDOG, ["perro.watchdog", "--log"], {
+        "StartInterval": 10 * 60,             # every 10 minutes; checks the others and n8n
     })
 
 
@@ -138,7 +147,7 @@ def main() -> None:
         sys.exit(f"Perro needs Python 3.11 or newer; this is {sys.version.split()[0]}. "
                  "Install one from python.org or with `brew install python`.")
     if args.remove:
-        for label in (HEARTBEAT, TELEGRAM, BACKUP):
+        for label in (HEARTBEAT, TELEGRAM, WATCHDOG, BACKUP):
             remove(label)
         return
 
@@ -156,6 +165,7 @@ def main() -> None:
     paired = (REPO / "home" / "telegram.json").is_file()
     if os.environ.get("PERRO_TELEGRAM_TOKEN") and paired:
         plists.append((TELEGRAM, telegram_plist()))
+        plists.append((WATCHDOG, watchdog_plist()))   # it tells you through the bot
     elif os.environ.get("PERRO_TELEGRAM_TOKEN"):
         print("Skipped the Telegram bridge: pair it first (python3 -m perro.telegram --pair), then run this again.")
     else:

@@ -27,7 +27,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from perro import alarms, approvals, dream, identity, inbox, mail, n8n, skills, tools, workshop
+from perro import alarms, approvals, dream, identity, inbox, mail, n8n, skills, tools, watchdog, workshop
 from perro.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from perro.model import ModelClient, ModelError
 
@@ -641,6 +641,8 @@ def main() -> None:
         print(f"[{datetime.now():%Y-%m-%d %H:%M}] Another heartbeat is already running "
               f"for {args.home}. Exiting.")
         sys.exit(1)
+    # Only the heartbeat holding the lock says it's alive (see watchdog.py).
+    watchdog.keep_alive(args.home, "heartbeat")
 
     if not os.environ.get(n8n.KEY_ENV):
         # For the owner reading this log: a variable set with setx only
