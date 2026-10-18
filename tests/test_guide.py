@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory() as d:
     top = tools.run(m, "about_yourself", {})
     assert "Sections: How you run, Your memory" in top and "# About yourself" not in top, top
     s = tools.run(m, "about_yourself", {"section": "what you can't do"})
-    assert s.startswith("## What you can't do") and "send email" in s and "## Your mind" not in s, s[:200]
+    assert s.startswith("## What you can't do") and "email anyone" in s and "## Your mind" not in s, s[:200]
     assert tools.run(m, "about_yourself", {"section": "memory"}).startswith("## Your memory")
     assert "No section called" in tools.run(m, "about_yourself", {"section": "cooking"})
     assert "backend 'deepseek'" in tools.run(m, "about_yourself", {"section": "Your mind"}).splitlines()[-1]
