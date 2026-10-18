@@ -121,7 +121,7 @@ def _docker_exe() -> str:
 
 
 def docker(*args: str, timeout: float = 120, check: bool = True,
-           stdout=subprocess.PIPE) -> subprocess.CompletedProcess:
+           stdout=subprocess.PIPE, input: str | None = None) -> subprocess.CompletedProcess:
     exe = _docker_exe()
     env = dict(os.environ)
     # Docker Desktop's helpers (its credential store) sit next to docker.exe
@@ -130,7 +130,7 @@ def docker(*args: str, timeout: float = 120, check: bool = True,
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     result = subprocess.run([exe, *args], stdout=stdout, stderr=subprocess.PIPE, text=True,
                             encoding="utf-8", errors="replace", timeout=timeout, env=env,
-                            creationflags=flags)
+                            creationflags=flags, input=input)
     if check and result.returncode:
         raise WorkshopError(f"docker {args[0]} failed: {(result.stderr or '').strip()[-500:]}")
     return result
@@ -151,26 +151,29 @@ def image() -> str:
     return tag
 
 
-def ensure_proxy() -> None:
-    """The networks and the proxy, (re)made when proxy.py or ALLOW changed."""
-    for name, internal in ((NETWORK, True), (OUT_NETWORK, False)):
+def ensure_proxy(proxy: str = PROXY, network: str = NETWORK, out_network: str = OUT_NETWORK,
+                 allow: tuple[str, ...] = ALLOW) -> None:
+    """A box's networks and its proxy, (re)made when proxy.py or the allowlist
+    changed. The workshop's by default; the browser (perro/browser.py) has its
+    own, with its own networks."""
+    for name, internal in ((network, True), (out_network, False)):
         if docker("network", "inspect", name, check=False).returncode:
             docker("network", "create", *(["--internal"] if internal else []), name)
-    want = _hash((FILES / "proxy.py").read_bytes(), ",".join(ALLOW), PROXY_IMAGE)
+    want = _hash((FILES / "proxy.py").read_bytes(), ",".join(allow), PROXY_IMAGE)
     seen = docker("inspect", "-f", '{{index .Config.Labels "perro.hash"}} {{.State.Running}}',
-                  PROXY, check=False)
+                  proxy, check=False)
     if seen.returncode == 0 and seen.stdout.split()[0] == want:
         if seen.stdout.split()[-1] != "true":
-            docker("start", PROXY)
+            docker("start", proxy)
         return
-    docker("rm", "-f", PROXY, check=False)
-    docker("run", "-d", "--name", PROXY, "--restart", "unless-stopped", "--label", f"perro.hash={want}",
-           "--network", OUT_NETWORK, "--read-only", "--cap-drop", "ALL",
+    docker("rm", "-f", proxy, check=False)
+    docker("run", "-d", "--name", proxy, "--restart", "unless-stopped", "--label", f"perro.hash={want}",
+           "--network", out_network, "--read-only", "--cap-drop", "ALL",
            "--security-opt", "no-new-privileges", "--memory", "128m", "--pids-limit", "64",
-           "-e", f"ALLOW={','.join(ALLOW)}",
+           "-e", f"ALLOW={','.join(allow)}",
            "--mount", f"type=bind,src={FILES / 'proxy.py'},dst=/proxy.py,readonly",
            PROXY_IMAGE, "python", "-u", "/proxy.py")
-    docker("network", "connect", NETWORK, PROXY)
+    docker("network", "connect", network, proxy)
 
 
 def run_container(build_id: int, name: str, tag: str, command: list[str], minutes: int,

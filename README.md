@@ -25,6 +25,7 @@ Your PC: Perro runtime (Python)
   ├─ notion         → its own Notion workspace through the same n8n (its to organize; deleting goes to Notion's trash)
   ├─ alarms         → reminders and follow-ups; the heartbeat wakes it for them
   ├─ workshop       → Codex builds static sites in a locked Docker box (workshop/); nothing is published
+  ├─ browser        → a real Chromium in its own locked box (browser/), public sites only (Perro's tools for it: next)
   ├─ github         → keeps those sites in private repos on its own GitHub, through n8n; public only by approval
   ├─ vercel         → puts them online on its own Vercel: previews behind Vercel's sign-in, public only by approval
   ├─ approvals      → outward actions wait for your Approve/Deny tap on Telegram, then run in code
@@ -112,6 +113,7 @@ The pairing lives in `home/telegram.json`. Delete that file and pair again to sw
 - `py -m perro.workshop` — list Perro's sites and how their latest builds went (`--setup`, `--login`: see above).
 - `py -m perro.memory` — print what Perro sees of its memory. `py -m perro.memory search <text>` searches the full log.
 - `py -m perro.web <url>` — fetch a page exactly as Perro would see it (`--search <words>` for its Wikipedia search).
+- `py -m perro.browser --setup` — build and start the browser box (needs Docker Desktop); `--check` runs the fence test (what must open and what mustn't, about 20 seconds), `open <url>` prints a page as the browser reads it, `--stop` removes it.
 - `py -m perro.dream` — have Perro dream now instead of at 7:00 (only while the heartbeat is stopped). Dreams are written to `home/workspace/dreams/`.
 - `py -m perro.days` — regenerate `home/days/` from the log.
 - `py -m perro.watchdog --dry-run` — what the watchdog sees right now (heartbeat, bridge, n8n), without sending anything.
