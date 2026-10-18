@@ -21,6 +21,7 @@ Tools so far:
   message_owner write to the owner (see inbox.py)
   fetch_page   read a public web page as text (read-only; see web.py)
   search_wikipedia
+  web_search    the web at large, run by a separate model (see search.py)
   check_calendar read its Google calendars through the owner's n8n (see n8n.py)
   search_email  its own Gmail, read-only, also through n8n
   read_email
@@ -58,7 +59,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from perro import alarms, github, google, inbox, mail, n8n, notion, vercel, web, workshop
+from perro import alarms, github, google, inbox, mail, n8n, notion, search, vercel, web, workshop
 from perro.memory import Memory
 
 # What Perro can and can't do, kept in the code repo so Perro can read it but
@@ -277,6 +278,13 @@ def search_wikipedia(memory: Memory, query: str) -> str:
         raise ToolError(str(e)) from None
 
 
+def web_search(memory: Memory, query: str) -> str:
+    try:
+        return search.web_search(memory, query)
+    except search.SearchError as e:
+        raise ToolError(str(e)) from None
+
+
 # --- outside services, through n8n (see n8n.py) --------------------------
 
 def check_calendar(memory: Memory, days: int = 7) -> str:
@@ -429,6 +437,14 @@ TOOLS = {
         search_wikipedia,
         'Search English Wikipedia. Returns article titles, addresses, and snippets; '
         'read one with fetch_page. Args: {"query": "<text>"}',
+    ),
+    "web_search": (
+        web_search,
+        'Search the web at large. Another model runs the search and reads the pages, and you get '
+        'back a few results (title, address, what the page says) and, when they settle it, a short '
+        'answer. Takes 10 to 60 seconds, so one clear request in plain words beats several tries. '
+        f'Read a result in full with fetch_page. {search.DAILY_LIMIT} a day. '
+        'Args: {"query": "<what you want to find out>"}',
     ),
     "check_calendar": (
         check_calendar,

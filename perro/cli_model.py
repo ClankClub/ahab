@@ -18,6 +18,13 @@ PERRO_CLI_HOME defaults to %LOCALAPPDATA%\\Perro on Windows and ~/.perro
 elsewhere, outside both repos, because the login tokens live in there. Log
 in once per profile (see README.md > Setup); an empty profile just says
 "not logged in", it never falls back to yours.
+
+One thing can be switched back on: web search (web_search=True), for
+perro/search.py's own short runs that do nothing but search. Pip's brain
+never gets it; search reaches Pip as an ordinary tool. Codex searches on
+OpenAI's side and Claude Code's WebSearch on Anthropic's, so neither touches
+this PC's network. Claude Code's WebFetch would fetch from here (localhost,
+n8n), so it stays off.
 """
 
 from __future__ import annotations
@@ -58,6 +65,13 @@ CODEX_MODEL_DROP = ("multi_agent_version",)
 CODEX_SETTINGS_OFF = ("tools.experimental_request_user_input.enabled=false",)
 CLI_TIMEOUT_SECONDS = 300
 EMPTY_REPLY_ATTEMPTS = 2
+
+
+def _json_or_none(line: str):
+    try:
+        return json.loads(line)
+    except json.JSONDecodeError:
+        return None
 
 
 def cli_home() -> Path:
@@ -102,10 +116,12 @@ def flatten(messages: list[Message]) -> tuple[str, str]:
 
 class CliClient:
     def __init__(self, cli: str, model: str, effort: str | None = None,
-                 timeout: float = CLI_TIMEOUT_SECONDS):
+                 timeout: float = CLI_TIMEOUT_SECONDS, web_search: bool = False):
         if cli not in ("codex", "claude"):
             raise ModelError(f"Unknown CLI {cli!r}; known: codex, claude.")
         self.cli, self.model, self.effort, self.timeout = cli, model, effort, timeout
+        self.web_search = web_search
+        self.searches: list[str] = []   # what the last call searched for, when known
         self.home = cli_home()
 
     def complete(self, messages: list[Message], temperature: float = 0.7,
@@ -135,6 +151,12 @@ class CliClient:
         scratch.mkdir(parents=True, exist_ok=True)
         (self.home / profile).mkdir(parents=True, exist_ok=True)
         env = {**os.environ, env_name: str(self.home / profile)}
+        if profile == "claude":
+            # A profile of its own isn't enough for Claude Code: it still read
+            # the owner's ~/.claude/CLAUDE.md, so Perro on claude-haiku had the
+            # owner's personal instructions in its head (found 2026-10-18).
+            # This and --setting-sources "" below each keep it out.
+            env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"
         # The installed heartbeat runs hidden; without this, Windows would
         # flash a console window on screen for every model call.
         hidden = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -175,7 +197,7 @@ class CliClient:
         try:
             args = ["exec", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config",
                     "--ignore-rules", "--sandbox", "read-only", "--json", "-m", self.model,
-                    "-c", 'web_search="disabled"',
+                    "-c", f'web_search="{"live" if self.web_search else "disabled"}"',
                     "-c", f"model_instructions_file={json.dumps(Path(f.name).as_posix())}"]
             plain = self._plain_model()
             if plain:
@@ -201,6 +223,7 @@ class CliClient:
             for name in temp:
                 os.unlink(name)
         text, reasoning, usage, errors = "", [], {}, []
+        self.searches = []
         for line in out.splitlines():
             try:
                 event = json.loads(line)
@@ -211,6 +234,8 @@ class CliClient:
                 text = item.get("text") or ""
             elif event.get("type") == "item.completed" and item.get("type") == "reasoning":
                 reasoning.append(item.get("text") or "")
+            elif event.get("type") == "item.completed" and item.get("type") == "web_search":
+                self.searches.append(str(item.get("query") or (item.get("action") or {}).get("query") or "?"))
             elif event.get("type") == "turn.completed":
                 usage = event.get("usage") or {}
             elif event.get("type") in ("error", "turn.failed"):
@@ -227,7 +252,11 @@ class CliClient:
         with tempfile.NamedTemporaryFile("w", suffix=".txt", encoding="utf-8", delete=False) as f:
             f.write(system)
         try:
-            args = ["-p", "--output-format", "json", "--tools", "", "--strict-mcp-config",
+            # With search on, the event stream shows each search's query; the
+            # last line is the same result object plain JSON output gives.
+            tools = (["--tools", "WebSearch", "--allowedTools", "WebSearch", "--output-format", "stream-json",
+                      "--verbose"] if self.web_search else ["--tools", "", "--output-format", "json"])
+            args = ["-p", *tools, "--strict-mcp-config", "--setting-sources", "",
                     "--no-session-persistence", "--model", self.model,
                     "--system-prompt-file", f.name]
             if self.effort:
@@ -235,13 +264,27 @@ class CliClient:
             out = self._run(args, prompt, "CLAUDE_CONFIG_DIR", "claude")
         finally:
             os.unlink(f.name)
+        lines = out.strip().splitlines()
         try:
-            data = json.loads(out.strip().splitlines()[-1])
+            # The result object: the only line in plain JSON output, and the
+            # one marked "result" in the event stream (not always the last).
+            data = next((d for d in map(_json_or_none, reversed(lines)) if isinstance(d, dict)
+                         and d.get("type") == "result"), None) or json.loads(lines[-1])
         except (json.JSONDecodeError, IndexError):
             raise ModelError(f"claude sent something that isn't JSON: {out[:300]}") from None
         if data.get("is_error"):
             raise ModelError(f"claude: {str(data.get('result'))[:300]}")
         usage = data.get("usage") or {}
+        self.searches = []
+        for line in out.splitlines()[:-1]:
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if event.get("type") == "assistant":
+                for block in (event.get("message") or {}).get("content") or []:
+                    if block.get("type") == "tool_use" and block.get("name") == "WebSearch":
+                        self.searches.append(str((block.get("input") or {}).get("query") or "?"))
         cached = usage.get("cache_read_input_tokens") or 0
         prompt_tokens = (usage.get("input_tokens") or 0) + cached + (usage.get("cache_creation_input_tokens") or 0)
         model = next(iter(data.get("modelUsage") or {}), self.model)
