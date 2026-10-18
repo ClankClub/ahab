@@ -13,8 +13,9 @@ The dream sees the conversation, Perro's own thoughts, one line per tool it
 used, and errors. It doesn't see what tools returned (web pages, emails,
 files), on purpose: the dream is where Perro decides what to keep about
 itself and its owner, and a sentence planted in a web page shouldn't get a
-say in that. It can read its workspace and search its log, and nothing else:
-no messages, no web, no Google.
+say in that. It can read its workspace, search its log and read the guide to
+itself (to check any "can't do" its notes claim), and nothing else: no
+messages, no web, no Google.
 
 Files it changes come back inside its final answer, not through write_file.
 In testing, DeepSeek wrote "I've put a line in SOUL.md" without ever making
@@ -48,7 +49,10 @@ THOUGHT_CHAR_LIMIT = 600
 LINE_CHAR_LIMIT = 250
 ENTRY_CHAR_LIMIT = 8_000
 MAX_DREAM_TOOL_CALLS = 8
-DREAM_TOOLS = ("list_files", "read_file", "recall")
+# about_yourself so a "can't do" in the notes gets checked, not carried: on
+# 2026-10-18 a wrong one ("the Sheets tools aren't callable") sat in the notes
+# and was believed again every wake.
+DREAM_TOOLS = ("list_files", "read_file", "recall", "about_yourself")
 MAX_FILES_CHANGED = 6
 # Kinds the dream doesn't need: bookkeeping, private reasoning (long, and
 # not what Perro decided), old notes (it gets the current ones), restarts.
@@ -71,7 +75,9 @@ only their words and yours get a say in that.
 
 Do these things:
 1. Put what lasts where it belongs. What you learned about your owner goes
-   in USER.md. A preference they stated about what to bring up, what to
+   in USER.md, keeping what they told you or confirmed apart from your own
+   reads of them: a read stays marked as a guess until they confirm it. A
+   preference they stated about what to bring up, what to
    leave alone, or when, goes in PROACTIVE_PREFERENCES.md, in their words;
    never your own guess. A short lesson about getting work done here (a
    convention, a tool or site quirk, a mistake not to repeat) goes in
@@ -87,11 +93,22 @@ Do these things:
 2. Rewrite your notes down to what's still open: each unfinished task with
    its next step, and what you need for the coming days. Drop what's done,
    stale, or now kept in another file. If you changed SOUL.md, add a line
-   to tell your owner what changed the next time you talk.
-3. Write your dream entry: a short reflection in plain prose. What went
-   well, what went wrong or annoyed your owner, what you'd do differently,
-   and anything that needs mending or following up (put those in your notes
-   as well). Honest and specific: it's a working record, not a performance.
+   to tell your owner what changed the next time you talk. If your notes or
+   files say you can't do something (a tool missing, a service out of
+   reach), check it against your waking tools below and with
+   about_yourself before keeping it, and fix or drop it if they say
+   otherwise: a wrong "can't" gets believed again every wake after. Your
+   waking tools are the same every wake-up; they don't come and go. One can
+   fail now and then (a refused call, a service down), which is worth noting
+   as that, but a tool in the list is never "not available".
+3. Write your dream entry: a short reflection in plain prose, about three
+   paragraphs. First, what you now believe about your owner and how sure
+   you are, what the day changed, with guesses marked as guesses. Then
+   what's open: each thing's state and whose move it is. Last, where you
+   helped and where you fell short or annoyed them, the one lesson you
+   don't want to need twice, and your first move for the coming day (put
+   anything to mend or follow up in your notes as well). Honest and
+   specific: it's a working record, not a performance.
    It's saved as dreams/<date>.md in your workspace, where your owner can
    read it.
 
@@ -102,7 +119,10 @@ are in your "files" field. Keep what you
 checked apart from what you remember. Don't redo the day's work or start new
 work; there's no messaging or web while dreaming.
 
-Tools (up to {MAX_DREAM_TOOL_CALLS} calls):
+Your waking tools, by name (not usable while dreaming; see about_yourself
+for what they reach): {", ".join(tools.TOOLS)}.
+
+Tools (up to {MAX_DREAM_TOOL_CALLS} calls), the only ones that work while dreaming:
 {tool_list}
 
 Your whole reply must be one plain JSON object. Do not use any built-in
@@ -116,7 +136,7 @@ You'll get the result, then reply again.
 To finish the dream:
 {{"thought": "<what you're thinking>",
   "notes": "<the full new text of your notes, under {NOTES_CHAR_LIMIT} characters>",
-  "dream": "<your dream entry>",
+  "dream": "<your dream entry, just the prose: its heading is added for you>",
   "files": {{"<path in your workspace>": "<its full new text>", ...}}}}
 "files" holds only the files you're changing (at most {MAX_FILES_CHANGED}); {{}} for none."""
 
@@ -259,7 +279,13 @@ def dream(memory: Memory, client: ModelClient, name: str | None) -> bool:
         memory.record("error", f"Dream failed: {type(e).__name__}: {e}.\n\n" + "\n\n".join(transcript))
         return False
 
-    entry = entry.strip()
+    # A heading of its own, copied from an earlier entry, would sit under
+    # the one written below.
+    lines_ = entry.strip().splitlines()
+    while lines_ and (lines_[0].startswith("# Dream") or lines_[0].startswith("*Looking back")
+                      or not lines_[0].strip()):
+        lines_.pop(0)
+    entry = "\n".join(lines_).strip() or entry.strip()
     if len(entry) > ENTRY_CHAR_LIMIT:
         entry = entry[:ENTRY_CHAR_LIMIT] + "\n\n[cut at the dream entry limit]"
     path = tools.workspace_root(memory) / "dreams" / f"{now:%Y-%m-%d}.md"
