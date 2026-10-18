@@ -26,6 +26,7 @@ Tools so far:
   read_email
   drive_search, read_drive_file   its own Google Drive (see google.py)
   create_doc, append_to_doc       Google Docs, in that Drive
+  read_sheet, create_sheet, add_rows, update_cells   Google Sheets
 
 The workspace is the first time Perro can touch the disk, so every path it
 gives goes through _resolve() below, which is the whole sandbox. Its job:
@@ -355,6 +356,30 @@ TOOLS = {
         _google_tool(google.append_to_doc),
         'Add text to the end of a Google Doc, as a new paragraph. Works on your docs '
         'and on docs shared with you for editing. Args: {"id": "<doc id>", "text": "<plain text>"}',
+    ),
+    "read_sheet": (
+        _google_tool(google.read_sheet),
+        'Read a Google Sheet by its id. Without a range: its tabs and the first tab\'s '
+        'rows, numbered. With one: just that, in A1 notation ("Sheet1!A1:D20", "Budget!B:B"). '
+        'Args: {"id": "<sheet id>", "range": "<A1 range>"} (range optional)',
+    ),
+    "create_sheet": (
+        _google_tool(google.create_sheet),
+        'Create a Google Sheet, optionally with rows (a list of lists, the first usually '
+        'headers). As with create_doc, put it in a folder your owner shared for them to see it. '
+        'Args: {"title": "<name>", "rows": [["Item", "Qty"], ["eggs", 12]], "folder": "<folder id>"} (rows, folder optional)',
+    ),
+    "add_rows": (
+        _google_tool(google.add_rows),
+        'Add rows below the last filled row of a sheet\'s first tab, or of the tab named. '
+        'Values go in exactly as written; formulas are off. '
+        'Args: {"id": "<sheet id>", "rows": [["eggs", 12]], "tab": "<tab name>"} (tab optional)',
+    ),
+    "update_cells": (
+        _google_tool(google.update_cells),
+        'Overwrite cells in a sheet, starting at the top-left of the range. Values go in '
+        'exactly as written; formulas are off. '
+        'Args: {"id": "<sheet id>", "range": "Sheet1!B2", "rows": [["done"]]}',
     ),
 }
 
