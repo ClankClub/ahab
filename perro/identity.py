@@ -31,6 +31,20 @@ FILES = (("SOUL.md", "Who you are"), ("USER.md", "Your owner"),
          ("PROACTIVE_PREFERENCES.md", "What to bring up on your own"),
          ("AGENTS.md", "How you work here"))
 CHAR_LIMIT = 4000
+# AGENTS.md holds the lessons that pile up from doing the work, plus the
+# owner's own guide to how Perro should sound, so it gets more room.
+LIMITS = {"AGENTS.md": 10_000}
+
+
+def limit(filename: str) -> int:
+    """How long an identity file may be."""
+    return LIMITS.get(filename, CHAR_LIMIT)
+
+
+def limits_text() -> str:
+    """The caps in words, for the prompts."""
+    extra = "".join(f" ({name} under {cap})" for name, cap in LIMITS.items())
+    return f"{CHAR_LIMIT} characters{extra}"
 
 
 def seed(memory: Memory, name: str | None) -> list[str]:
@@ -51,9 +65,10 @@ def _read(path: Path) -> str:
     if not path.is_file():
         return f"(no {path.name} yet; you can write one)"
     text = path.read_text(encoding="utf-8", errors="replace").strip()
-    if len(text) > CHAR_LIMIT:
-        text = (text[:CHAR_LIMIT] + f"\n[cut: {path.name} is {len(text)} characters,"
-                f" over the {CHAR_LIMIT} limit. Trim it.]")
+    cap = limit(path.name)
+    if len(text) > cap:
+        text = (text[:cap] + f"\n[cut: {path.name} is {len(text)} characters,"
+                f" over the {cap} limit. Trim it.]")
     return text or "(empty)"
 
 

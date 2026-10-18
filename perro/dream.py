@@ -83,7 +83,7 @@ Do these things:
    Saying or thinking that you changed one doesn't change it. The four
    identity files are shown above in full; read any other file (a skill you
    want to update) before rewriting it. Keep identity files under
-   {identity.CHAR_LIMIT} characters.
+   {identity.limits_text()}.
 2. Rewrite your notes down to what's still open: each unfinished task with
    its next step, and what you need for the coming days. Drop what's done,
    stale, or now kept in another file. If you changed SOUL.md, add a line
@@ -269,8 +269,8 @@ def dream(memory: Memory, client: ModelClient, name: str | None) -> bool:
                     f"*Looking back since {start}.*\n\n{entry}\n", encoding="utf-8")
     changed, refused = [], []
     for name_, text in files.items():
-        if name_ in (f for f, _ in identity.FILES) and isinstance(text, str) and len(text) > identity.CHAR_LIMIT:
-            refused.append(f"{name_} (over {identity.CHAR_LIMIT} chars)")
+        if name_ in (f for f, _ in identity.FILES) and isinstance(text, str) and len(text) > identity.limit(name_):
+            refused.append(f"{name_} (over {identity.limit(name_)} chars)")
             continue
         # Through the same fence as write_file: inside the workspace only.
         result = tools.run(memory, "write_file", {"path": name_, "content": text})
