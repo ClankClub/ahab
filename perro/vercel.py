@@ -3,10 +3,10 @@
 Requests go through one n8n workflow, "Perro: Vercel relay"
 (n8n/workflows/perro-vercel.json). It holds the sign-in and passes on only
 an allowlist: reading, making a project, uploading files, making a preview
-deployment of static files, and promoting one existing deployment to
+deployment of static files, and redeploying one existing deployment as
 production. No deleting, domains, aliases, environment variables or
 settings, no builds on Vercel, nothing that would run code there (api/,
-middleware, vercel.json), and no deployment aimed at production directly.
+middleware, vercel.json), and no new files aimed at production directly.
 This module is the other half.
 
 What Perro may do here, on purpose:
@@ -23,7 +23,10 @@ What Perro may do here, on purpose:
 - request_publish: making a site public is an approval (see approvals.py).
   The request names one preview deployment. Deployments never change once
   made, so what the owner opened is what goes live. The approved action
-  promotes exactly that deployment to production.
+  redeploys exactly that deployment as production: its files, unchanged, in
+  a new deployment that takes over the public address. (Vercel's promote
+  only moves the address to a deployment built for production, and refuses
+  a preview with a bare HTTP 422; found the hard way, 2026-10-18.)
 
 Files go up the way Vercel's own tools send them: the deployment lists every
 file by its SHA-1, Vercel answers with the ones it doesn't have yet, and
@@ -259,8 +262,11 @@ def list_websites(memory: Memory, name: str = "") -> str:
                  + ("" if _protected(project) else ". Previews are NOT protected.")]
         for d in found.get("deployments") or []:
             uid = d.get("uid")
-            kind = "placeholder" if uid in known else ("public" if uid == live else "preview")
-            lines.append(f"- {uid}: {kind}, {str(d.get('state') or d.get('readyState')).lower()}, "
+            state = str(d.get("state") or d.get("readyState")).lower()
+            kind = ("placeholder" if uid in known else "public" if uid == live else "preview"
+                    if d.get("target") != "production" else "public before" if state == "ready"
+                    else "publish attempt")
+            lines.append(f"- {uid}: {kind}, {state}, "
                          f"{_when(d.get('created') or d.get('createdAt'))}, https://{d.get('url')}")
         return "\n".join(lines)
     projects = _vercel("v9/projects", query={"limit": "50"}).get("projects") or []
@@ -336,14 +342,28 @@ def _publish(memory: Memory, payload: dict) -> str:
     found = _vercel(f"v13/deployments/{deployment}")
     if found.get("projectId") != project_id or found.get("readyState") != "READY":
         raise RuntimeError(f"{deployment} is no longer a ready deployment of {name}, so nothing was published.")
-    _vercel(f"v10/projects/{project_id}/promote/{deployment}", "POST", body={})
+    # The same files as the approved preview, as a new production deployment.
+    made = _vercel("v13/deployments", "POST", query={"skipAutoDetectionConfirmation": "1"},
+                   body={"name": name, "project": name, "deploymentId": deployment, "target": "production",
+                         "projectSettings": {"framework": None}})
+    copy = str(made.get("id") or "")
+    if not DEPLOYMENT.fullmatch(copy):
+        raise RuntimeError(f"Vercel didn't say which deployment it made from {deployment}; check list_websites.")
     deadline = time.monotonic() + READY_SECONDS
-    while time.monotonic() < deadline:
-        project = _project(name) or {}
-        if _live(project) == deployment:
-            return f"{name} is public now: {_production(project) or payload['url']}"
+    while True:
+        state = made.get("readyState")
+        if state in ("ERROR", "CANCELED"):
+            raise RuntimeError(f"Vercel's production copy of {deployment} ({copy}) ended {state.lower()}: "
+                               f"{made.get('errorMessage') or 'no explanation'}. The public site is unchanged.")
+        if state == "READY":
+            project = _project(name) or {}
+            if _live(project) == copy:
+                return f"{name} is public now: {_production(project) or payload['url']} (deployment {copy}, from {deployment})"
+        if time.monotonic() >= deadline:
+            return (f"Vercel is still putting {name} up ({copy}, from {deployment}); list_websites shows "
+                    "when it's public.")
         time.sleep(3)
-    return f"Vercel accepted publishing {deployment}; it's still switching over. list_websites shows the address."
+        made = _vercel(f"v13/deployments/{copy}")
 
 
 approvals.register("vercel_publish", _publish_card, _publish)

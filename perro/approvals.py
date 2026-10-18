@@ -5,7 +5,7 @@ action that reaches the world (making a site public, later perhaps sending
 mail) instead goes through here, in four steps:
 
   1. A tool asks. It files a request with the exact payload of the action
-     ("promote deployment dpl_123 of project rat-weights") and returns to
+     ("publish deployment dpl_123 of project rat-weights") and returns to
      Perro straight away. Nothing has happened yet.
   2. The card. Code writes it from the payload, so it states facts, not
      Perro's description of them: Perro reads web pages all day, and a page
