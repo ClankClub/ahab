@@ -234,9 +234,9 @@ def write_file(memory: Memory, path: str, content: str) -> str:
 
 # --- alarms (the logic lives in alarms.py) -------------------------------
 
-def set_alarm(memory: Memory, minutes_from_now: int, message: str) -> str:
+def set_alarm(memory: Memory, minutes_from_now: int, message: str, repeat: str | None = None) -> str:
     try:
-        return alarms.add(memory, minutes_from_now, message)
+        return alarms.add(memory, minutes_from_now, message, repeat)
     except ValueError as e:
         raise ToolError(str(e)) from None
 
@@ -368,8 +368,10 @@ TOOLS = {
         'Leave a message for a future wake-up. At that time you wake (even if '
         'it is sooner than the next wake you chose) and the message appears in '
         f'your log. {alarms.MIN_MINUTES} min to {alarms.MAX_MINUTES // 1440} days '
-        'ahead. Your pending alarms are listed every wake-up. '
-        'Args: {"minutes_from_now": <integer>, "message": "<text>"}',
+        'ahead. Your pending alarms are listed every wake-up. With "repeat", it '
+        'rings again at the same local time (daily, weekdays or weekly) until you '
+        'cancel it. Args: {"minutes_from_now": <integer>, "message": "<text>", '
+        '"repeat": "daily" | "weekdays" | "weekly"} (repeat optional)',
     ),
     "cancel_alarm": (
         cancel_alarm,
