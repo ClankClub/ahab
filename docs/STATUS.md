@@ -6,7 +6,7 @@ Forked from Lobo's runtime (`../Lobo`, commit `2076c5d`). None of Lobo's `home/`
 
 **Character.** [AGENTS.md](../AGENTS.md), the README and the heartbeat prompt (`PROMPT_BODY` in `perro/heartbeat.py`) describe a personal assistant in the spirit of Muse or OpenClaw. It does work you hand it, takes initiative within its own tools, is good to just talk to, and has a personality. An earlier draft was too strict, close to "speak when spoken to"; the current wording is deliberately looser.
 
-**Identity files** (modelled loosely on Muse's core files, built one at a time). Who Perro is lives in `home/workspace/SOUL.md`: origin (the Lobo joke), character, voice. It's shown first on every wake-up page, capped at 3,000 characters, and Perro may edit it with `write_file` as long as it tells the owner. The prompt holds only the rules (trust, tools, reply format), which Perro can't edit. There's no separate IDENTITY file; it's folded into SOUL. Notes (4,000-character cap) now hold what Perro knows about the owner plus open tasks. Planned next, each its own step: USER.md (the owner), PROACTIVE_PREFERENCES.md (owner-edited: what to bring up, when, how often), and a read-only self-knowledge doc in the code repo describing what Perro can and can't do.
+**Identity files** (modelled loosely on Muse's core files, built one at a time). Two files in `home/workspace/`, both shown at the top of every wake-up page and capped at 3,000 characters each (`perro/identity.py`): `SOUL.md`, who Perro is (origin, character, voice; it tells the owner when it edits it), and `USER.md`, what it knows about the owner. Perro edits both with `write_file`. The prompt holds only the rules (trust, tools, reply format), which Perro can't edit. There's no separate IDENTITY file; it's folded into SOUL. Notes (4,000 characters) are now for open tasks and short-lived things. Generic starters live in `templates/` in the code repo (see its README); each wake-up copies in any that are missing, with the agent's name filled in, and never overwrites. Perro's own SOUL and USER were written by hand for it and live only in the private home repo. Planned next, each its own step: PROACTIVE_PREFERENCES.md (owner-edited: what to bring up, when, how often), and a read-only self-knowledge doc in the code repo describing what Perro can and can't do.
 
 **What it can do.** Take tasks and conversation through the inbox or Telegram, research on the public web and Wikipedia, write files in its workspace, set reminders, and message the owner. Nothing outside its workspace yet: no email or calendar.
 
@@ -29,11 +29,11 @@ Forked from Lobo's runtime (`../Lobo`, commit `2076c5d`). None of Lobo's `home/`
 
 **Git.** Code at `silascroe/perro` (public), `home/` at `silascroe/firstborn-perro` (private), the same split as Lobo. The "Perro backup" task is installed and ran hidden successfully, push included.
 
-Not yet tested: the Mac installer (`scripts/install_mac.py`, which doesn't know about the bridge), and a real logout and login with the tasks installed.
+Not yet tested: the Mac installer (`scripts/install_mac.py`, which doesn't know about the bridge). A real reboot (2026-10-17) brought the heartbeat and bridge back on their own, with the backup still scheduled.
 
 ## Next, roughly in order
 
-1. **Live with it for a while.** Chat with Perro through Telegram and adjust the prompt from what it actually does. Next identity files, one at a time: USER.md, PROACTIVE_PREFERENCES.md, the self-knowledge doc.
+1. **Live with it for a while.** Chat with Perro through Telegram and adjust the prompt from what it actually does. Next identity files, one at a time: PROACTIVE_PREFERENCES.md, then the self-knowledge doc.
 2. **Backend and budget.** The DeepSeek balance is small, with no auto-refill. Pick a backend deliberately before running unattended.
 3. **Its own Google account.** The owner shares calendars and docs with it, never their own login.
 4. **n8n as its hands.** n8n (`../n8n`, Docker) handles Gmail, Calendar and similar connections. Perro calls n8n webhooks instead of implementing sign-in per service, so outbound actions pass through one place where the approval step sits.

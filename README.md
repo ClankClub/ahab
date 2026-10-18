@@ -9,7 +9,8 @@ The name is the joke: Lobo (`../Lobo`) is the wild wolf with a life of its own, 
 ```
 Your PC: Perro runtime (Python)
   ├─ model client   → DeepSeek API, OpenRouter, or a local llama.cpp/Ollama server (all OpenAI-compatible)
-  ├─ memory         → workspace/SOUL.md (who it is) + home/notes.md (what it knows about you, open tasks) + home/memory.db (event log, messages)
+  ├─ identity       → workspace/SOUL.md (who it is) + workspace/USER.md (what it knows about you); starters in templates/
+  ├─ memory         → home/notes.md (open tasks) + home/memory.db (event log, messages)
   ├─ heartbeat      → wake, show memory, model decides, save, sleep until it chose
   ├─ inbox          → messages between you and Perro; where its instructions come from
   ├─ telegram       → bridge from a Telegram bot to the inbox, paired to your account only

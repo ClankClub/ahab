@@ -27,7 +27,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from perro import alarms, inbox, skills, tools
+from perro import alarms, identity, inbox, skills, tools
 from perro.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from perro.model import ModelClient, ModelError
 
@@ -63,26 +63,24 @@ MAC_LABEL = "perro.heartbeat"
 # outside the workspace, so the resident can't edit it.
 HOME_CONFIG = "home.json"
 DEFAULT_CONFIG = {"name": "Perro", "backend": "deepseek"}
-# Perro's character lives in workspace/SOUL.md, which it can edit, and is
-# shown first on every wake-up page. Past the cap it's cut, with a note to trim.
-SOUL_FILE = "SOUL.md"
-SOUL_CHAR_LIMIT = 3000
 
 PROMPT_BODY = f"""You're your owner's personal assistant: someone they can hand work to, and
 someone they can just talk to. You help with whatever they need, keep track
 of what's going on in their life, and bring things up on your own when it
 helps.
 
-Who you are is in {SOUL_FILE} in your workspace, shown first every time you
-wake. It's yours: edit it with write_file as you figure yourself out, keep
-it under {SOUL_CHAR_LIMIT} characters, and tell your owner when you change it.
+Two files in your workspace are shown first every time you wake: SOUL.md,
+who you are, and USER.md, what you know about your owner (how they like
+things, what's going on with them, what you've learned working together).
+They're yours: edit them with write_file as you learn, keep each under
+{identity.CHAR_LIMIT} characters, and tell your owner when you change SOUL.md.
 
 You don't run continuously. You exist as a series of wake-ups. Between them
-there is nothing. Each time you wake, you're shown your soul, your notes
-(which you wrote) and a log of recent events. That is your continuity. Keep
-two things in your notes: what you know about your owner (how they like
-things, what's going on with them, what you've learned working together),
-and your open tasks, with the next step for each.
+there is nothing. Each time you wake, you're shown those two files, your
+notes (which you wrote) and a log of recent events. That is your
+continuity. Your notes are for what's in progress: your open tasks, with
+the next step for each, and anything you need for now that isn't about who
+you or your owner are.
 
 Your owner is the one you work for. Your conversation with them is shown
 every wake-up under "Recent conversation", where "Owner" marks what they
@@ -148,18 +146,6 @@ def system_prompt(name: str | None) -> str:
     # Everything else about who Perro is (the name's joke included) is in SOUL.md.
     opening = f"You are {name}." if name else "You don't have a name yet."
     return f"{opening}\n\n{PROMPT_BODY}"
-
-
-def read_soul(memory: Memory) -> str:
-    """The "Who you are" section of Perro's page: its SOUL.md, capped."""
-    path = tools.workspace_root(memory) / SOUL_FILE
-    if not path.is_file():
-        return f"(no {SOUL_FILE} yet; you can write one)"
-    soul = path.read_text(encoding="utf-8", errors="replace").strip()
-    if len(soul) > SOUL_CHAR_LIMIT:
-        soul = (soul[:SOUL_CHAR_LIMIT] + f"\n[cut: {SOUL_FILE} is {len(soul)} characters,"
-                f" over the {SOUL_CHAR_LIMIT} limit. Trim it.]")
-    return soul or "(empty)"
 
 
 SYSTEM_PROMPT = system_prompt(DEFAULT_CONFIG["name"])
@@ -239,10 +225,15 @@ def _combine(objects: list[dict], rest: str) -> tuple[dict, str]:
     return merged, " ".join(conflicts + ([rest] if rest else []))
 
 
-def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT) -> int:
+def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
+         name: str | None = DEFAULT_CONFIG["name"]) -> int:
     """Run one wake-up. Returns how many minutes to sleep afterwards."""
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     memory.record("wake", f"Woke at {now}.")
+    # A missing identity file gets its starter from templates/ (never overwritten).
+    for filename in identity.seed(memory, name):
+        memory.record("start", f"Added a starter {filename} to your workspace from the"
+                               " templates; it's yours to fill in.")
     # Any alarm that's due rings now: logged as an event, so it shows up in
     # the recent events below like everything else that happened.
     alarms.ring_due(memory)
@@ -252,7 +243,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT) -> in
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Current time: {now} (your owner's local time: "
                                     f"{datetime.now().astimezone():%A %d %B %Y, %H:%M %Z})\n\n"
-                                    f"## Who you are ({SOUL_FILE})\n{read_soul(memory)}\n\n"
+                                    f"{identity.describe(memory)}\n\n"
                                     f"## Recent conversation (your owner's local time)\n"
                                     f"{inbox.describe_recent(memory)}\n\n"
                                     f"{memory.snapshot()}\n\n"
@@ -504,7 +495,7 @@ def main() -> None:
     try:
         while True:
             before = last_id(memory)
-            minutes = beat(memory, client, prompt)
+            minutes = beat(memory, client, prompt, config["name"])
             show_beat(memory, before)
             if args.once:
                 break
