@@ -24,5 +24,5 @@ These are the parts worth being careful about, because Perro reads other people'
 - Secrets come from environment variables, never files in the repo.
 - Perro's file tools only touch `<home>/workspace/`; every path goes through `_resolve()` in `perro/tools.py`. That's fine for text files, not for a shell, which would need a container. Web reading goes through `perro/web.py`, which stays read-only and refuses private addresses. Outside services (Gmail, Calendar) are planned to go through n8n webhooks, where the approval step can sit.
 - Tokens cost the owner money, so watch how often Perro wakes and how much it reads per wake.
-- Not a Git repo yet. Ask the owner before making it one or creating a remote.
+- Two repos, as with Lobo. The code is `silascroe/perro` (public, so no secrets or personal details in it). `home/` is its own repo, `silascroe/firstborn-perro` (private), holding Perro's memory, notes, workspace and the owner's conversations; the "Perro backup" task commits and pushes it every 6 hours while Perro sleeps, so don't commit there by hand while it's awake. Commit and push code when a piece is finished and tested (the owner's standing permission); ask first for anything delicate, like history rewrites, force pushes or repo visibility.
 - Update `docs/STATUS.md` when a piece lands or a decision is made.

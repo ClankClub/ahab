@@ -23,7 +23,9 @@ Forked from Lobo's runtime (`../Lobo`, commit `2076c5d`). None of Lobo's `home/`
 - It believed messages wait for its next scheduled wake-up; they actually wake it within seconds. The prompt now says so.
 - Cost: one 10-call wake-up used about 227k input tokens, because every call resends all earlier page fetches. Trimming old tool results within a wake-up is the biggest saving available.
 
-Not yet tested: the Mac installer (`scripts/install_mac.py`, which doesn't know about the bridge), the backup, and a real logout and login with the tasks installed.
+**Git.** Code at `silascroe/perro` (public), `home/` at `silascroe/firstborn-perro` (private), the same split as Lobo. The "Perro backup" task is installed and ran hidden successfully, push included.
+
+Not yet tested: the Mac installer (`scripts/install_mac.py`, which doesn't know about the bridge), and a real logout and login with the tasks installed.
 
 ## Next, roughly in order
 
@@ -35,7 +37,3 @@ Not yet tested: the Mac installer (`scripts/install_mac.py`, which doesn't know 
 6. **Approval before acting.** Reading and drafting run freely; sending to others, accepting, deleting and spending get the owner's OK. The first outward-acting tool builds this.
 7. **Later:** a shell, only inside a container.
 
-## Open decisions
-
-- Backup: whether `home/` becomes its own private Git repo, the way Lobo's `firstborn` works. `backup.py` assumes so.
-- Git for the code itself: not a repo yet. The owner decides when, and where the remote lives.

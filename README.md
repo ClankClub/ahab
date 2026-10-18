@@ -17,7 +17,7 @@ Your PC: Perro runtime (Python)
   ├─ web            → read-only: any public page as text, plus Wikipedia search
   ├─ alarms         → reminders and follow-ups; the heartbeat wakes it for them
   ├─ skills         → know-how files it keeps in workspace/skills/
-  ├─ backup         → commits and pushes home/ to a private repo (not set up yet)
+  ├─ backup         → commits and pushes home/ to its private repo every 6 hours, only between wakes
   ├─ days           → home/days/: the log as one readable Markdown file per day
   └─ home/workspace/ → the only part of the disk its tools may touch
 ```
@@ -59,7 +59,7 @@ The pairing lives in `home/telegram.json`. Delete that file and pair again to sw
 - `py -m perro.days` — regenerate `home/days/` from the log.
 - `.\scripts\install-task.ps1` — run Perro unattended: registers two Windows scheduled tasks, "Perro heartbeat" and "Perro telegram" (the latter only if `PERRO_TELEGRAM_TOKEN` is set), that start hidden at login and restart if they crash. Output goes to `home/heartbeat.log` and `home/telegram.log`. `-Remove` uninstalls both. Stop one with `Stop-ScheduledTask "Perro telegram"`. After changing code, `py -m perro.heartbeat --restart` reloads the heartbeat; for the bridge, `Stop-ScheduledTask` then `Start-ScheduledTask`.
 - `py -m perro.heartbeat --restart` — restart the unattended heartbeat, for example to load new code.
-- `.\scripts\install-backup-task.ps1`, `py -m perro.backup` — backups. These need `home/` to be its own Git repo with a private remote, which it isn't yet, so the backup refuses to run.
+- `.\scripts\install-backup-task.ps1` — registers "Perro backup", which commits and pushes `home/` to its private repo every 6 hours, only while Perro is asleep (`-EveryHours N` to change, `-Remove` to uninstall). `py -m perro.backup` does one backup by hand. `home/` must be its own Git repo with a remote.
 - `scripts/install_mac.py` — the Mac equivalent of both tasks, also untested under the new name.
 
 ## License

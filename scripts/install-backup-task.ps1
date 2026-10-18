@@ -10,7 +10,7 @@
 param(
     [switch]$Remove,
     [int]$EveryHours = 6,
-    [string]$Pythonw = (Join-Path (Split-Path (Get-Command python).Source) "pythonw.exe")
+    [string]$Pythonw = ""
 )
 
 $TaskName = "Perro backup"
@@ -19,6 +19,17 @@ if ($Remove) {
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
     Write-Host "Removed '$TaskName'."
     return
+}
+
+# Find pythonw.exe (Python without a console window). `python` may not be on
+# the PATH, so ask the py launcher where Python lives and look next to it.
+if (-not $Pythonw) {
+    $python = if (Get-Command py -ErrorAction SilentlyContinue) {
+        & py -c "import sys; print(sys.executable)"
+    } else {
+        (Get-Command python -ErrorAction Stop).Source
+    }
+    $Pythonw = Join-Path (Split-Path $python) "pythonw.exe"
 }
 
 $repo = Split-Path -Parent $PSScriptRoot
