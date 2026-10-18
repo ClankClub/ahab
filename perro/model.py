@@ -69,6 +69,10 @@ class Reply:
     # Thinking models (DeepSeek in thinking mode) reason before answering and
     # return that reasoning separately from the answer. Empty if there's none.
     reasoning: str = ""
+    # How many of prompt_tokens the server already had cached from an earlier
+    # call with the same opening. Those are billed far cheaper. 0 if the
+    # server doesn't say.
+    cached_tokens: int = 0
 
 
 class ModelClient:
@@ -119,8 +123,18 @@ class ModelClient:
         # nothing, or with fragments of its own native tool-call markup
         # ("DSML" tokens) instead of the JSON asked for. That's the model
         # slipping, not an answer, so ask again right away.
+        # A slipped reply is still billed, so its tokens are added in too.
+        prompt_tokens = completion_tokens = cached_tokens = 0
         for attempt in range(1, EMPTY_REPLY_ATTEMPTS + 1):
             data = self._post_with_retries(f"{self.base_url}/chat/completions", body, headers)
+            usage = data.get("usage") or {}
+            prompt_tokens += usage.get("prompt_tokens") or 0
+            completion_tokens += usage.get("completion_tokens") or 0
+            # DeepSeek reports prompt_cache_hit_tokens; OpenAI-style servers
+            # (OpenRouter included) report prompt_tokens_details.cached_tokens.
+            cached_tokens += (usage.get("prompt_cache_hit_tokens")
+                              or (usage.get("prompt_tokens_details") or {}).get("cached_tokens")
+                              or 0)
             try:
                 message = data["choices"][0]["message"]
                 text = message["content"]
@@ -128,13 +142,13 @@ class ModelClient:
                 raise ModelError(f"Unexpected response shape: {str(data)[:300]}")
             if not json_mode or (text and text.strip() and "DSML" not in text):
                 break
-        usage = data.get("usage") or {}
         return Reply(
             text=text,
             model=data.get("model", self.model),
-            prompt_tokens=usage.get("prompt_tokens", 0),
-            completion_tokens=usage.get("completion_tokens", 0),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
             reasoning=message.get("reasoning_content") or "",
+            cached_tokens=cached_tokens,
         )
 
     def _post_with_retries(self, url: str, body: bytes, headers: dict) -> dict:
@@ -174,4 +188,5 @@ if __name__ == "__main__":
     except ModelError as e:
         sys.exit(f"Model call failed: {e}")
     print(reply.text)
-    print(f"\n[{reply.model} | {reply.prompt_tokens} in, {reply.completion_tokens} out]")
+    print(f"\n[{reply.model} | {reply.prompt_tokens} in ({reply.cached_tokens} cached), "
+          f"{reply.completion_tokens} out]")

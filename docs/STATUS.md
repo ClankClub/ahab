@@ -23,7 +23,9 @@ Forked from Lobo's runtime (`../Lobo`, commit `2076c5d`). None of Lobo's `home/`
 - A 12-moon research task carried over two wake-ups through its notes. One side claim it made from memory was wrong (it said Miranda comes after Charon; Umbriel does). The prompt now asks it to keep checked facts apart from remembered ones.
 - It read UTC as local time and used an emoji. Each wake-up now shows the owner's local time, and the prompt asks for plain text.
 - It believed messages wait for its next scheduled wake-up; they actually wake it within seconds. The prompt now says so.
-- Cost: one 10-call wake-up used about 227k input tokens, because every call resends all earlier page fetches. Trimming old tool results within a wake-up is the biggest saving available.
+- Cost: one 10-call wake-up used about 227k input tokens, because every call resends all earlier page fetches. Now only the latest tool result stays whole and long earlier ones are cut to 600 characters; in a fake 10-read wake-up that sent 36% of the characters. DeepSeek caches repeated prompt openings and bills those tokens far cheaper, so the untrimmed version cost less than its raw count suggested; the sleep line now shows how much was cached (`3081 in (2900 cached)`), and tokens from retried empty replies are counted too.
+- Perro only saw the last 20 log events, about two chat exchanges (a reply makes ~9 events). Asked how long it had been alive, it dated its "earliest memory" to the last thing on its page, not its first wake-up. The page now has a "Recent conversation" section from the messages table (16 messages / 4,000 characters), and message events in the log show only their header.
+- Told that SOUL.md is a file it can edit, it also wrote its notes into `workspace/notes.md` before using the notes field. The prompt now says notes aren't a workspace file.
 
 **Git.** Code at `silascroe/perro` (public), `home/` at `silascroe/firstborn-perro` (private), the same split as Lobo. The "Perro backup" task is installed and ran hidden successfully, push included.
 
@@ -31,11 +33,10 @@ Not yet tested: the Mac installer (`scripts/install_mac.py`, which doesn't know 
 
 ## Next, roughly in order
 
-1. **Live with it for a while.** Chat with Perro through Telegram and adjust the prompt from what it actually does.
-2. **Trim old tool results** inside a wake-up, to cut token use.
-3. **Backend and budget.** The DeepSeek balance is small, with no auto-refill. Pick a backend deliberately before running unattended.
-4. **Its own Google account.** The owner shares calendars and docs with it, never their own login.
-5. **n8n as its hands.** n8n (`../n8n`, Docker) handles Gmail, Calendar and similar connections. Perro calls n8n webhooks instead of implementing sign-in per service, so outbound actions pass through one place where the approval step sits.
-6. **Approval before acting.** Reading and drafting run freely; sending to others, accepting, deleting and spending get the owner's OK. The first outward-acting tool builds this.
-7. **Later:** a shell, only inside a container.
+1. **Live with it for a while.** Chat with Perro through Telegram and adjust the prompt from what it actually does. Next identity files, one at a time: USER.md, PROACTIVE_PREFERENCES.md, the self-knowledge doc.
+2. **Backend and budget.** The DeepSeek balance is small, with no auto-refill. Pick a backend deliberately before running unattended.
+3. **Its own Google account.** The owner shares calendars and docs with it, never their own login.
+4. **n8n as its hands.** n8n (`../n8n`, Docker) handles Gmail, Calendar and similar connections. Perro calls n8n webhooks instead of implementing sign-in per service, so outbound actions pass through one place where the approval step sits.
+5. **Approval before acting.** Reading and drafting run freely; sending to others, accepting, deleting and spending get the owner's OK. The first outward-acting tool builds this.
+6. **Later:** a shell, only inside a container.
 

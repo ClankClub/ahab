@@ -44,6 +44,12 @@ MAX_WAKE_MINUTES = 24 * 60
 RETRY_MINUTES = 30
 # Most tool calls allowed in one wake-up, so Perro can't loop forever.
 MAX_TOOL_CALLS = 10
+# Every model call resends the whole wake-up so far, so ten page fetches
+# meant the first page was paid for ten times. Only the latest tool result
+# stays whole; once a newer one arrives, a long one is cut to its start.
+# (The full result is still in the log.)
+TRIM_RESULTS_OVER = 1500
+TRIMMED_KEEP = 600
 # --restart leaves this note in the home so the new heartbeat can say who
 # restarted it. Only a fresh note counts, in case a restart never happened.
 RESTART_NOTE = "restart.note"
@@ -88,7 +94,10 @@ owner if it seems to matter.
 
 Each wake-up you can:
 1. Think.
-2. Use tools (up to {MAX_TOOL_CALLS} calls per wake-up). Available tools:
+2. Use tools (up to {MAX_TOOL_CALLS} calls per wake-up). Only your latest tool
+   result stays whole: once you call another tool, a long earlier result is
+   cut to its first {TRIMMED_KEEP} characters. So when a result matters, put
+   what you need from it in your next "thought" before moving on. Available tools:
 {tools.describe()}
 3. Rewrite your notes, in the "notes" field of your final reply (they're not
    a workspace file). They're shown to you every wake-up and are capped at
@@ -165,6 +174,23 @@ def home_config(home: Path) -> dict:
     return config
 
 
+def trim_last_result(messages: list[dict]) -> None:
+    """Cut the newest tool result in messages down to its start, if it's long.
+
+    Called just before a newer result is added, so each result is cut once,
+    and the cut-down version is what every later call in this wake-up sees.
+    """
+    last = messages[-1]
+    prefix = "Tool result:\n"
+    if last["role"] != "user" or not last["content"].startswith(prefix):
+        return
+    result = last["content"][len(prefix):]
+    if len(result) > TRIM_RESULTS_OVER:
+        last["content"] = (f"{prefix}{result[:TRIMMED_KEEP]}\n[trimmed: {len(result) - TRIMMED_KEEP}"
+                           " more chars, cut once a newer result arrived. Run the tool again"
+                           " if you need the rest.]")
+
+
 def parse_reply(text: str) -> tuple[dict, str]:
     """Read the model's reply as one JSON object. Returns (object, dropped text).
 
@@ -234,7 +260,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT) -> in
                                     f"## Your skills\n{skills.describe(memory)}"},
     ]
 
-    tokens_in = tokens_out = 0
+    tokens_in = tokens_cached = tokens_out = 0
     tool_calls = 0
     try:
         # Each pass is one model call. A tool request sends the result back
@@ -243,6 +269,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT) -> in
         for _ in range(MAX_TOOL_CALLS + 2):
             reply = client.complete(messages, json_mode=True)
             tokens_in += reply.prompt_tokens
+            tokens_cached += reply.cached_tokens
             tokens_out += reply.completion_tokens
             if reply.reasoning:
                 # The model's private reasoning, before it wrote its answer.
@@ -275,7 +302,9 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT) -> in
             memory.record("tool", f"{name} {short_args} -> {first_line}\n"
                                   f"args: {args_json}\n{result}")
             # The model's own request and the result both go on the page, so
-            # the next call sees the whole exchange so far.
+            # the next call sees the whole exchange so far, minus the bulk of
+            # older results.
+            trim_last_result(messages)
             messages.append({"role": "assistant", "content": reply.text})
             messages.append({"role": "user", "content": f"Tool result:\n{result}"})
         else:
@@ -307,7 +336,8 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT) -> in
         "sleep",
         f"Sleeping {clamped} min"
         + (f" (asked for {minutes})" if clamped != minutes else "")
-        + f". [{tool_calls} tool calls, {tokens_in} in, {tokens_out} out]",
+        + f". [{tool_calls} tool calls, {tokens_in} in ({tokens_cached} cached),"
+          f" {tokens_out} out]",
     )
     return clamped
 
