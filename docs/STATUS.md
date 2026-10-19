@@ -14,6 +14,7 @@ What it can't: see images or hear audio, email anyone off its list, share or del
 
 - Whether the proactive defaults bring up useful things or noise, whether AGENTS.md and the dream's skills fill with real lessons, and whether Pip reads its guide when asked about itself.
 - Proper memory (new; the weekly memory report on Telegram, Sundays at 7pm, counts it): whether Pip writes to MEMORY.md and memory/ as it goes or leaves it all to the dream, whether the dream keeps MEMORY.md tidy rather than ever longer, and whether Pip reaches for recall instead of saying it doesn't remember. The page grew: five files at up to 54,000 characters together, plus the latest day note.
+- FEEDBACK.md (new): whether Pip uses it, and whether it stays specific. Builders read it before planning.
 - Standing intents (new): whether Pip reaches for them over notes when a promise is about a subject, not a time.
 - The sanity canary (new): one live probe came back clean; watch its first days on the real home. A "model_tools" event in the log means Codex's own tools are back.
 - The tool list is about 14,000 characters on every wake and growing. At some point tools want grouping (browser tools appearing only once asked for, say).

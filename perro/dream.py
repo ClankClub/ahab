@@ -146,7 +146,11 @@ Do these things:
    otherwise: a wrong "can't" gets believed again every wake after. Your
    waking tools are the same every wake-up; they don't come and go. One can
    fail now and then (a refused call, a service down), which is worth noting
-   as that, but a tool in the list is never "not available".
+   as that, but a tool in the list is never "not available". A real
+   "can't" from the day that you'd want fixed (an ability missing, a limit
+   that pinched, a tool that kept failing), or an idea for how you're
+   built, goes in {identity.FEEDBACK} for your builders, briefly and dated,
+   if it isn't there already.
 4. Write the day's note, in the "day" field: what happened, plainly and
    specifically. What your owner asked and told you, what you did, what
    was decided, what's still open, with times. Name things the way a

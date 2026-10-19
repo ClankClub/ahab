@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory() as d:
     soul, user = (ws / "SOUL.md").read_text(encoding="utf-8"), (ws / "USER.md").read_text(encoding="utf-8")
     assert "You're Luna," in soul and "{name}" not in soul and "Lobo" not in soul
     assert user.startswith("# USER")
-    assert len(starts) == 5, starts
+    assert len(starts) == 6, starts
     assert (ws / "AGENTS.md").read_text(encoding="utf-8").startswith("# AGENTS")
     assert (ws / "PROACTIVE_PREFERENCES.md").read_text(encoding="utf-8").startswith("# PROACTIVE PREFERENCES")
     assert p.index("## Who you are (SOUL.md)") < p.index("## Your owner (USER.md)") < p.index("## What to bring up on your own (PROACTIVE_PREFERENCES.md)") < p.index("## How you work here (AGENTS.md)") < p.index("## What you remember (MEMORY.md)") < p.index("## Your memory folder (memory/)") < p.index("## Recent conversation") < p.index("## Your notes")
@@ -35,10 +35,10 @@ with tempfile.TemporaryDirectory() as d:
     # existing files are never overwritten; no new start events
     (ws / "USER.md").write_text("# USER\nGoes by Sam.", encoding="utf-8")
     _, p, starts = page(home, "Luna")
-    assert "Goes by Sam." in p and len(starts) == 5 and (ws / "USER.md").read_text(encoding="utf-8") == "# USER\nGoes by Sam."
+    assert "Goes by Sam." in p and len(starts) == 6 and (ws / "USER.md").read_text(encoding="utf-8") == "# USER\nGoes by Sam."
     # deleted file comes back as a starter; cap still works
     (ws / "SOUL.md").unlink(); (ws / "USER.md").write_text("u" * 8500, encoding="utf-8")
     _, p, starts = page(home, None)
-    assert "You're the assistant," in (ws / "SOUL.md").read_text(encoding="utf-8") and len(starts) == 6
+    assert "You're the assistant," in (ws / "SOUL.md").read_text(encoding="utf-8") and len(starts) == 7
     assert "[cut: USER.md is 8500 characters" in p
 print("ALL PASSED")

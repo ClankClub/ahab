@@ -40,6 +40,12 @@ TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
 FILES = (("SOUL.md", "Who you are"), ("USER.md", "Your owner"),
          ("PROACTIVE_PREFERENCES.md", "What to bring up on your own"),
          ("AGENTS.md", "How you work here"), ("MEMORY.md", "What you remember"))
+# Starters seeded like the files above but not shown on the page: FEEDBACK.md
+# is what Perro tells its builders (problems, missing abilities, ideas), read
+# by them, not by Perro every wake.
+STARTERS = ("FEEDBACK.md",)
+FEEDBACK = "FEEDBACK.md"
+FEEDBACK_CHAR_LIMIT = 20_000   # a guide in the prompt, not enforced: roomy on purpose
 CHAR_LIMIT = 8000
 # AGENTS.md holds the lessons that pile up from doing the work, plus the
 # owner's own guide to how Perro should sound, so it gets more room;
@@ -68,7 +74,7 @@ def seed(memory: Memory, name: str | None) -> list[str]:
     """Copy in the starter for each identity file that's missing. Returns what was added."""
     root = workspace_root(memory)
     added = []
-    for filename, _ in FILES:
+    for filename in [f for f, _ in FILES] + list(STARTERS):
         target, template = root / filename, TEMPLATES / filename
         if target.exists() or not template.is_file():
             continue

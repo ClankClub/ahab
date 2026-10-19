@@ -7,6 +7,11 @@ from perro import identity, heartbeat
 from perro.memory import Memory
 m = Memory(Path(tempfile.mkdtemp())); identity.seed(m, "Perro")
 ws = identity.workspace_root(m)
+# FEEDBACK.md is seeded too, but it's for the builders: never on the page.
+assert (ws / "FEEDBACK.md").read_text(encoding="utf-8").startswith("# FEEDBACK.md")
+assert "FEEDBACK.md: problems" not in identity.describe(m) and "FEEDBACK.md" in heartbeat.SYSTEM_PROMPT
+(ws / "FEEDBACK.md").write_text("mine", encoding="utf-8"); identity.seed(m, "Perro")
+assert (ws / "FEEDBACK.md").read_text(encoding="utf-8") == "mine"
 (ws / "AGENTS.md").write_text("a" * 9000, encoding="utf-8")
 (ws / "SOUL.md").write_text("s" * 9000, encoding="utf-8")
 page = identity.describe(m)

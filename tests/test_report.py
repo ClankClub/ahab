@@ -21,6 +21,7 @@ tool("edit_file", {"path": "MEMORY.md", "old": "", "new": "x"}, "Added to the en
 tool("write_file", {"path": "memory/people/ann.md", "content": "# Ann"}, "Created memory/people/ann.md (5 chars).")
 tool("edit_file", {"path": "notes-of-mine.md", "old": "", "new": "x"}, "Created notes-of-mine.md (now 1 chars).")
 tool("edit_file", {"path": "MEMORY.md", "old": "zz", "new": "x"}, "edit_file refused: old appears 0 times")
+tool("edit_file", {"path": "FEEDBACK.md", "old": "", "new": "- 18 Oct: can't see images"}, "Added to the end of FEEDBACK.md (now 40 chars).")
 tool("recall", {"query": "Ann"}, "Best matches...")
 tool("recall", {"query": "bees"}, "Best matches...")
 tool("read_conversation", {"date": "2026-10-01"}, "Your conversation...")
@@ -40,6 +41,7 @@ assert "Wrote to memory while awake 2 time(s): MEMORY.md, memory/people/ann.md."
 assert "The dream ran 1 time(s) and changed 2 memory file(s)." in text
 assert "MEMORY.md is 1,200 characters (cap 20,000)." in text and "since the last report" not in text
 assert "People pages: 1 (ann)." in text
+assert "Added to FEEDBACK.md 1 time(s)" in text, text
 assert "Looked things up: recall 2, read_conversation 1." in text
 assert "Said it didn't remember 1 time(s), latest: \"Sorry, I don't remember an Ann.\"" in text
 assert f"Talked on 2 day(s); no day note for {yesterday:%Y-%m-%d}." in text, "today's note isn't due yet"

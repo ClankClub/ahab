@@ -1,6 +1,6 @@
 # Agent instructions for Perro
 
-Read `README.md`, then `docs/STATUS.md` (and `docs/BUILD_LOG.md` for the piece you're touching). Perro is a fork of Lobo (`../Lobo`); don't edit anything in that folder from here.
+Read `README.md`, then `docs/STATUS.md` (and `docs/BUILD_LOG.md` for the piece you're touching). The running agent's own reports to its builders (problems, missing abilities, ideas) are in `home/workspace/FEEDBACK.md`: read it before planning work, and when you fix or answer an entry, mark it there with the date (it's the agent's file, so mark, don't rewrite, and leave the commit to the backup). Perro is a fork of Lobo (`../Lobo`); don't edit anything in that folder from here.
 
 ## What Perro is
 

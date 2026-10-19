@@ -38,8 +38,12 @@ FORGOT = re.compile(r"\b(?:don't|do not|can't|cannot|no longer) (?:remember|reca
                     r"|\bI(?:'ve| have) forgotten\b", re.I)
 
 
+def _clean(path: str) -> str:
+    return str(path).strip().replace("\\", "/").removeprefix("./")
+
+
 def _is_memory(path: str) -> bool:
-    path = str(path).strip().replace("\\", "/").removeprefix("./")
+    path = _clean(path)
     return path == MEMORY_PATHS[0] or path.startswith(MEMORY_PATHS[1])
 
 
@@ -72,6 +76,7 @@ def gather(memory: Memory, now: datetime, days: int = DAYS) -> dict:
     rows = memory.db.execute("SELECT time, kind, content FROM events WHERE time >= ? ORDER BY id",
                              (since,)).fetchall()
     awake, dream_files, lookups, forgot, talked, dreams = [], [], {}, [], set(), 0
+    feedback = 0
     for when, kind, content in rows:
         if kind == "tool":
             name, _, rest = content.partition(" ")
@@ -80,6 +85,8 @@ def gather(memory: Memory, now: datetime, days: int = DAYS) -> dict:
                 result = rest.split(" -> ", 1)[-1].split("\n", 1)[0]
                 if _is_memory(path) and result.startswith(WROTE):
                     awake.append(str(path))
+                elif _clean(path) == identity.FEEDBACK and result.startswith(WROTE):
+                    feedback += 1
             elif name in ("recall", "read_conversation"):
                 lookups[name] = lookups.get(name, 0) + 1
         elif kind == "dream":
@@ -87,6 +94,7 @@ def gather(memory: Memory, now: datetime, days: int = DAYS) -> dict:
             m = re.search(r" Changed (.+?)\. (?:Not saved|Tell your|\[|$)", content.split("\n", 1)[0])
             if m:
                 dream_files += [f for f in m.group(1).split(", ") if _is_memory(f)]
+                feedback += identity.FEEDBACK in m.group(1).split(", ")
         elif kind == "message":
             first, _, text = content.partition("\n")
             if first.startswith("From the owner"):
@@ -102,7 +110,7 @@ def gather(memory: Memory, now: datetime, days: int = DAYS) -> dict:
     people = root / identity.MEMORY_FOLDER / "people"
     return {
         "awake": awake, "dream_files": dream_files, "dreams": dreams, "lookups": lookups,
-        "forgot": forgot, "talked": sorted(talked), "missing_days": missing,
+        "forgot": forgot, "talked": sorted(talked), "missing_days": missing, "feedback": feedback,
         "memory_chars": len(memory_md.read_text(encoding="utf-8", errors="replace")) if memory_md.is_file() else 0,
         "people": sorted(p.stem for p in people.glob("*.md")) if people.is_dir() else [],
     }
@@ -132,6 +140,9 @@ def describe(name: str, n: dict, last_chars: int | None) -> str:
         lines.append(f"Said it didn't remember {len(n['forgot'])} time(s), latest: \"{n['forgot'][-1]}\"")
     else:
         lines.append("Never told you it didn't remember.")
+    if n.get("feedback"):
+        lines.append(f"Added to {identity.FEEDBACK} {n['feedback']} time(s): problems or ideas for you "
+                     f"(home/workspace/{identity.FEEDBACK}).")
     lines.append(f"Talked on {len(n['talked'])} day(s)" + (
         f"; no day note for {', '.join(n['missing_days'])}." if n["missing_days"] else ", each with its day note."))
     return "\n".join(lines)
