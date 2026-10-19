@@ -2,7 +2,7 @@
 
 A persistent personal assistant in the spirit of Muse or OpenClaw. It wakes on a schedule it picks, takes on work you hand it, keeps track of what's going on, brings things up on its own, and is someone you can just talk to. Its sense of who it is grows in its notes over time.
 
-The name is the joke: Lobo (`../Lobo`) is the wild wolf with a life of its own, and Perro is the wolf that decided to work with you. The runtime is a fork of Lobo's; the difference is what it's for. See [AGENTS.md](AGENTS.md) for the rules, and [docs/STATUS.md](docs/STATUS.md) for what exists and what's next.
+The name is the joke: Lobo (`../Lobo`) is the wild wolf with a life of its own, and Perro is the wolf that decided to work with you. The runtime is a fork of Lobo's; the difference is what it's for. See [AGENTS.md](AGENTS.md) for the rules, [docs/ANATOMY.md](docs/ANATOMY.md) for the overview, [docs/STATUS.md](docs/STATUS.md) for what exists and what's next, and [docs/BUILD_LOG.md](docs/BUILD_LOG.md) for the details.
 
 ## The shape of it
 
@@ -80,7 +80,7 @@ If `codex` isn't on your PATH, the desktop app's copy is under `~\.codex\package
 
 ### Google and Notion (through n8n)
 
-Perro never signs in to Google or Notion. Your own n8n, in Docker, holds the sign-ins, and Perro calls its webhooks on localhost. Everything to set it up is in [n8n/](n8n/README.md): the Docker setup, the workflows, and which sign-ins to create. Every call carries a key that n8n checks, so other programs and web pages on this PC can't use them. The key is the environment variable `PERRO_N8N_KEY`, and it must match n8n's credential "Perro relay key". Restart the heartbeat after changing it. See [docs/STATUS.md](docs/STATUS.md) for what each workflow does.
+Perro never signs in to Google or Notion. Your own n8n, in Docker, holds the sign-ins, and Perro calls its webhooks on localhost. Everything to set it up is in [n8n/](n8n/README.md): the Docker setup, the workflows, and which sign-ins to create. Every call carries a key that n8n checks, so other programs and web pages on this PC can't use them. The key is the environment variable `PERRO_N8N_KEY`, and it must match n8n's credential "Perro relay key". Restart the heartbeat after changing it. See [docs/BUILD_LOG.md](docs/BUILD_LOG.md) for what each workflow does.
 
 ### The workshop (Codex builds sites, in Docker)
 

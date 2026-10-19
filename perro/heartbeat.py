@@ -367,7 +367,9 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
         {"role": "system", "content": prompt},
         {"role": "user", "content": f"Current time: {now} (your owner's local time: "
                                     f"{datetime.now().astimezone():%A %d %B %Y, %H:%M %Z})\n"
-                                    f"{coming_days(datetime.now().astimezone())}\n\n"
+                                    f"{coming_days(datetime.now().astimezone())}\n"
+                                    f"Your mind right now: "
+                                    f"{tools._this_mind(memory, getattr(client, 'backend', None))}\n\n"
                                     f"{identity.describe(memory)}\n\n"
                                     f"## Recent conversation (your owner's local time)\n"
                                     f"{inbox.describe_recent(memory)}\n\n"
@@ -389,6 +391,14 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
             tokens_in += reply.prompt_tokens
             tokens_cached += reply.cached_tokens
             tokens_out += reply.completion_tokens
+            if getattr(client, "foreign", None):
+                # The canary: Codex let the model use a tool of its own, which
+                # is how Perro once came to believe its real tools were gone.
+                # The watchdog tells the owner; this tells Perro.
+                memory.record("model_tools", "Inside that model call, Codex let your model use its own "
+                              f"built-in tools ({', '.join(sorted(set(client.foreign)))}). Those aren't "
+                              "yours and their results never reach you; your tools are the ones in "
+                              "your prompt. Your owner will hear about it from the watchdog.")
             if reply.reasoning:
                 # The model's private reasoning, before it wrote its answer.
                 # Kept for you to read; Perro's page only shows the header.

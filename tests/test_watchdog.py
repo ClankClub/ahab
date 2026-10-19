@@ -138,3 +138,42 @@ assert "n8n isn't answering" in said[-1] and "Telegram bridge isn't running" in 
 del os.environ["PERRO_N8N_KEY"]
 assert "n8n" not in watchdog.problems(home, m, NOW)
 print("watchdog ok")
+
+# The sanity probe: the model, asked with nothing on the table, has no tools.
+from perro.model import ModelError, Reply
+
+
+class Mind:
+    def __init__(self, text=None, foreign=(), fail=None):
+        self.text, self.foreign, self.fail, self.asked = text, list(foreign), fail, []
+
+    def complete(self, messages, json_mode=False):
+        self.asked.append((messages, json_mode))
+        if self.fail:
+            raise ModelError(self.fail)
+        return Reply(self.text, "fake", 10, 5)
+
+
+# An API backend (no backend in home.json means deepseek) isn't probed at all.
+assert watchdog.probe_mind(home, NOW) is None and not (home / watchdog.PROBE_STATE).exists()
+clean = Mind('{"tools": []}')
+assert watchdog.probe_mind(home, NOW, clean) is None
+assert clean.asked[0][1] == watchdog.PROBE_FORM
+bad = watchdog.probe_mind(home, NOW, Mind('Sure! {"tools": ["exec", "wait"]}'))
+assert "has tools of its own again: exec, wait" in bad, bad
+assert "command_execution" in watchdog.probe_mind(home, NOW, Mind('{"tools": []}', ["command_execution"]))
+assert "isn't answering: not logged in" in watchdog.probe_mind(home, NOW, Mind(fail="not logged in"))
+assert "unreadable" in watchdog.probe_mind(home, NOW, Mind("I have no tools."))
+# The last answer stands until it's due again: a day when clean, an hour when not.
+(home / "home.json").write_text(json.dumps({"name": "Pip", "backend": "codex-luna"}))
+assert "unreadable" in watchdog.probe_mind(home, NOW + 30 * MIN)
+watchdog.probe_mind(home, NOW, clean)
+assert watchdog.probe_mind(home, NOW + 23 * 3600) is None
+(home / watchdog.PROBE_STATE).write_text(json.dumps({"at": NOW, "problem": "Pip's model is odd."}))
+assert watchdog.problems(home, m, NOW + 30 * MIN)["mind"] == "Pip's model is odd."
+watchdog.probe_mind(home, NOW, clean)
+# A wake-up that logged Codex's own tools counts for a day, between probes.
+event("model_tools", "Inside that model call, Codex let your model use its own built-in tools (exec).", 2 * 3600)
+assert "Codex let the model use its own built-in tools" in watchdog.problems(home, m, NOW)["mind"]
+assert "mind" not in watchdog.problems(home, m, NOW + 23 * 3600)
+print("probe ok")

@@ -101,13 +101,17 @@ class ModelClient:
         config = dict(BACKENDS[name])
         if "cli" in config:
             from perro.cli_model import CliClient  # imports Reply from here
-            return CliClient(**{**config, **overrides})
-        key_env = config.pop("api_key_env")
-        api_key = os.environ.get(key_env) if key_env else None
-        if key_env and not api_key:
-            raise ModelError(f"{key_env} is not set. See README.md > Setup.")
-        config.update(overrides)
-        return cls(api_key=api_key, **config)
+            client = CliClient(**{**config, **overrides})
+        else:
+            key_env = config.pop("api_key_env")
+            api_key = os.environ.get(key_env) if key_env else None
+            if key_env and not api_key:
+                raise ModelError(f"{key_env} is not set. See README.md > Setup.")
+            config.update(overrides)
+            client = cls(api_key=api_key, **config)
+        # Remembered so the wake-up page can say which mind is running.
+        client.backend = name
+        return client
 
     def complete(self, messages: list[Message], temperature: float = 0.7,
                  json_mode: bool = False) -> Reply:

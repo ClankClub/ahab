@@ -1,6 +1,6 @@
 # Anatomy
 
-What Perro is, built up from the bottom: everything around the model, layer by layer. For what each piece does in detail and what's next, see [STATUS.md](STATUS.md).
+What Perro is, built up from the bottom: everything around the model, layer by layer. For where things stand, see [STATUS.md](STATUS.md); for each piece in detail, [BUILD_LOG.md](BUILD_LOG.md).
 
 **Layer zero: the starting point.** A language model is a stateless function. Text goes in, text comes out, and it remembers nothing between calls. It has no clock, no hands, no idea who you are, and it never does anything unless someone calls it. Everything else is scaffolding around that one fact.
 
@@ -30,6 +30,6 @@ What Perro is, built up from the bottom: everything around the model, layer by l
 
 **Taming the borrowed brain.** Separate CLI profiles so it never reads the owner's own setup, Codex's own tools stripped out, the model-catalog fix for the hidden `exec` box, trimming old tool results, the one-call `message` field, and the retry when a reply comes back malformed.
 
-**Staying alive unattended.** Login tasks, the watchdog, the six-hourly backup of its home to a private repo, the Mac installer, and tests on every push.
+**Staying alive unattended.** Login tasks, the watchdog (checking that Perro is alive, and once a day that its model is sane), the six-hourly backup of its home to a private repo, the Mac installer, and tests on every push.
 
 The model is maybe 10% of what Perro is. The other 90% is deciding what a stateless function needs in order to behave like someone.

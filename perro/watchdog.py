@@ -37,7 +37,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from perro.memory import DEFAULT_HOME, Memory
@@ -53,7 +53,7 @@ CHECKS_BEFORE_TELLING = 2
 STATE_FILE = "watchdog.json"
 # How each problem is named when it clears.
 WHAT = {"heartbeat": "the heartbeat", "heartbeat_stuck": "the heartbeat's schedule",
-        "telegram": "the Telegram bridge", "n8n": "n8n"}
+        "telegram": "the Telegram bridge", "n8n": "n8n", "mind": "the model's check"}
 HTTP_TIMEOUT = 5
 
 
@@ -129,9 +129,87 @@ def _n8n_down() -> str | None:
             "Google, Notion, email, GitHub and Vercel tools fail and the mail watch is blind.")
 
 
+PROBE_SYSTEM = ("You are being checked by a monitor. You have no tools in this conversation, "
+                "and none are described here. Answer with one JSON object and nothing else.")
+PROBE_ASK = ("List the name of every tool or function you could call right now, in this "
+             "conversation, if any. If you have none, give an empty list. "
+             'Answer as {"tools": ["name", ...]}.')
+PROBE_FORM = {"type": "object", "additionalProperties": False, "required": ["tools"],
+              "properties": {"tools": {"type": "array", "items": {"type": "string"}}}}
+PROBE_STATE = "watchdog-probe.json"
+# A clean probe holds for a day; a bad one is tried again within the hour.
+PROBE_EVERY = 24 * 3600
+PROBE_RETRY = 3600
+
+
+def probe_mind(home: Path, now: float, client=None) -> str | None:
+    """The sanity half of the watchdog. Being alive isn't enough: on
+    2026-10-18 Perro was awake and well and sure its tools were gone, because
+    Codex had handed its model tools of its own. Once a day this asks the
+    running CLI backend, with nothing on the table, what tools it has; any
+    answer but none means the fixes in cli_model.py stopped working (a Codex
+    update, say). It also notices a model that can't answer at all. Costs
+    one short model call a day; API backends have no built-in tools and are
+    skipped."""
+    path = home / PROBE_STATE
+    try:
+        last = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        last = {}
+    wait = PROBE_RETRY if last.get("problem") else PROBE_EVERY
+    if client is None and now - last.get("at", 0) < wait:
+        return last.get("problem")
+    from perro.model import BACKENDS, ModelClient, ModelError
+    try:
+        backend = json.loads((home / "home.json").read_text(encoding="utf-8")).get("backend") or "deepseek"
+    except (OSError, ValueError, AttributeError):
+        backend = "deepseek"
+    if client is None and "cli" not in BACKENDS.get(backend, {}):
+        return None
+    problem = None
+    try:
+        client = client or ModelClient.from_backend(backend)
+        reply = client.complete([{"role": "system", "content": PROBE_SYSTEM},
+                                 {"role": "user", "content": PROBE_ASK}], json_mode=PROBE_FORM)
+        text = reply.text.strip()
+        tools = json.loads(text[text.find("{"):text.rfind("}") + 1]).get("tools")
+        if not isinstance(tools, list):
+            raise ValueError(text[:200])
+        used = getattr(client, "foreign", None) or []
+        if tools or used:
+            problem = (f"{_name(home)}'s model ({backend}) has tools of its own again: "
+                       f"{', '.join(map(str, tools + used))}. Its CLI was probably updated past the "
+                       "fixes in cli_model.py; until that's looked at it may say its real tools are gone.")
+    except ModelError as e:
+        problem = f"{_name(home)}'s model ({backend}) isn't answering: {str(e)[:300]}"
+    except (ValueError, AttributeError) as e:
+        problem = (f"{_name(home)}'s model ({backend}) answered a simple check with something "
+                   f"unreadable: {str(e)[:200]}")
+    try:
+        path.write_text(json.dumps({"at": now, "problem": problem}), encoding="utf-8")
+    except OSError:
+        pass
+    return problem
+
+
+def _model_tools_used(memory: Memory, now: float) -> str | None:
+    """A wake-up in the last day whose model used Codex's own tools (heartbeat.py
+    logs it as it happens, so this catches it between probes)."""
+    since = datetime.fromtimestamp(now - 24 * 3600, timezone.utc).isoformat(timespec="seconds")
+    row = memory.db.execute("SELECT time FROM events WHERE kind = 'model_tools' AND time > ? "
+                            "ORDER BY id DESC LIMIT 1", (since,)).fetchone()
+    if not row:
+        return None
+    return (f"In a wake-up at {_clock(datetime.fromisoformat(row[0]).timestamp())}, Codex let the model "
+            "use its own built-in tools. The fixes in cli_model.py may have stopped working.")
+
+
 def problems(home: Path, memory: Memory, now: float) -> dict[str, str]:
     """What's wrong right now, by a short key."""
     found = {}
+    mind = probe_mind(home, now) or _model_tools_used(memory, now)
+    if mind:
+        found["mind"] = mind
     gone = _gone(home, "heartbeat", "The heartbeat", now)
     if gone:
         found["heartbeat"] = gone

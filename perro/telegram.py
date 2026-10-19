@@ -65,6 +65,12 @@ OUTBOX_SECONDS = 2
 # After a network failure, wait this long before trying again.
 RETRY_SECONDS = 10
 TELEGRAM_CHAR_LIMIT = 4096
+# What a message without text can carry, as Telegram names it, in the words
+# Perro hears.
+NON_TEXT = {"photo": "a photo", "sticker": "a sticker", "voice": "a voice message",
+            "video_note": "a video message", "video": "a video", "animation": "a GIF",
+            "audio": "an audio file", "document": "a file", "location": "a location",
+            "contact": "a contact", "poll": "a poll"}
 
 
 class TelegramError(Exception):
@@ -146,7 +152,19 @@ def handle_update(update: dict, state: dict, memory: Memory, bot: Bot) -> None:
         return
     text = message.get("text")
     if not text:
-        bot.send(state["owner_chat_id"], "I can only read text messages for now.")
+        # Perro can't take the thing itself yet, but it hears that it came,
+        # with any caption, so it isn't left wondering why the owner went quiet.
+        kind = next((NON_TEXT[k] for k in NON_TEXT if k in message), "a message that isn't text")
+        caption = (message.get("caption") or "").strip()
+        note = (f"[From the Telegram bridge: the owner sent {kind}, which can't reach you; "
+                f"you can only read text for now.]")
+        try:
+            inbox.owner_sends(memory, f"{note}\n{caption}" if caption else note, knock=True)
+        except ValueError:
+            inbox.owner_sends(memory, note, knock=True)
+        bot.send(state["owner_chat_id"], f"Perro can only read text for now, so it's been told you "
+                                         f"sent {kind}" + (", with the caption." if caption else "."))
+        print(f"[{_now()}] In: {kind} from the owner, passed on as a note.")
         return
     if text.strip().lower() in TALK_COMMANDS:
         # Lifting the email brakes is the owner's call, so it's done here, in

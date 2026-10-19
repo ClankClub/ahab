@@ -122,6 +122,7 @@ class CliClient:
         self.cli, self.model, self.effort, self.timeout = cli, model, effort, timeout
         self.web_search = web_search
         self.searches: list[str] = []   # what the last call searched for, when known
+        self.foreign: list[str] = []    # built-in Codex tools the last call used (should be none)
         self.home = cli_home()
 
     def complete(self, messages: list[Message], temperature: float = 0.7,
@@ -223,7 +224,7 @@ class CliClient:
             for name in temp:
                 os.unlink(name)
         text, reasoning, usage, errors = "", [], {}, []
-        self.searches = []
+        self.searches, self.foreign = [], []
         for line in out.splitlines():
             try:
                 event = json.loads(line)
@@ -234,8 +235,13 @@ class CliClient:
                 text = item.get("text") or ""
             elif event.get("type") == "item.completed" and item.get("type") == "reasoning":
                 reasoning.append(item.get("text") or "")
-            elif event.get("type") == "item.completed" and item.get("type") == "web_search":
+            elif event.get("type") == "item.completed" and item.get("type") == "web_search" and self.web_search:
                 self.searches.append(str(item.get("query") or (item.get("action") or {}).get("query") or "?"))
+            elif event.get("type") == "item.completed" and item.get("type") not in ("error", None):
+                # Anything else is the model using a tool of Codex's own (its
+                # exec box, a helper agent, a plan list...), which every switch
+                # above is meant to rule out. Kept so the heartbeat can say so.
+                self.foreign.append(str(item.get("type")))
             elif event.get("type") == "turn.completed":
                 usage = event.get("usage") or {}
             elif event.get("type") in ("error", "turn.failed"):

@@ -1,6 +1,6 @@
 # Agent instructions for Perro
 
-Read `README.md`, then `docs/STATUS.md`. Perro is a fork of Lobo (`../Lobo`); don't edit anything in that folder from here.
+Read `README.md`, then `docs/STATUS.md` (and `docs/BUILD_LOG.md` for the piece you're touching). Perro is a fork of Lobo (`../Lobo`); don't edit anything in that folder from here.
 
 ## What Perro is
 
@@ -30,4 +30,4 @@ These are the parts worth being careful about, because Perro reads other people'
 - Tokens cost the owner money, so watch how often Perro wakes and how much it reads per wake.
 - Two repos, as with Lobo. The code is `silascroe/perro` (public, so no secrets or personal details in it). `home/` is its own repo, `silascroe/pip` (private), holding Perro's memory, notes, workspace and the owner's conversations; the "Perro backup" task commits and pushes it every 6 hours while Perro sleeps, so don't commit there by hand while it's awake. Commit and push code when a piece is finished and tested (the owner's standing permission); ask first for anything delicate, like history rewrites, force pushes or repo visibility.
 - Run `py tests/run.py` before committing, and add a test with each new piece. Tests stay offline (fake relays and APIs, throwaway homes from `tempfile`) and generic, since the repo is public.
-- Update `docs/STATUS.md` when a piece lands or a decision is made. When a change adds, removes or limits something Perro can do, also update `docs/ABOUT_YOURSELF.md`: Perro reads it to answer questions about itself, so a stale line there becomes a false promise. Keep it generic, since it's in the public repo.
+- When a piece lands or a decision is made, describe it in `docs/BUILD_LOG.md` and update the summary in `docs/STATUS.md`; touch `docs/ANATOMY.md` only if the shape of things changes. When a change adds, removes or limits something Perro can do, also update `docs/ABOUT_YOURSELF.md`: Perro reads it to answer questions about itself, so a stale line there becomes a false promise. Keep it generic, since it's in the public repo.

@@ -37,6 +37,20 @@ before = len(m.recent(1000))
 f = Fake([{"thought": "Easy.", "message": "Fine, thanks.", "notes": None, "next_wake_minutes": 600}])
 assert heartbeat.beat(m, f, prompt) == 600
 assert len(f.seen) == 1, "one model call for a plain chat"
+# The page names the mind running: the client's backend, else home.json's.
+assert "Your mind right now: backend 'deepseek'" in f.seen[0][1]["content"]
+f = Fake([{"thought": "-", "message": None, "notes": None, "next_wake_minutes": 600}])
+f.backend = "codex-luna"
+heartbeat.beat(m, f, prompt)
+assert "Your mind right now: backend 'codex-luna', model gpt-6-luna, reasoning effort max, through Codex" \
+    in f.seen[0][1]["content"], f.seen[0][1]["content"][:600]
+# The canary: a model call that used Codex's own tools is logged for Perro.
+assert not [e for e in m.recent(1000) if e.kind == "model_tools"]
+f = Fake([{"thought": "-", "message": None, "notes": None, "next_wake_minutes": 600}])
+f.foreign = ["command_execution", "command_execution"]
+heartbeat.beat(m, f, prompt)
+leak = [e for e in m.recent(1000) if e.kind == "model_tools"]
+assert len(leak) == 1 and "(command_execution)" in leak[0].content, leak
 convo = inbox.describe_recent(m)
 assert convo.index("Owner: How are you?") < convo.index("You: Fine, thanks."), convo
 new = m.recent(1000)[before:]
