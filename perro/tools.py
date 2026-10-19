@@ -70,7 +70,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from perro import (alarms, browser, github, google, inbox, intents, mail, n8n, notion, search, senses,
+from perro import (alarms, browser, github, google, inbox, intents, mail, n8n, notion, obsidian, search, senses,
                    vercel, watches, web, workers, workshop)
 from perro.memory import Memory
 
@@ -629,6 +629,33 @@ def _deleting_tool(function):
     return tool
 
 
+# --- the Obsidian vault (the logic, and its fence, live in obsidian.py) --------
+
+def vault_search(memory: Memory, query: str = "", tag: str = "") -> str:
+    return obsidian.search(memory, query, tag)
+
+
+def vault_read(memory: Memory, note: str, start: int = 0) -> str:
+    return obsidian.read(memory, note, start)
+
+
+def vault_write(memory: Memory, note: str, content: str, mode: str = "", old: str | None = None) -> str:
+    return obsidian.write(memory, note, content, mode, old)
+
+
+def vault_move(memory: Memory, note: str, to: str) -> str:
+    return obsidian.move(memory, note, to)
+
+
+def vault_delete(memory: Memory, note: str) -> str:
+    if deleted_today(memory) >= DELETE_LIMIT:
+        raise ToolError(f"You've deleted {DELETE_LIMIT} things today, the daily limit. It resets at "
+                        "midnight; if more really has to go today, ask your owner to do it.")
+    result = obsidian.delete(memory, note)
+    memory.record("deleted", result)
+    return result
+
+
 def _workshop_tool(function):
     """The build tools (workshop.py), wrapped so a refusal reads as one."""
     def tool(memory: Memory, **args) -> str:
@@ -721,6 +748,37 @@ TOOLS = {
         'text to replace (it must appear once), new what replaces it. An empty old adds new '
         'to the end (and starts the file if it\'s new). Args: {"path": "<file>", "old": "<text>", '
         '"new": "<text>"}',
+    ),
+    "vault_search": (
+        vault_search,
+        'Search the Obsidian vault (notes that link to each other, as Markdown files) by words '
+        '(best match first, with a snippet) and/or a tag. With neither, lists the notes changed '
+        'most recently. Args: {"query": "<words>", "tag": "<tag>"} (both optional)',
+    ),
+    "vault_read": (
+        vault_read,
+        'Read a note in the vault by its name or path, the way a [[link]] names it, with the notes '
+        'it links to and the notes that link to it. "today", "yesterday" and "tomorrow" mean those '
+        'daily notes. Args: {"note": "<name>", "start": <char offset>} (start optional)',
+    ),
+    "vault_write": (
+        vault_write,
+        'Write a note in the vault; link others with [[Note name]] and tag with #tag. mode: '
+        '"create" (the default; a new note, folders made as needed), "append" (the default for '
+        'a daily note; starts the note if it is new), "replace" (the old version goes to the '
+        "vault's trash), or give old, an exact passage to swap for content. \"today\" is today's "
+        f'daily note. Max {WRITE_CHAR_LIMIT} chars. Args: {{"note": "<name or folder/name>", '
+        '"content": "<Markdown>", "mode": "<mode>", "old": "<passage>"} (mode and old optional)',
+    ),
+    "vault_move": (
+        vault_move,
+        'Rename a note or move it to another folder of the vault; every [[link]] to it is updated. '
+        'Args: {"note": "<name>", "to": "<new name, folder/new name, or an existing folder>"}',
+    ),
+    "vault_delete": (
+        vault_delete,
+        "Move a note to the vault's trash, where it can be brought back. One of your "
+        f'{DELETE_LIMIT} deletes a day. Args: {{"note": "<name>"}}',
     ),
     "set_alarm": (
         set_alarm,
@@ -1188,7 +1246,7 @@ def run(memory: Memory, name: str, args: dict) -> str:
     function, _ = TOOLS[name]
     try:
         return function(memory, **args)
-    except (ToolError, senses.SenseError) as e:
+    except (ToolError, senses.SenseError, obsidian.ObsidianError) as e:
         return f"{name} refused: {e}"
     except (TypeError, ValueError) as e:
         return f"Bad args for {name}: {e}"

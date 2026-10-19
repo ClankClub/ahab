@@ -25,6 +25,7 @@ Your PC: Perro runtime (Python)
   ├─ n8n, google    → its own Google account through your local n8n: Gmail (read; send to a list you keep),
   │                   its calendar, Drive, Docs, Sheets, Tasks, Contacts (read and write; deletes only
   │                   its own tasks and contacts, 25 deletes a day; no sharing or calendar guests)
+  ├─ obsidian       → an Obsidian vault (its own in workspace/vault/, or yours, set in home.json): links, backlinks, tags, daily notes
   ├─ notion         → its own Notion workspace through the same n8n (its to organize; deleting goes to Notion's trash)
   ├─ alarms         → reminders and follow-ups; the heartbeat wakes it for them
   ├─ watches        → web pages checked in code while it sleeps ("tell me when this changes / mentions X"); no tokens until one trips
@@ -81,6 +82,10 @@ py -m perro.senses --warm
 ```
 
 Or skip faster-whisper and set `GROQ_API_KEY` (or `OPENAI_API_KEY`) to transcribe through that API; `PERRO_HEARING` picks one when several are set up. `py -m perro.senses` shows what's set up, and `py -m perro.senses <file>` reads or transcribes one file as Perro would.
+
+### Obsidian (optional)
+
+Pip keeps its own vault in `home/workspace/vault/`; open that folder as a vault in Obsidian to read along. To have it work in a vault of yours instead, put `"obsidian_vault": "C:\path\to\vault"` in `home/home.json`. Nothing else is needed: a vault is plain Markdown files. Pip never touches `.obsidian/` (the app's settings and plugins), and what it deletes goes to the vault's `.trash/`.
 
 ### Codex or Claude Code as the model (instead of an API key)
 

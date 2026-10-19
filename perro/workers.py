@@ -57,6 +57,7 @@ MODEL_NOTES = {"luna": "GPT-6 Luna at max effort: the deepest thinker here, and 
 FALLBACK_MODEL = "haiku"         # the default when Perro's own model isn't in MODELS
 
 WORKER_TOOLS = ("recall", "read_conversation", "list_files", "read_file", "look_at", "transcribe",
+                "vault_search", "vault_read",
                 "fetch_page", "search_wikipedia", "web_search",
                 "check_calendar", "search_email", "read_email",
                 "drive_search", "read_drive_file", "read_sheet",
