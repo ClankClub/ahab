@@ -34,6 +34,11 @@ BACKENDS = {
         # DeepSeek-V4.1-Flash. Thinking mode is on by default.
         "model": "deepseek-flash",
         "api_key_env": "DEEPSEEK_API_KEY",
+        # Shown on Perro's page while this backend runs (heartbeat.page_note).
+        "page_note": ("Pricing right now: your thinking costs double at peak, 01:00-04:00 and "
+                      "06:00-10:00 UTC, Monday to Friday. For something of your own with no "
+                      "urgency (your next wake-up, an alarm, a routine check), prefer off-peak. "
+                      "Answering your owner is always fine."),
     },
     "local": {
         "base_url": "http://localhost:8080/v1",
@@ -99,6 +104,7 @@ class ModelClient:
         if name not in BACKENDS:
             raise ModelError(f"Unknown backend {name!r}; known: {', '.join(BACKENDS)}")
         config = dict(BACKENDS[name])
+        config.pop("page_note", None)   # for Perro's page, not the client
         if "cli" in config:
             from perro.cli_model import CliClient  # imports Reply from here
             client = CliClient(**{**config, **overrides})

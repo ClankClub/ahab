@@ -210,6 +210,15 @@ def coming_days(today: datetime, days: int = 14) -> str:
     return f"Coming days: {dates}"
 
 
+def page_note(client) -> str | None:
+    """What the running backend needs Perro to know, if anything (DeepSeek's
+    peak prices). The page doesn't name the model: which one Perro runs on
+    shouldn't color who it is, and the about_yourself guide says it when
+    asked. Only the practical consequence is shown, and only while it applies."""
+    from perro.model import BACKENDS
+    return BACKENDS.get(getattr(client, "backend", None) or "", {}).get("page_note")
+
+
 def trim_last_result(messages: list[dict]) -> None:
     """Cut the newest tool result in messages down to its start, if it's long.
 
@@ -368,9 +377,8 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
         {"role": "user", "content": f"Current time: {now} (your owner's local time: "
                                     f"{datetime.now().astimezone():%A %d %B %Y, %H:%M %Z})\n"
                                     f"{coming_days(datetime.now().astimezone())}\n"
-                                    f"Your mind right now: "
-                                    f"{tools._this_mind(memory, getattr(client, 'backend', None))}\n\n"
-                                    f"{identity.describe(memory)}\n\n"
+                                    + (f"{page_note(client)}\n" if page_note(client) else "") +
+                                    f"\n{identity.describe(memory)}\n\n"
                                     f"## Recent conversation (your owner's local time)\n"
                                     f"{inbox.describe_recent(memory)}\n\n"
                                     f"{memory.snapshot()}\n\n"

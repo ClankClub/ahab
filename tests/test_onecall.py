@@ -37,13 +37,16 @@ before = len(m.recent(1000))
 f = Fake([{"thought": "Easy.", "message": "Fine, thanks.", "notes": None, "next_wake_minutes": 600}])
 assert heartbeat.beat(m, f, prompt) == 600
 assert len(f.seen) == 1, "one model call for a plain chat"
-# The page names the mind running: the client's backend, else home.json's.
-assert "Your mind right now: backend 'deepseek'" in f.seen[0][1]["content"]
+# The page never names the model; DeepSeek's peak prices show only on DeepSeek.
+page = f.seen[0][1]["content"]
+assert "Pricing right now" not in page and "gpt-6" not in page and "deepseek" not in page.lower()
 f = Fake([{"thought": "-", "message": None, "notes": None, "next_wake_minutes": 600}])
-f.backend = "codex-luna"
+f.backend = "deepseek"
 heartbeat.beat(m, f, prompt)
-assert "Your mind right now: backend 'codex-luna', model gpt-6-luna, reasoning effort max, through Codex" \
-    in f.seen[0][1]["content"], f.seen[0][1]["content"][:600]
+page = f.seen[0][1]["content"]
+assert "Pricing right now: your thinking costs double at peak" in page and "deepseek" not in page.lower(), page[:600]
+from perro.model import ModelClient
+assert ModelClient.from_backend("local").backend == "local"   # page_note stays out of the client
 # The canary: a model call that used Codex's own tools is logged for Perro.
 assert not [e for e in m.recent(1000) if e.kind == "model_tools"]
 f = Fake([{"thought": "-", "message": None, "notes": None, "next_wake_minutes": 600}])

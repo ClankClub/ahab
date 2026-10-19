@@ -102,15 +102,13 @@ def about_yourself(memory: Memory, section: str = "") -> str:
     return text
 
 
-def _this_mind(memory: Memory, name: str | None = None) -> str:
-    """The backend running (name), or else the one this home's home.json
-    picks, read fresh each time."""
+def _this_mind(memory: Memory) -> str:
+    """The backend this home's home.json picks, read fresh each time."""
     from perro.model import BACKENDS
-    if not name:
-        try:
-            name = json.loads((memory.home / "home.json").read_text(encoding="utf-8")).get("backend")
-        except (OSError, ValueError):
-            name = None
+    try:
+        name = json.loads((memory.home / "home.json").read_text(encoding="utf-8")).get("backend")
+    except (OSError, ValueError):
+        name = None
     name = name or "deepseek"
     config = BACKENDS.get(name, {})
     via = {"codex": "through Codex", "claude": "through Claude Code"}.get(config.get("cli"), "through an API")
