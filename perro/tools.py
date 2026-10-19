@@ -18,6 +18,8 @@ Tools so far:
                Perro's workspace: a folder of its own, and nothing else
   set_alarm    leave a message for a future wake-up (see alarms.py)
   cancel_alarm
+  set_intent   "when X comes up, do Y", matched in code (see intents.py)
+  cancel_intent
   message_owner write to the owner (see inbox.py)
   fetch_page   read a public web page as text (read-only; see web.py)
   search_wikipedia
@@ -61,7 +63,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from perro import alarms, browser, github, google, inbox, mail, n8n, notion, search, vercel, web, workshop
+from perro import alarms, browser, github, google, inbox, intents, mail, n8n, notion, search, vercel, web, workshop
 from perro.memory import Memory
 
 # What Perro can and can't do, kept in the code repo so Perro can read it but
@@ -362,6 +364,23 @@ def cancel_alarm(memory: Memory, id: int) -> str:
         raise ToolError(str(e)) from None
 
 
+# --- standing intents (the logic lives in intents.py) --------------------
+
+def set_intent(memory: Memory, when, then: str, watch: str = "owner", times=None,
+               cooldown_hours=None, days=None) -> str:
+    try:
+        return intents.add(memory, when, then, watch, times, cooldown_hours, days)
+    except ValueError as e:
+        raise ToolError(str(e)) from None
+
+
+def cancel_intent(memory: Memory, id: int) -> str:
+    try:
+        return intents.cancel(memory, id)
+    except ValueError as e:
+        raise ToolError(str(e)) from None
+
+
 # --- writing to the owner (the logic lives in inbox.py) ------------------
 
 def message_owner(memory: Memory, text: str) -> str:
@@ -553,6 +572,24 @@ TOOLS = {
     "cancel_alarm": (
         cancel_alarm,
         'Cancel a pending alarm. Args: {"id": <alarm number>}',
+    ),
+    "set_intent": (
+        set_intent,
+        'Remember to do something when a subject comes up, rather than at a time (that\'s an '
+        'alarm): "when the move comes up, ask whether the deposit came back." Code listens for '
+        'the words in what arrives at the start of each wake-up (your owner\'s messages, or with '
+        '"watch" the sender and subject of new email) and shows you the intent in your log when '
+        f'one matches. Words match from the start of a word ("move" catches "moved", not "remove"). '
+        f'It fires up to "times" times (default {intents.DEFAULT_TIMES}), at most once every '
+        f'"cooldown_hours" (default {intents.DEFAULT_COOLDOWN_HOURS}), and expires after "days" '
+        f'(default {intents.DEFAULT_DAYS}). Your armed intents are listed every wake-up. '
+        'Args: {"when": ["<word or phrase>", ...], "then": "<what to do or say>", '
+        '"watch": "owner" | "email" | "both", "times": <n>, "cooldown_hours": <n>, "days": <n>} '
+        '(all but when and then optional)',
+    ),
+    "cancel_intent": (
+        cancel_intent,
+        'Cancel a standing intent. Args: {"id": <intent number>}',
     ),
     "message_owner": (
         message_owner,

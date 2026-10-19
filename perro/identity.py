@@ -49,8 +49,8 @@ LIMITS = {"AGENTS.md": 10_000, "MEMORY.md": 20_000}
 
 MEMORY_FOLDER = "memory"
 DAYS = "daily"                 # memory/daily/<YYYY-MM-DD>.md, one per day, by the dream
-DAY_NOTE_CHAR_LIMIT = 4000
-MAX_LISTED = 40
+DAY_NOTE_CHAR_LIMIT = 8000
+MAX_LISTED = 80
 
 
 def limit(filename: str) -> int:

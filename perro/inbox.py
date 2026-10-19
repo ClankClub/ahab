@@ -31,10 +31,10 @@ from pathlib import Path
 
 from perro.memory import DEFAULT_HOME, Memory
 
-MESSAGE_CHAR_LIMIT = 4000
+MESSAGE_CHAR_LIMIT = 16_000
 # How much of the conversation Perro's page shows every wake-up.
-RECENT_LIMIT = 16
-RECENT_CHAR_LIMIT = 4000
+RECENT_LIMIT = 30
+RECENT_CHAR_LIMIT = 16_000
 
 
 def _table(memory: Memory) -> None:

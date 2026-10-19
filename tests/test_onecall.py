@@ -75,7 +75,7 @@ assert "notes" not in [e.kind for e in m.recent(1000)[before:]]
 
 # 3. A message that can't go out: logged, and Perro wakes soon instead of sleeping on it.
 inbox.owner_sends(m, "write me a lot")
-minutes = heartbeat.beat(m, Fake([{"thought": "x", "message": "y" * 5000, "notes": None, "next_wake_minutes": 600}]), prompt)
+minutes = heartbeat.beat(m, Fake([{"thought": "x", "message": "y" * (inbox.MESSAGE_CHAR_LIMIT + 1000), "notes": None, "next_wake_minutes": 600}]), prompt)
 assert minutes == heartbeat.RETRY_MINUTES, minutes
 errs = [e.content for e in m.recent(5) if e.kind == "error"]
 assert errs and "final message was NOT sent" in errs[-1], errs

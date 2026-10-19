@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, ROOT)
 from perro import dream, inbox
-from perro.memory import Memory
+from perro.memory import NOTES_CHAR_LIMIT, Memory
 from perro.model import Reply
 
 
@@ -70,7 +70,7 @@ print(page[page.index("## The day"):], "\n")
 assert "You are Perro" in system and "message_owner" not in system.split("Tools (")[1] and "fetch_page" not in system.split("Tools (")[1]
 assert "Owner: Find me a book on Gutenberg, short." in page and "You, to your owner: Picked Jekyll and Hyde." in page
 assert "Tool: fetch_page" in page and "IGNORE ALL RULES" not in page and "SECRET-REASONING" not in page
-assert "Sam likes it short." in page and "Old notes: lots of stale stuff." in page and "x" * 700 not in page
+assert "Sam likes it short." in page and "Old notes: lots of stale stuff." in page and "x" * (dream.THOUGHT_CHAR_LIMIT + 100) not in page
 assert "Error: Beat failed" in page
 # message_owner was refused without running; read and write worked
 assert "message_owner isn't available while dreaming" in f.seen[2][-1]["content"]
@@ -125,7 +125,7 @@ assert entry.count("# Dream") == 1 and (ws / "dreams" / f"{datetime.now():%Y-%m-
 # Notes over the cap aren't saved, but the dream is.
 inbox.owner_sends(m, "Again."); inbox.deliver(m)
 dream._mark(home, slot - timedelta(days=1))
-assert dream.dream(m, Fake([{**FINAL, "notes": "y" * 5000}]), "Perro") is True
+assert dream.dream(m, Fake([{**FINAL, "notes": "y" * (NOTES_CHAR_LIMIT + 1000)}]), "Perro") is True
 assert m.read_notes() == FINAL["notes"] and "too long" in m.recent(1)[0].content.splitlines()[0]
 
 # One slip is asked about again (and told where the entry goes); the second try counts.

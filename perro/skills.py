@@ -33,7 +33,7 @@ from perro.tools import workspace_root
 FOLDER = "skills"
 RETIRED = "retired"
 # Keep the list from costing as much as the notes it's meant to relieve.
-MAX_LISTED = 30
+MAX_LISTED = 60
 DESCRIPTION_CHAR_LIMIT = 200
 FIRST_LINE_BYTES = 4096       # how much of each file is read to find its first line
 

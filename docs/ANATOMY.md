@@ -18,7 +18,7 @@ What Perro is, built up from the bottom: everything around the model, layer by l
 
 **A night shift.** The dream, at 7am, consolidates the day into its memory files and a day note, prunes false beliefs and writes skills. That's how it gets better rather than just older.
 
-**Ways to reach the owner and be reached.** The inbox, the Telegram bridge paired to the owner alone, alarms (repeating ones too), and the mail watch with its brakes for agent-to-agent emails.
+**Ways to reach the owner and be reached.** The inbox, the Telegram bridge paired to the owner alone, alarms (repeating ones too), standing intents ("when this comes up"), and the mail watch with its brakes for agent-to-agent emails.
 
 **Senses.** `fetch_page` and Wikipedia, `web_search` as a separate search-only run, and the browser box for pages built by JavaScript.
 

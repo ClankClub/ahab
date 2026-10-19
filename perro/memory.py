@@ -39,7 +39,7 @@ DEFAULT_HOME = Path(__file__).resolve().parent.parent / "home"
 # Roughly 1,000 tokens: room for who Perro is and what it knows about its
 # owner, plus its open tasks. Still capped, because these get paid for on
 # every wake-up and a cap forces Perro to decide what's worth keeping.
-NOTES_CHAR_LIMIT = 4000
+NOTES_CHAR_LIMIT = 8000
 
 # Event kinds whose full text is too long for the page; snapshot() shows only
 # their first line. Messages are shown in full in their own section instead

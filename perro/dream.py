@@ -48,7 +48,7 @@ DREAM_HOUR = 7
 STATE_FILE = "dream.state"   # in the home: which morning was last handled
 LOOK_BACK_HOURS = 48         # never read further back than this
 DAY_CHAR_LIMIT = 60_000      # about 15k tokens of the day, at most
-THOUGHT_CHAR_LIMIT = 600
+THOUGHT_CHAR_LIMIT = 1200
 LINE_CHAR_LIMIT = 250
 ENTRY_CHAR_LIMIT = 8_000
 MAX_DREAM_TOOL_CALLS = 12
@@ -60,7 +60,7 @@ MAX_FILES_CHANGED = 12
 # A wake-up with this many tool calls is pointed out as a place a skill may be.
 BUSY_WAKE = 4
 # One skill is one how-to; past this it's a manual, and costs too much to read.
-SKILL_CHAR_LIMIT = 4_000
+SKILL_CHAR_LIMIT = 8_000
 # Kinds the dream doesn't need: bookkeeping, private reasoning (long, and
 # not what Perro decided), old notes (it gets the current ones), restarts.
 SKIP_KINDS = ("wake", "sleep", "reasoning", "notes", "start", "stopped")
@@ -101,6 +101,17 @@ Do these things:
    something you learned about the world in memory/world.md. Make each
    memory/ file's first line say what's in it. Change only what the day
    gives you reason to.
+   What not to keep as lasting. A failure is an observation about one
+   moment, not a fact about the world: "the browser timed out on that site,
+   18 Oct" can go in a note, "the browser doesn't work" can't, because a
+   lasting "doesn't work" stops you trying the very thing that would show
+   it works again. When something failed for a reason that can be fixed
+   (something not installed, a sign-in, a setting), keep the fix ("ask your
+   owner to reconnect X"), not the verdict. A failure that went away on a
+   retry isn't a lesson; the retry is. A task that ended without a way that
+   worked doesn't become a how-to or a skill: keep it as open, dated, or
+   not at all. And leave out what you could look up again, details that
+   only mattered that day, and what your files already say.
    You make a change by putting the file's full new text in the "files"
    field of your final reply; that's the only way a file changes here.
    Saying or thinking that you changed one doesn't change it. The four

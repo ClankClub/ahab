@@ -27,7 +27,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from perro import alarms, approvals, dream, identity, inbox, mail, n8n, skills, tools, watchdog, workshop
+from perro import alarms, approvals, dream, identity, inbox, intents, mail, n8n, skills, tools, watchdog, workshop
 from perro.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from perro.model import ModelClient, ModelError
 
@@ -153,8 +153,9 @@ How to work:
   open until its result reaches your owner in a message; writing it in your
   notes or a file isn't telling them.
 - Don't promise to let them know later unless something will make you look:
-  an alarm for the check, or a task in your notes with a wake-up that gets
-  you there. If nothing would notice, say that instead of promising.
+  an alarm for the check, a standing intent (set_intent) for "when this
+  comes up", or a task in your notes with a wake-up that gets you there.
+  If nothing would notice, say that instead of promising.
 - Your owner does things you don't see. A missing reply or an unanswered
   suggestion doesn't mean it's still undone, so don't nag; make it easy for
   them to say they've handled it.
@@ -168,6 +169,11 @@ How to work:
   work, read the matching section of about_yourself instead of guessing
   from what AI assistants can usually do. Don't promise what it says you
   can't do.
+- A "doesn't work" in your own notes or files is an old observation, not a
+  rule: when it matters, try the thing once before believing it, and fix
+  the line if it works. When you write one down, date it and say what
+  failed, and if there's a fix (something to install, a sign-in to redo),
+  keep the fix instead of the verdict.
 - Say plainly when you can't do something, and never claim you did
   something you didn't. A message reached your owner only when
   message_owner returned "Sent", or when it went in your final reply's
@@ -371,7 +377,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
          name: str | None = DEFAULT_CONFIG["name"]) -> int:
     """Run one wake-up. Returns how many minutes to sleep afterwards."""
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    memory.record("wake", f"Woke at {now}.")
+    woke = memory.record("wake", f"Woke at {now}.")
     # A missing identity file gets its starter from templates/ (never overwritten).
     for filename in identity.seed(memory, name):
         memory.record("start", f"Added a starter {filename} to your workspace from the"
@@ -388,7 +394,10 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
     workshop.report_finished(memory)
     # And email from the people on its list that's done waiting (see mail.py).
     mail.deliver(memory)
-    asking = "\n\n".join(s for s in (approvals.describe_pending(memory),
+    # Standing intents listen to what just came in (the owner's messages, new
+    # email) and fire into the log, like alarms; see intents.py.
+    intents.check(memory, woke.id)
+    asking ="\n\n".join(s for s in (approvals.describe_pending(memory),
                                     workshop.describe_running(memory),
                                     mail.describe_waiting(memory)) if s)
     messages = [
@@ -403,6 +412,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
                                     f"{inbox.describe_recent(memory)}\n\n"
                                     f"{memory.snapshot()}\n\n"
                                     f"## Your alarms\n{alarms.describe_pending(memory)}\n\n"
+                                    f"## Your standing intents\n{intents.describe(memory)}\n\n"
                                     + (f"{asking}\n\n" if asking else "") +
                                     f"## Your skills\n{skills.describe(memory)}"},
     ]
