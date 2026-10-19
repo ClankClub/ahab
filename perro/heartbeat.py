@@ -27,7 +27,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from perro import (alarms, approvals, dream, identity, inbox, intents, mail, n8n, senses, skills, tools,
+from perro import (alarms, approvals, desktop, dream, identity, inbox, intents, mail, n8n, senses, skills, tools,
                    watchdog, watches, workers, workshop)
 from perro.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from perro.model import ModelClient, ModelError
@@ -44,7 +44,7 @@ MAX_WAKE_MINUTES = 24 * 60
 # When a beat fails (network down, bad reply), try again after this long.
 RETRY_MINUTES = 30
 # Most tool calls allowed in one wake-up, so Perro can't loop forever.
-MAX_TOOL_CALLS = 10
+MAX_TOOL_CALLS = 20
 # Every model call resends the whole wake-up so far, so ten page fetches
 # meant the first page was paid for ten times. Only the latest tool result
 # stays whole; once a newer one arrives, a long one is cut to its start.
@@ -761,6 +761,10 @@ def main() -> None:
                 dreaming = dream_at < wake_at
                 if dreaming:
                     wake_at, why, watching = dream_at, " (to dream)", False
+                desktop_at = desktop.idle_at()
+                idling = desktop_at is not None and desktop_at < wake_at
+                if idling:
+                    wake_at, why, watching, dreaming = desktop_at, " (to stop the idle desktop)", False, False
                 print(f"--- next wake at {datetime.fromtimestamp(max(wake_at, time.time())):%H:%M}"
                       f" local{why}. Ctrl+C to stop. ---\n")
                 if sleep_until(wake_at, interrupt=lambda: inbox.knocked(memory)
@@ -769,6 +773,12 @@ def main() -> None:
                     print("--- knock: a message, an approval, a finished build or worker, or an"
                           " email; waking early. ---\n")
                     break
+                if idling:
+                    try:
+                        desktop.idle_stop()
+                    except Exception as e:  # never stop the heartbeat over the desktop
+                        memory.record("error", f"Stopping the idle desktop crashed: {type(e).__name__}: {e}")
+                    continue
                 if watching:
                     # Checked here, in code, while Perro sleeps: no model call
                     # unless one trips (see watches.py).

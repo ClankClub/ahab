@@ -33,6 +33,9 @@ Tools so far:
   web_search    the web at large, run by a separate model (see search.py)
   browse, browse_look, browse_click, browse_type, browse_scroll, browse_back, browse_screenshot
                 a real Chromium in a locked box, public sites only (see browser.py)
+  desktop_look, desktop_act, desktop_shell, desktop_files
+                a Linux desktop of its own in a locked box, offline unless the owner
+                lists hosts (see desktop.py)
   check_calendar read its Google calendars through the owner's n8n (see n8n.py)
   search_email  its own Gmail, read-only, also through n8n
   read_email, save_attachment
@@ -70,7 +73,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from perro import (alarms, browser, github, google, inbox, intents, mail, n8n, notion, obsidian, screen,
+from perro import (alarms, browser, desktop, github, google, inbox, intents, mail, n8n, notion, obsidian, screen,
                    search, senses, vercel, watches, web, workers, workshop)
 from perro.memory import Memory
 
@@ -680,6 +683,16 @@ def _browser_tool(function):
     return tool
 
 
+def _desktop_tool(function):
+    """The desktop tools (desktop.py), wrapped the same way."""
+    def tool(memory: Memory, **args) -> str:
+        try:
+            return function(memory, **args)
+        except (desktop.DesktopError, workshop.WorkshopError) as e:
+            raise ToolError(str(e)) from None
+    return tool
+
+
 def _hosting_tool(function):
     """The GitHub and Vercel tools (github.py, vercel.py), wrapped the same way."""
     def tool(memory: Memory, **args) -> str:
@@ -935,6 +948,44 @@ TOOLS = {
         'A picture of what the browser shows now (the visible part), saved in your media/ '
         'folder and shown to you: for what the text doesn\'t carry, like a map, a chart or how '
         'a page looks. Args: {}',
+    ),
+    "desktop_look": (
+        _desktop_tool(desktop.desktop_look),
+        'A picture of your desktop: a Linux computer of your own in a locked box (XFCE, with '
+        'Firefox, LibreOffice, a text editor, files, a terminal and Obsidian), offline unless your '
+        'owner lists sites. The screen is 1024x768 and the picture is the same size, so x,y in it '
+        'are x,y for desktop_act. Also lists the open windows. "zoom": [x0, y0, x1, y1] enlarges a '
+        'region (its own coordinates, explained in the result); "grid": true draws a labeled grid '
+        'every 100 px; "save": true also saves it in media/ (to send it on). '
+        'Args: {"zoom": [..], "grid": false, "save": false} (all optional)',
+    ),
+    "desktop_act": (
+        _desktop_tool(desktop.desktop_act),
+        'Use your desktop like a person at it; answers with what happened, the windows and a fresh '
+        'screenshot. Actions: "click" {x, y, button: left|right|middle, count: 1-3}, "move" {x, y}, '
+        '"drag" {x, y, to_x, to_y}, "scroll" {x, y, direction: up|down|left|right, amount: 1-10}, '
+        '"type" {text}, "key" {keys: like "ctrl+s", "Return", "alt+F4"}, "launch" {app: files, '
+        'editor, writer, calc, firefox, terminal, images, calculator, obsidian}, "focus" {window: '
+        'part of a title}, "copy" (reads the clipboard as text: select, ctrl+c, then copy, for '
+        'exact text), "wait" {seconds: up to 5}. Nothing in the box reaches anyone, so act freely. '
+        'Args: {"action": "<action>", ...its args}',
+    ),
+    "desktop_shell": (
+        _desktop_tool(desktop.desktop_shell),
+        'Run a shell command (bash) inside your desktop box, as its user, in its home folder; the '
+        "output comes back as text. It's the box's own Linux, offline unless your owner lists "
+        "sites: Python 3 and the usual tools, nothing of your owner's PC. Files you make there stay "
+        'in the box until desktop_files "get" brings them back. '
+        f'Args: {{"command": "<command>", "timeout": <seconds, up to {desktop.SHELL_MAX_TIMEOUT}>}} '
+        f'(timeout optional, default {desktop.SHELL_TIMEOUT})',
+    ),
+    "desktop_files": (
+        _desktop_tool(desktop.desktop_files),
+        "Move files between your workspace and your desktop's home folder. \"list\" shows what's "
+        'there (path optional); "put" copies a workspace file or folder in, under ~/from-workspace/; '
+        '"get" copies a file or folder from the desktop into your workspace, under desktop/; "reset" '
+        "wipes the desktop's home and starts it fresh (counts as a deletion). "
+        'Args: {"do": "list|put|get|reset", "path": "<path>"}',
     ),
     "check_calendar": (
         check_calendar,
@@ -1256,7 +1307,8 @@ def run(memory: Memory, name: str, args: dict) -> str:
     function, _ = TOOLS[name]
     try:
         return function(memory, **args)
-    except (ToolError, senses.SenseError, obsidian.ObsidianError, screen.ScreenError) as e:
+    except (ToolError, senses.SenseError, obsidian.ObsidianError, screen.ScreenError,
+            desktop.DesktopError) as e:
         return f"{name} refused: {e}"
     except (TypeError, ValueError) as e:
         return f"Bad args for {name}: {e}"

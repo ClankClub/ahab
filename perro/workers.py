@@ -1,6 +1,6 @@
 """Workers: helpers Perro hands a job to, which run in the background on their own.
 
-A wake-up is one page and ten tool calls. That's right for answering the
+A wake-up is one page and twenty tool calls. That's right for answering the
 owner, and wrong for "read these fifteen pages and tell me which three
 matter": the reading eats the calls, and every result sits on the page being
 paid for again on each call after it. A worker is a separate run of a model

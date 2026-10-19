@@ -1,6 +1,6 @@
 # Design: the desktop box (computer use)
 
-Agreed with the owner on 2026-10-19; not built yet. It's built in three phases (at the end). When it's done, the story goes into `BUILD_LOG.md`, the fences into `AGENTS.md` and the module docstrings, and this file is deleted.
+Agreed with the owner on 2026-10-19. Phase 1 is built (see BUILD_LOG), with a fourth tool the owner added, `desktop_shell` (bash in the box, text in and out). Phases 2 and 3 are still to come. When it's done, the story goes into `BUILD_LOG.md`, the fences into `AGENTS.md` and the module docstrings, and this file is deleted.
 
 ## Why
 

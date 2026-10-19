@@ -91,6 +91,10 @@ Pip keeps its own vault in `home/workspace/vault/`; open that folder as a vault 
 
 `screenshot_window` lets Pip look at one app's window on your screen, for the apps you list by program name in `home/home.json`, e.g. `"screen_apps": ["Obsidian"]`. With no list it refuses everything. It never takes the whole screen, and it can't click or type. Windows only.
 
+### The desktop (computer use, in Docker)
+
+`py -m perro.desktop --setup` builds and starts Pip's desktop: Linux with XFCE, Firefox, LibreOffice, Obsidian and a terminal, on a 1024x768 virtual screen, in a locked container with no network. `--check` runs the fence test. `--watch` shows the screen live at http://127.0.0.1:8765/. To let it reach some sites, list them in `home/home.json` as `"desktop_hosts": ["example.com"]`; anything in the box can then reach (and post to) those, and nothing else. It stops itself after 15 idle minutes; its files live in the Docker volume `perro-desktop-home`.
+
 ### Codex or Claude Code as the model (instead of an API key)
 
 Perro can think through your Codex or Claude Code subscription: backends `codex-luna` (GPT-6 Luna, max effort) and `claude-haiku` (Claude Haiku). Each CLI runs as the model only, with its own tools off, and uses a separate profile folder under `%LOCALAPPDATA%\Perro` (`~/.perro` on a Mac; `PERRO_CLI_HOME` to move it), so it never sees your own CLAUDE.md, AGENTS.md, memories or plugins. Log in once per profile, in a terminal you close afterwards:
@@ -150,6 +154,7 @@ The pairing lives in `home/telegram.json`. Delete that file and pair again to sw
 - `py -m perro.heartbeat --restart` — restart the unattended heartbeat, for example to load new code.
 - `.\scripts\install-backup-task.ps1` — registers "Perro backup", which commits and pushes `home/` to its private repo every 6 hours, only while Perro is asleep (`-EveryHours N` to change, `-Remove` to uninstall). `py -m perro.backup` does one backup by hand. `home/` must be its own Git repo with a remote.
 - `python3 scripts/install_mac.py` — the Mac equivalent: launchd agents for the heartbeat and, once it's paired, the Telegram bridge, running with no window, at every login, restarted after a crash (`--with-backup` adds the backup, `--remove` uninstalls, `--dry-run` shows the files). Run it from a terminal where Perro already works, after stopping any copy running there with Ctrl+C: it copies that terminal's keys, settings and PATH into the agents, since launchd doesn't read `~/.zshrc`. Run it again after changing a key.
+- `py -m perro.desktop --setup | --check | --watch | --stop` — the desktop box; `look`, `windows`, `click X Y`, `type TEXT`, `key KEYS`, `launch APP` and `shell CMD` drive it by hand.
 
 ## License
 
