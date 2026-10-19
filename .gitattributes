@@ -1,2 +1,4 @@
 # Shell scripts must keep Unix line endings, or bash on a Mac chokes on them.
 *.sh text eol=lf
+# The desktop box runs these with sh inside Linux: Windows line endings break them.
+desktop/*.sh text eol=lf
