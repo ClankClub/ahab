@@ -87,6 +87,10 @@ Or skip faster-whisper and set `GROQ_API_KEY` (or `OPENAI_API_KEY`) to transcrib
 
 Pip keeps its own vault in `home/workspace/vault/`; open that folder as a vault in Obsidian to read along. To have it work in a vault of yours instead, put `"obsidian_vault": "C:\path\to\vault"` in `home/home.json`. Nothing else is needed: a vault is plain Markdown files. Pip never touches `.obsidian/` (the app's settings and plugins), and what it deletes goes to the vault's `.trash/`.
 
+### Window screenshots (off unless you allow an app)
+
+`screenshot_window` lets Pip look at one app's window on your screen, for the apps you list by program name in `home/home.json`, e.g. `"screen_apps": ["Obsidian"]`. With no list it refuses everything. It never takes the whole screen, and it can't click or type. Windows only.
+
 ### Codex or Claude Code as the model (instead of an API key)
 
 Perro can think through your Codex or Claude Code subscription: backends `codex-luna` (GPT-6 Luna, max effort) and `claude-haiku` (Claude Haiku). Each CLI runs as the model only, with its own tools off, and uses a separate profile folder under `%LOCALAPPDATA%\Perro` (`~/.perro` on a Mac; `PERRO_CLI_HOME` to move it), so it never sees your own CLAUDE.md, AGENTS.md, memories or plugins. Log in once per profile, in a terminal you close afterwards:

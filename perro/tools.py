@@ -70,8 +70,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from perro import (alarms, browser, github, google, inbox, intents, mail, n8n, notion, obsidian, search, senses,
-                   vercel, watches, web, workers, workshop)
+from perro import (alarms, browser, github, google, inbox, intents, mail, n8n, notion, obsidian, screen,
+                   search, senses, vercel, watches, web, workers, workshop)
 from perro.memory import Memory
 
 # What Perro can and can't do, kept in the code repo so Perro can read it but
@@ -629,6 +629,10 @@ def _deleting_tool(function):
     return tool
 
 
+def screenshot_window(memory: Memory, app: str) -> str:
+    return screen.screenshot_window(memory, app)
+
+
 # --- the Obsidian vault (the logic, and its fence, live in obsidian.py) --------
 
 def vault_search(memory: Memory, query: str = "", tag: str = "") -> str:
@@ -729,6 +733,12 @@ TOOLS = {
         'screenshot, an attachment you saved. It\'s attached to the result, and you keep '
         f'seeing it for the rest of this wake-up (the newest {senses.IMAGES_PER_CALL} images at once). '
         'Photos your owner sends are shown to you without asking. Args: {"path": "<image>"}',
+    ),
+    "screenshot_window": (
+        screenshot_window,
+        "A picture of one app's window on your owner's screen, for the apps they allow you to look "
+        "at (none unless they've said); it's attached to the result. Never the whole screen, and you "
+        'can only look, not click. Args: {"app": "<program name, like Obsidian>"}',
     ),
     "transcribe": (
         transcribe,
@@ -1246,7 +1256,7 @@ def run(memory: Memory, name: str, args: dict) -> str:
     function, _ = TOOLS[name]
     try:
         return function(memory, **args)
-    except (ToolError, senses.SenseError, obsidian.ObsidianError) as e:
+    except (ToolError, senses.SenseError, obsidian.ObsidianError, screen.ScreenError) as e:
         return f"{name} refused: {e}"
     except (TypeError, ValueError) as e:
         return f"Bad args for {name}: {e}"
