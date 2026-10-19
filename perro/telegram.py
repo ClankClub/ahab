@@ -4,8 +4,11 @@ A bridge between a Telegram bot and Perro's inbox, run as its own process
 next to the heartbeat. It does two things, over and over:
 
   in   your Telegram messages -> the inbox, as a knock, so Perro wakes up
-       to read them (the same as `python -m perro.inbox --now "..."`)
-  out  Perro's replies (message_owner) -> your Telegram chat
+       to read them (the same as `python -m perro.inbox --now "..."`).
+       Photos, files and voice notes are saved in Perro's workspace under
+       media/ first, and voice notes transcribed (see senses.py).
+  out  Perro's replies (message_owner) -> your Telegram chat, with any
+       files it attached
 
 One command is handled here instead of passed on: /talk lifts the brakes
 on Perro's email with other AI agents (see mail.py).
@@ -48,7 +51,7 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-from perro import approvals, inbox, mail, watchdog
+from perro import approvals, inbox, mail, senses, tools, watchdog
 from perro.memory import DEFAULT_HOME, Memory
 
 TOKEN_ENV = "PERRO_TELEGRAM_TOKEN"
@@ -65,12 +68,22 @@ OUTBOX_SECONDS = 2
 # After a network failure, wait this long before trying again.
 RETRY_SECONDS = 10
 TELEGRAM_CHAR_LIMIT = 4096
+CAPTION_CHAR_LIMIT = 1024
+FILE_API = "https://api.telegram.org/file/bot{token}/{path}"
+# The most a bot may download, and the most it may send as a photo or a file.
+DOWNLOAD_BYTE_LIMIT = 20 * 1024 * 1024
+PHOTO_BYTE_LIMIT = 10 * 1024 * 1024
+UPLOAD_BYTE_LIMIT = 50 * 1024 * 1024
+# A long voice note's words go in the message up to this; all of them are
+# kept in the .txt next to the recording.
+SPOKEN_CHAR_LIMIT = 12_000
 # What a message without text can carry, as Telegram names it, in the words
 # Perro hears.
 NON_TEXT = {"photo": "a photo", "sticker": "a sticker", "voice": "a voice message",
             "video_note": "a video message", "video": "a video", "animation": "a GIF",
             "audio": "an audio file", "document": "a file", "location": "a location",
-            "contact": "a contact", "poll": "a poll"}
+            "venue": "a place", "contact": "a contact", "poll": "a poll"}
+BRIDGE = "[From the Telegram bridge: "
 
 
 class TelegramError(Exception):
@@ -110,6 +123,43 @@ class Bot:
     def send(self, chat_id: int, text: str) -> None:
         for start in range(0, len(text), TELEGRAM_CHAR_LIMIT):
             self.call("sendMessage", chat_id=chat_id, text=text[start:start + TELEGRAM_CHAR_LIMIT])
+
+    def download(self, file_id: str) -> bytes:
+        """A file someone sent the bot (the owner, since nobody else gets this far)."""
+        info = self.call("getFile", file_id=file_id)
+        if (info.get("file_size") or 0) > DOWNLOAD_BYTE_LIMIT or not info.get("file_path"):
+            raise TelegramError(f"it's over {DOWNLOAD_BYTE_LIMIT // 1024 // 1024} MB, more than a bot may download")
+        url = FILE_API.format(token=self.token, path=info["file_path"])
+        try:
+            with urllib.request.urlopen(url, timeout=120) as response:
+                data = response.read(DOWNLOAD_BYTE_LIMIT + 1)
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            raise TelegramError(f"download: {str(e).replace(self.token, '<token>')}") from None
+        if len(data) > DOWNLOAD_BYTE_LIMIT:
+            raise TelegramError("it's too big to download")
+        return data
+
+    def upload(self, method: str, field: str, path: Path, **params) -> object:
+        """sendPhoto or sendDocument: one file from Perro's workspace, as a form upload."""
+        boundary = secrets.token_hex(16)
+        parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
+                 for k, v in params.items()]
+        safe_name = "".join(c for c in path.name if c.isalnum() or c in "._-") or "file"
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{field}"; filename="{safe_name}"\r\n'
+                     f"Content-Type: application/octet-stream\r\n\r\n".encode() + path.read_bytes() + b"\r\n")
+        body = b"".join(parts) + f"--{boundary}--\r\n".encode()
+        request = urllib.request.Request(API.format(token=self.token, method=method), data=body, method="POST",
+                                         headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+        try:
+            with urllib.request.urlopen(request, timeout=300) as response:
+                data = json.loads(response.read())
+        except urllib.error.HTTPError as e:
+            raise TelegramError(f"{method}: HTTP {e.code} {e.read().decode('utf-8', 'replace')[:200]}") from None
+        except (urllib.error.URLError, TimeoutError, ConnectionError, json.JSONDecodeError) as e:
+            raise TelegramError(f"{method}: {str(e).replace(self.token, '<token>')}") from None
+        if not data.get("ok"):
+            raise TelegramError(f"{method}: {data.get('description', 'not ok')}")
+        return data["result"]
 
 
 # --- state: who the owner is, and how far we've read -------------------------
@@ -152,19 +202,7 @@ def handle_update(update: dict, state: dict, memory: Memory, bot: Bot) -> None:
         return
     text = message.get("text")
     if not text:
-        # Perro can't take the thing itself yet, but it hears that it came,
-        # with any caption, so it isn't left wondering why the owner went quiet.
-        kind = next((NON_TEXT[k] for k in NON_TEXT if k in message), "a message that isn't text")
-        caption = (message.get("caption") or "").strip()
-        note = (f"[From the Telegram bridge: the owner sent {kind}, which can't reach you; "
-                f"you can only read text for now.]")
-        try:
-            inbox.owner_sends(memory, f"{note}\n{caption}" if caption else note, knock=True)
-        except ValueError:
-            inbox.owner_sends(memory, note, knock=True)
-        bot.send(state["owner_chat_id"], f"Perro can only read text for now, so it's been told you "
-                                         f"sent {kind}" + (", with the caption." if caption else "."))
-        print(f"[{_now()}] In: {kind} from the owner, passed on as a note.")
+        handle_media(message, state, memory, bot)
         return
     if text.strip().lower() in TALK_COMMANDS:
         # Lifting the email brakes is the owner's call, so it's done here, in
@@ -182,15 +220,148 @@ def handle_update(update: dict, state: dict, memory: Memory, bot: Bot) -> None:
     print(f"[{_now()}] In: {len(text)} chars from the owner.")
 
 
+# --- what isn't text: saved in Perro's workspace, then seen, read or heard ---
+
+def handle_media(message: dict, state: dict, memory: Memory, bot: Bot) -> None:
+    """A photo, voice note, file and the rest: saved to media/ (senses.py),
+    and passed to the inbox as the owner's caption plus a note saying what
+    came and where it is. Voice notes are transcribed here, before Perro
+    wakes, so their words reach it like typed ones."""
+    kind = next((NON_TEXT[k] for k in NON_TEXT if k in message), "a message that isn't text")
+    caption = (message.get("caption") or "").strip()
+    try:
+        note, files = take_in(message, memory, bot)
+    except (TelegramError, senses.SenseError) as e:
+        note, files = f"{BRIDGE}the owner sent {kind}, but it couldn't be saved: {e}]", []
+        bot.send(state["owner_chat_id"], f"Perro has been told you sent {kind}, but it couldn't be saved: {e}")
+    body = f"{caption}\n{note}" if caption else note
+    try:
+        inbox.owner_sends(memory, body, knock=True, attachments=files)
+    except ValueError:   # a caption plus a long transcript over the limit
+        inbox.owner_sends(memory, note[:inbox.MESSAGE_CHAR_LIMIT - 100] + "...]", knock=True, attachments=files)
+    print(f"[{_now()}] In: {kind} from the owner" + (f", saved as {', '.join(files)}." if files else "."))
+
+
+def _stamp() -> str:
+    return f"{datetime.now():%H%M%S}"
+
+
+def _keep(memory: Memory, bot: Bot, file_id: str, name: str) -> str:
+    return senses.save(memory, bot.download(file_id), name)
+
+
+def _heard(memory: Memory, rel: str, what: str) -> str:
+    """A recording's words for the note, transcribed now and kept next to it
+    the way the transcribe tool keeps them."""
+    path = tools.workspace_root(memory) / rel
+    try:
+        said, who = senses.transcribe(path)
+    except senses.SenseError as e:
+        return f"{what}, saved as {rel}. It couldn't be transcribed: {e}]"
+    path.with_name(path.name + ".txt").write_text(f"{who}\n{said}", encoding="utf-8")
+    if len(said) > SPOKEN_CHAR_LIMIT:
+        said = said[:SPOKEN_CHAR_LIMIT] + f" [...the rest is in {rel}.txt]"
+    return (f"{what}, saved as {rel}, transcribed by {who} (machine transcription: it can mishear). "
+            f"What they said:]\n{said or '(nothing audible)'}")
+
+
+def take_in(message: dict, memory: Memory, bot: Bot) -> tuple[str, list[str]]:
+    """(the note Perro reads, the workspace paths of what was saved)."""
+    stamp = _stamp()
+    if "photo" in message:
+        rel = _keep(memory, bot, message["photo"][-1]["file_id"], f"photo-{stamp}.jpg")   # the largest size
+        return f"{BRIDGE}the owner sent a photo, saved as {rel} and shown to you with this page.]", [rel]
+    if "voice" in message:
+        rel = _keep(memory, bot, message["voice"]["file_id"], f"voice-{stamp}.ogg")
+        seconds = message["voice"].get("duration")
+        what = f"{BRIDGE}a voice message from the owner" + (f" ({seconds} s)" if seconds else "")
+        return _heard(memory, rel, what), [rel]
+    for key, label in (("video_note", "a video message"), ("video", "a video"), ("animation", "a GIF")):
+        if key in message:
+            clip, files, parts = message[key], [], []
+            thumb = clip.get("thumbnail") or clip.get("thumb")
+            if thumb:
+                still = _keep(memory, bot, thumb["file_id"], f"{key}-{stamp}-still.jpg")
+                files.append(still)
+                parts.append(f"a still from it is saved as {still} and shown to you with this page")
+            if key != "animation" and (clip.get("file_size") or 0) <= DOWNLOAD_BYTE_LIMIT:
+                rel = _keep(memory, bot, clip["file_id"], f"{key}-{stamp}.mp4")
+                files.append(rel)
+                # You can't watch video, but you can hear it.
+                return (_heard(memory, rel, f"{BRIDGE}{label} from the owner ({'; '.join(parts) or 'no still'}); "
+                               f"you can't watch video, but its sound"), files)
+            parts.append("you can't watch it")
+            return f"{BRIDGE}the owner sent {label}: {'; '.join(parts)}.]", files
+    if "document" in message or "audio" in message:
+        doc = message.get("document") or message["audio"]
+        if "document" in message:
+            name = doc.get("file_name") or f"file-{stamp}"
+        else:
+            name = doc.get("file_name") or f"{doc.get('title') or 'audio'}-{stamp}.mp3"
+        rel = _keep(memory, bot, doc["file_id"], name)
+        sort = senses.kind(Path(rel))
+        how = {"image": "it's shown to you with this page",
+               "document": "read_file reads it",
+               "audio": "transcribe turns what's said in it into text",
+               "video": "you can't watch it, but transcribe gives you what's said in it",
+               }.get(sort, "read_file reads it if it's text")
+        return (f'{BRIDGE}the owner sent a file, "{doc.get("file_name") or name}" '
+                f"({senses.size_text(doc.get('file_size') or 0)}), saved as {rel}; {how}.]"), [rel]
+    if "location" in message or "venue" in message:
+        venue = message.get("venue") or {}
+        place = venue.get("location") or message["location"]
+        lat, lon = place.get("latitude"), place.get("longitude")
+        named = f"{venue.get('title')}, {venue.get('address')}: " if venue else ""
+        return (f"{BRIDGE}the owner shared a location: {named}{lat}, {lon} "
+                f"(https://www.openstreetmap.org/?mlat={lat}&mlon={lon}).]"), []
+    if "contact" in message:
+        c = message["contact"]
+        name = " ".join(x for x in (c.get("first_name"), c.get("last_name")) if x)
+        return f"{BRIDGE}the owner shared a contact: {name or '(no name)'}, {c.get('phone_number', 'no number')}.]", []
+    if "sticker" in message:
+        return f"{BRIDGE}the owner sent a sticker: {message['sticker'].get('emoji') or '(no emoji)'}.]", []
+    if "poll" in message:
+        poll = message["poll"]
+        options = "; ".join(o.get("text", "") for o in poll.get("options") or [])
+        return f"{BRIDGE}the owner sent a poll: {poll.get('question')} Options: {options}.]", []
+    return f"{BRIDGE}the owner sent a message that isn't text, of a kind that can't reach you.]", []
+
+
+def _send_file(bot: Bot, state: dict, home: Path, rel: str) -> None:
+    """One file Perro attached, as a picture if it's a small image, else as a file."""
+    path = home / "workspace" / rel
+    chat = state["owner_chat_id"]
+    if not path.is_file():
+        bot.send(chat, f"(Perro attached {rel}, but it's gone.)")
+        return
+    size = path.stat().st_size
+    if size > UPLOAD_BYTE_LIMIT:
+        bot.send(chat, f"(Perro attached {rel}, but it's over {UPLOAD_BYTE_LIMIT // 1024 // 1024} MB.)")
+    elif senses.kind(path) == "image" and size <= PHOTO_BYTE_LIMIT:
+        bot.upload("sendPhoto", "photo", path, chat_id=chat)
+    else:
+        bot.upload("sendDocument", "document", path, chat_id=chat)
+
+
 def forward_replies(state: dict, memory: Memory, bot: Bot, home: Path) -> int:
     """Send Perro's new messages to the owner's chat. Returns how many."""
     inbox._table(memory)
     rows = memory.db.execute(
-        "SELECT id, text FROM messages WHERE sender = 'perro' AND id > ? ORDER BY id",
+        "SELECT id, text, attachments FROM messages WHERE sender = 'perro' AND id > ? ORDER BY id",
         (state.get("last_forwarded_id", 0),),
     ).fetchall()
-    for msg_id, text in rows:
+    for msg_id, text, files in rows:
         bot.send(state["owner_chat_id"], text)
+        for rel in inbox.files_of(files):
+            try:
+                _send_file(bot, state, home, rel)
+            except TelegramError as e:
+                # Said once and moved on: retrying would send the text again too.
+                print(f"[{_now()}] Couldn't send {rel}: {e}")
+                try:
+                    bot.send(state["owner_chat_id"], f"(Perro attached {rel}, but it couldn't be sent: {e})")
+                except TelegramError:
+                    pass
         # Seen on Telegram counts as read, same as reading it in the terminal.
         memory.db.execute("UPDATE messages SET read_at = ? WHERE id = ? AND read_at IS NULL",
                           (_iso_now(), msg_id))

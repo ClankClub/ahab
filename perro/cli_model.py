@@ -36,6 +36,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from perro import senses
 from perro.model import Message, ModelError, Reply
 
 # Codex features that give its model reach beyond writing an answer. All off.
@@ -99,19 +100,23 @@ def find_cli(cli: str) -> str:
     raise ModelError(f"Can't find the {cli} command. Install it, or set PERRO_{cli.upper()}_BIN.")
 
 
-def flatten(messages: list[Message]) -> tuple[str, str]:
-    """(system text, everything else as one prompt). A CLI call takes a single
-    prompt, so the wake-up so far is written out in order, labeled."""
+def flatten(messages: list[Message]) -> tuple[str, str, list[dict]]:
+    """(system text, everything else as one prompt, the images to attach). A
+    CLI call takes a single prompt, so the wake-up so far is written out in
+    order, labeled; each image is named where it came in (see senses.py)."""
+    sent = senses.carried(messages)
+    numbers = senses.number(sent)
+    body = lambda m: m["content"] + senses.labels(m, sent, numbers)
     system = "\n\n".join(m["content"] for m in messages if m["role"] == "system")
     rest = [m for m in messages if m["role"] != "system"]
     if len(rest) == 1:
-        return system, rest[0]["content"]
-    parts = [rest[0]["content"], "\n\n## This wake-up so far, oldest first"]
+        return system, body(rest[0]), sent
+    parts = [body(rest[0]), "\n\n## This wake-up so far, oldest first"]
     for m in rest[1:]:
         who = "Your reply" if m["role"] == "assistant" else "Then"
-        parts.append(f"\n--- {who}:\n{m['content']}")
+        parts.append(f"\n--- {who}:\n{body(m)}")
     parts.append("\n\nNow write your next reply: one JSON object, as described.")
-    return system, "\n".join(parts)
+    return system, "\n".join(parts), sent
 
 
 class CliClient:
@@ -124,6 +129,8 @@ class CliClient:
         self.searches: list[str] = []   # what the last call searched for, when known
         self.foreign: list[str] = []    # built-in Codex tools the last call used (should be none)
         self.home = cli_home()
+        # Both CLIs take images with a prompt (senses.py says how).
+        self.can_see = True
 
     def complete(self, messages: list[Message], temperature: float = 0.7,
                  json_mode: bool = False) -> Reply:
@@ -135,10 +142,11 @@ class CliClient:
         # hand Haiku tried calling Perro's tools natively, was refused, and
         # decided it had none (2026-10-18).
         schema = json_mode if isinstance(json_mode, dict) else None
-        system, prompt = flatten(messages)
+        system, prompt, images = flatten(messages)
         total = Reply("", self.model, 0, 0)
         for _ in range(EMPTY_REPLY_ATTEMPTS):
-            reply = self._codex(system, prompt, schema) if self.cli == "codex" else self._claude(system, prompt)
+            reply = (self._codex(system, prompt, schema, images) if self.cli == "codex"
+                     else self._claude(system, prompt, images))
             total.prompt_tokens += reply.prompt_tokens
             total.completion_tokens += reply.completion_tokens
             total.cached_tokens += reply.cached_tokens
@@ -188,7 +196,8 @@ class CliClient:
         entry = {k: v for k, v in entry.items() if k not in CODEX_MODEL_DROP}
         return {**entry, **CODEX_MODEL_PLAIN}
 
-    def _codex(self, system: str, prompt: str, schema: dict | None = None) -> Reply:
+    def _codex(self, system: str, prompt: str, schema: dict | None = None,
+               images: list[dict] = ()) -> Reply:
         # Perro's system prompt replaces Codex's built-in instructions (about
         # 3,500 tokens describing a coding agent) instead of following them.
         temp = []
@@ -196,7 +205,12 @@ class CliClient:
             f.write(system or "Answer the user.")  # Codex refuses an empty file
         temp.append(f.name)
         try:
-            args = ["exec", "--skip-git-repo-check", "--ephemeral", "--ignore-user-config",
+            # --image takes any number of files, so they go first, where the
+            # next flag ends the list (never next to the "-" for stdin). This
+            # attaches them to the prompt; Codex's view_image tool, which would
+            # let the model open files on this PC itself, stays off.
+            attached = [a for img in images for a in ("--image", img["path"])]
+            args = ["exec", *attached, "--skip-git-repo-check", "--ephemeral", "--ignore-user-config",
                     "--ignore-rules", "--sandbox", "read-only", "--json", "-m", self.model,
                     "-c", f'web_search="{"live" if self.web_search else "disabled"}"',
                     "-c", f"model_instructions_file={json.dumps(Path(f.name).as_posix())}"]
@@ -252,7 +266,7 @@ class CliClient:
                      usage.get("output_tokens") or 0, "\n".join(reasoning),
                      usage.get("cached_input_tokens") or 0)
 
-    def _claude(self, system: str, prompt: str) -> Reply:
+    def _claude(self, system: str, prompt: str, images: list[dict] = ()) -> Reply:
         # The system prompt goes through a file: a command line has a length
         # limit on Windows, and Perro's prompt is long.
         with tempfile.NamedTemporaryFile("w", suffix=".txt", encoding="utf-8", delete=False) as f:
@@ -260,8 +274,17 @@ class CliClient:
         try:
             # With search on, the event stream shows each search's query; the
             # last line is the same result object plain JSON output gives.
-            tools = (["--tools", "WebSearch", "--allowedTools", "WebSearch", "--output-format", "stream-json",
-                      "--verbose"] if self.web_search else ["--tools", "", "--output-format", "json"])
+            # Images go in as content blocks, which takes stream-json input,
+            # and stream-json input takes stream-json output.
+            tools = ["--tools", "WebSearch", "--allowedTools", "WebSearch"] if self.web_search else ["--tools", ""]
+            tools += (["--output-format", "stream-json", "--verbose"] if self.web_search or images
+                      else ["--output-format", "json"])
+            if images:
+                tools += ["--input-format", "stream-json"]
+                blocks = [{"type": "image", "source": {"type": "base64", "media_type": mt, "data": data}}
+                          for mt, data in map(senses.image_data, images)]
+                prompt = json.dumps({"type": "user", "message": {"role": "user", "content": blocks + [
+                    {"type": "text", "text": prompt}]}})
             args = ["-p", *tools, "--strict-mcp-config", "--setting-sources", "",
                     "--no-session-persistence", "--model", self.model,
                     "--system-prompt-file", f.name]

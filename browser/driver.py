@@ -29,13 +29,14 @@ What the browser may do is set here, whatever a page asks for:
 
 Commands: {"do": "open", "url": ...}, {"do": "look", "start": n},
 {"do": "click", "n": 3}, {"do": "type", "n": 3, "text": ..., "enter": false},
-{"do": "scroll", "direction": "down"}, {"do": "back"}, {"do": "state"},
+{"do": "scroll", "direction": "down"}, {"do": "back"}, {"do": "screenshot"}, {"do": "state"},
 {"do": "blocked"}, {"do": "reset"}, {"do": "ping"}, {"do": "selftest"}
 (checks the rules above on a real page). Every command that shows a page
 also says what was stopped since the last one ("stopped").
 """
 
 import asyncio
+import base64
 import json
 import os
 import re
@@ -330,6 +331,16 @@ class Browser:
         return {"url": page.url, "title": await page.title(), "length": len(text), "start": start,
                 "text": text[start:start + TEXT_LIMIT], "stopped": stopped}
 
+    async def screenshot(self) -> dict:
+        """What the open page looks like: the visible part, as a JPEG. It
+        loads nothing new; a picture of what's already there."""
+        page = self._open_page()
+        if page is None:
+            return {"error": "No page is open (the browser forgets everything after 15 idle minutes); "
+                             "open one first."}
+        shot = await page.screenshot(type="jpeg", quality=70, full_page=False, timeout=20_000)
+        return {"url": page.url, "title": await page.title(), "image": base64.b64encode(shot).decode("ascii")}
+
     async def open(self, url) -> dict:
         url, note = check_url(url)
         page = await self.tab()
@@ -523,6 +534,8 @@ class Browser:
             return await self.scroll(command.get("direction", "down"))
         if what == "back":
             return await self.back()
+        if what == "screenshot":
+            return await self.screenshot()
         if what == "state":
             page = self._open_page()
             return {"url": page.url, "title": await page.title()} if page else {"url": None, "title": None}

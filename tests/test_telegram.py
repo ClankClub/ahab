@@ -22,6 +22,8 @@ class FakeBot(telegram.Bot):
             self.sent.append((p["chat_id"], p["text"]))
             return {}
         raise AssertionError(method)
+    def download(self, file_id):
+        return b"\xff\xd8 fake jpeg " + file_id.encode()
 
 def msg(uid, sender, text=None, chat_id=None, chat_type="private"):
     m = {"chat": {"id": chat_id or sender["id"], "type": chat_type}, "from": sender}
@@ -56,15 +58,17 @@ telegram.handle_update(msg(7, OWNER), state, memory, bot)  # some kind we don't 
 stranger_photo = msg(8, STRANGER)
 stranger_photo["message"]["photo"] = [{"file_id": "y"}]
 telegram.handle_update(stranger_photo, state, memory, bot)
-rows = memory.db.execute("SELECT sender, text, knock FROM messages WHERE sender='owner'").fetchall()
-assert rows[0] == ("owner", "hey perro, remind me about rent", 1), rows
-# A photo can't reach Perro, but Perro hears that it came, caption and all.
+rows = memory.db.execute("SELECT sender, text, knock, attachments FROM messages WHERE sender='owner'").fetchall()
+assert rows[0] == ("owner", "hey perro, remind me about rent", 1, None), rows
+# The owner's photo is saved in the workspace, caption first; the stranger's never downloads.
 assert len(rows) == 3, rows
-assert "sent a photo" in rows[1][1] and rows[1][1].endswith("\nlook at this") and rows[1][2] == 1, rows
+assert rows[1][1].startswith("look at this\n[From the Telegram bridge: the owner sent a photo, saved as media/"), rows
+assert rows[1][2] == 1 and rows[1][3].endswith('.jpg"]'), rows
+saved = list((home / "workspace" / "media").rglob("*.jpg"))
+assert len(saved) == 1 and saved[0].read_bytes().endswith(b"x"), saved
 assert "a message that isn't text" in rows[2][1], rows
 assert inbox.knocked(memory)
-assert bot.sent == [(111, "Perro can only read text for now, so it's been told you sent a photo, with the caption."),
-                    (111, "Perro can only read text for now, so it's been told you sent a message that isn't text.")], bot.sent
+assert bot.sent == [], bot.sent   # nothing to apologize for any more
 print("incoming ok")
 
 # Outgoing: only replies written after pairing go out, then get marked read.

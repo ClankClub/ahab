@@ -20,7 +20,7 @@ What Perro is, built up from the bottom: everything around the model, layer by l
 
 **Ways to reach the owner and be reached.** The inbox, the Telegram bridge paired to the owner alone, alarms (repeating ones too), standing intents ("when this comes up"), and the mail watch with its brakes for agent-to-agent emails.
 
-**Senses.** `fetch_page` and Wikipedia, `web_search` as a separate search-only run, and the browser box for pages built by JavaScript.
+**Senses.** For the web: `fetch_page` and Wikipedia, `web_search` as a separate search-only run, and the browser box for pages built by JavaScript. For everything else (`senses.py`): whatever arrives is saved in `workspace/media/`; images ride along on the model call (Codex's `--image`, Claude Code's image blocks, an API's image parts), PDFs and Office files are read as text, and voice notes are transcribed by Whisper before Perro wakes. And out: files and pictures attached to its messages.
 
 **Hands, with no keys in them.** n8n holds every sign-in, so Perro never sees a token. Through it: Google (calendar, Gmail read and send to the list, Drive, Docs, Sheets, Tasks, Contacts), its own Notion, its own GitHub, its own Vercel. Each relay is a second fence that refuses what the Python shouldn't be asking for anyway.
 

@@ -185,7 +185,7 @@ def show(answer: dict) -> str:
     return "\n".join(lines)
 
 
-def _act(memory, command: dict) -> str:
+def _act(memory, command: dict, raw: bool = False):
     global _box_checked
     if used_today(memory) >= DAILY_LIMIT:
         raise BrowserError(f"You've used the browser {DAILY_LIMIT} times today, the daily limit. It resets at "
@@ -199,7 +199,7 @@ def _act(memory, command: dict) -> str:
         answer = call(command)
     if "error" in answer:
         raise BrowserError(answer["error"])
-    return show(answer)
+    return answer if raw else show(answer)
 
 
 def browse(memory, url: str) -> str:
@@ -231,6 +231,26 @@ def browse_scroll(memory, direction: str = "down") -> str:
 
 def browse_back(memory) -> str:
     return _act(memory, {"do": "back"})
+
+
+def browse_screenshot(memory) -> str:
+    """A picture of the open page, saved in the workspace and shown to Perro
+    (senses.py): for what text doesn't carry, like a map, a chart or a layout."""
+    from perro import senses, tools
+    import base64
+    answer = _act(memory, {"do": "screenshot"}, raw=True)
+    try:
+        data = base64.b64decode(answer.get("image") or "", validate=True)
+    except ValueError:
+        data = b""
+    if not data:
+        raise BrowserError("The screenshot came back empty.")
+    rel = senses.save(memory, data, f"screen-{datetime.now():%H%M%S}.jpg")
+    head = f"Screenshot of {answer.get('title') or '(no title)'} ({answer.get('url')}), saved as {rel}"
+    if not senses.can_see(memory):
+        return f"{head}. The model you're running on can't see images, so it isn't shown to you."
+    senses.show(memory, tools.workspace_root(memory) / rel, rel)
+    return f"{head}, and attached to this result. {senses.NOT_ORDERS}"
 
 
 # --- the fence test -------------------------------------------------------------

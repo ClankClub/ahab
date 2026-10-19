@@ -105,6 +105,8 @@ class ModelClient:
             raise ModelError(f"Unknown backend {name!r}; known: {', '.join(BACKENDS)}")
         config = dict(BACKENDS[name])
         config.pop("page_note", None)   # for Perro's page, not the client
+        # An API model sees images only if its backend says "vision": True.
+        vision = config.pop("vision", False)
         if "cli" in config:
             from perro.cli_model import CliClient  # imports Reply from here
             client = CliClient(**{**config, **overrides})
@@ -115,6 +117,7 @@ class ModelClient:
                 raise ModelError(f"{key_env} is not set. See README.md > Setup.")
             config.update(overrides)
             client = cls(api_key=api_key, **config)
+            client.can_see = bool(vision)
         # Remembered so the wake-up page can say which mind is running.
         client.backend = name
         return client
@@ -132,7 +135,7 @@ class ModelClient:
         payload = {
             **self.extra,
             "model": self.model,
-            "messages": messages,
+            "messages": self._wire(messages),
             "temperature": temperature,
         }
         if json_mode:
@@ -173,6 +176,33 @@ class ModelClient:
             reasoning=message.get("reasoning_content") or "",
             cached_tokens=cached_tokens,
         )
+
+    # Whether this model takes images; from_backend sets it from "vision".
+    can_see = False
+
+    def _wire(self, messages: list[dict]) -> list[dict]:
+        """The messages as the API takes them. Images (see senses.py) become
+        image parts for a model that sees, and a plain note for one that
+        doesn't; the "images" key itself never goes to the server."""
+        from perro import senses
+        sent = senses.carried(messages) if self.can_see else []
+        numbers = senses.number(sent)
+        wire = []
+        for m in messages:
+            images = m.get("images") or []
+            if not images:
+                wire.append({"role": m["role"], "content": m["content"]})
+            elif not self.can_see:
+                wire.append({"role": m["role"], "content": m["content"] + "\n[An image came with this, but "
+                             "the model you're running on can't see images.]"})
+            else:
+                parts = [{"type": "text", "text": m["content"] + senses.labels(m, sent, numbers)}]
+                for img in images:
+                    if any(img is s for s in sent):
+                        mt, data = senses.image_data(img)
+                        parts.append({"type": "image_url", "image_url": {"url": f"data:{mt};base64,{data}"}})
+                wire.append({"role": m["role"], "content": parts})
+        return wire
 
     def _post_with_retries(self, url: str, body: bytes, headers: dict) -> dict:
         # Network calls fail sometimes. Retry the transient failures with a

@@ -97,7 +97,7 @@ out = run("read_drive_file", {"id": "fold2222"}, routes([
     ("files/fold2222", (200, FILES["files"][1])), ("GET https://www.googleapis.com/drive/v3/files", (200, FILES))]))
 assert "3 item(s) inside" in out and SEEN[1]["query"]["q"] == "'fold2222' in parents and trashed = false", out
 out = run("read_drive_file", {"id": "pdf33333"}, (200, FILES["files"][2]))
-assert "can't be read as text" in out and len(SEEN) == 1, out
+assert "save_drive_file copies it into your workspace" in out and len(SEEN) == 1, out
 out = run("read_drive_file", {"id": "json4444"}, routes([
     ('"alt": "media"', (200, {"a": [1, 2]})),
     ("files/json4444", (200, {"id": "json4444", "name": "a.json", "mimeType": "application/json", "size": "20"}))]))
@@ -277,5 +277,5 @@ assert "daily limit" in run("delete_contact", {"id": "c2222222"}, (200, BOB)) an
 assert run("add_task", {"title": "Still fine"}, (200, {"id": "tasknew03"})).startswith("Added")
 print("delete tests passed")
 
-assert len(tools.TOOLS) == 68, len(tools.TOOLS)
+assert len(tools.TOOLS) == 73, len(tools.TOOLS)
 print(f"tool descriptions: {len(tools.describe())} chars")

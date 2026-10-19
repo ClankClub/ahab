@@ -172,7 +172,9 @@ def read_drive_file(id: str, start: int = 0) -> str:
             return f"{head}\nIt's {f['size']} bytes, too big to read here."
         text = _google("drive", f"files/{id}", query={"alt": "media"})
     else:
-        return f"{head}\nThis kind of file can't be read as text here (only Docs, Sheets, Slides, folders and plain-text files)."
+        return (f"{head}\nIt isn't text to read here; save_drive_file copies it into your workspace, "
+                "where read_file reads PDFs and Office files, look_at shows images and transcribe "
+                "hears recordings.")
 
     if not isinstance(text, str):
         text = json.dumps(text, ensure_ascii=False, indent=1)  # a .json file, already parsed
@@ -185,6 +187,26 @@ def read_drive_file(id: str, start: int = 0) -> str:
     end = start + len(part)
     more = f"\n[...chars {start}-{end} of {len(text)}; use start={end} for more]" if end < len(text) else ""
     return f"{head}\n\n{part}{more}"
+
+
+SAVE_BYTE_LIMIT = 10 * 1024 * 1024
+
+
+def download_drive_file(id: str) -> tuple[str, bytes]:
+    """(file name, bytes) of one file in Drive, through its own read-only
+    relay (perro/drive/download): one GET of the file's contents, nothing else."""
+    import base64
+    id = _id(id, "id")
+    f = _google("drive", f"files/{id}", query={"fields": FILE_FIELDS})
+    mime, name = f.get("mimeType") or "", f.get("name") or id
+    if mime.startswith("application/vnd.google-apps."):
+        raise ValueError(f'"{name}" is a {KINDS.get(mime, "Google file")}, which read_drive_file reads directly.')
+    if int(f.get("size") or 0) > SAVE_BYTE_LIMIT:
+        raise ValueError(f'"{name}" is over {SAVE_BYTE_LIMIT // 1024 // 1024} MB, too big to copy here.')
+    answer = n8n.call("perro/drive/download", _limit=SAVE_BYTE_LIMIT * 2, id=id)
+    if not answer.get("data"):
+        raise n8n.N8nError(f"Drive didn't hand it over: {answer.get('error') or 'no data came back'}")
+    return name, base64.b64decode(answer["data"])
 
 
 def _create(name: str, mime: str, folder: str) -> dict:

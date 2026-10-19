@@ -1,0 +1,95 @@
+{
+ "id": "PerroEmailAttach",
+ "name": "Perro: email attachment",
+ "nodes": [
+  {
+   "parameters": {
+    "httpMethod": "GET",
+    "path": "perro/email/attachment",
+    "responseMode": "responseNode",
+    "options": {},
+    "authentication": "headerAuth"
+   },
+   "id": "9b41c6e0-5a2d-4f7e-8b12-000000000001",
+   "name": "Perro asks",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2.2,
+   "position": [
+    0,
+    0
+   ],
+   "webhookId": "9b41c6e0-5a2d-4f7e-8b12-0000000000aa",
+   "credentials": {
+    "httpHeaderAuth": {
+     "id": "PerroRelayKey001",
+     "name": "Perro relay key"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "url": "={{ 'https://gmail.googleapis.com/gmail/v1/users/me/messages/' + encodeURIComponent($json.query.id || 'missing') + '/attachments/' + encodeURIComponent($json.query.attachment || 'missing') }}",
+    "authentication": "predefinedCredentialType",
+    "nodeCredentialType": "gmailOAuth2",
+    "options": {}
+   },
+   "id": "9b41c6e0-5a2d-4f7e-8b12-000000000002",
+   "name": "The attachment",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    240,
+    0
+   ],
+   "onError": "continueRegularOutput",
+   "credentials": {
+    "gmailOAuth2": {
+     "id": "or2O9yfQudisXUxX",
+     "name": "Gmail account"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ $json.data ? { data: $json.data, size: $json.size } : { error: String(($json.error && ($json.error.message || $json.error)) || 'No attachment with that id.') } }}",
+    "options": {}
+   },
+   "id": "9b41c6e0-5a2d-4f7e-8b12-000000000003",
+   "name": "Answer Perro",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.5,
+   "position": [
+    480,
+    0
+   ]
+  }
+ ],
+ "connections": {
+  "Perro asks": {
+   "main": [
+    [
+     {
+      "node": "The attachment",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "The attachment": {
+   "main": [
+    [
+     {
+      "node": "Answer Perro",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1"
+ }
+}

@@ -43,6 +43,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from perro import senses
 from perro.memory import DEFAULT_HOME, Event, Memory
 from perro.model import ModelClient, ModelError
 
@@ -55,7 +56,7 @@ MODEL_NOTES = {"luna": "GPT-6 Luna at max effort: the deepest thinker here, and 
                "deepseek": "DeepSeek Flash: cheap and capable"}
 FALLBACK_MODEL = "haiku"         # the default when Perro's own model isn't in MODELS
 
-WORKER_TOOLS = ("recall", "read_conversation", "list_files", "read_file",
+WORKER_TOOLS = ("recall", "read_conversation", "list_files", "read_file", "look_at", "transcribe",
                 "fetch_page", "search_wikipedia", "web_search",
                 "check_calendar", "search_email", "read_email",
                 "drive_search", "read_drive_file", "read_sheet",
@@ -353,6 +354,7 @@ def _work(memory: Memory, worker_id: int, task: str, model: str, max_calls: int,
     name = heartbeat.home_config(memory.home).get("name") or "the assistant"
     form = heartbeat.reply_form(list(WORKER_TOOLS), FINISH)
     own = _WorkerMemory(memory, worker_id)
+    senses.set_sight(own, client)   # look_at works only on a model that sees
     deadline = datetime.fromisoformat(created) + timedelta(minutes=TIME_LIMIT_MINUTES)
     now = datetime.now().astimezone()
     messages = [{"role": "system", "content": _prompt(name, max_calls)},
@@ -409,6 +411,7 @@ def _work(memory: Memory, worker_id: int, task: str, model: str, max_calls: int,
         heartbeat.trim_last_result(messages)
         messages.append({"role": "assistant", "content": reply.text})
         messages.append({"role": "user", "content": f"Tool result:\n{result}"})
+        senses.attach(messages[-1], senses.take_shown(own))
     return ("failed", "", True, calls, tokens_in, tokens_out,
             "It kept asking for tools past its limit without finishing.")
 

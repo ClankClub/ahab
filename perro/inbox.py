@@ -25,6 +25,7 @@ the event log then shows message events by their header line only.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -45,9 +46,25 @@ def _table(memory: Memory) -> None:
             sender    TEXT NOT NULL,      -- 'owner' or 'perro'
             text      TEXT NOT NULL,
             knock     INTEGER NOT NULL DEFAULT 0,
-            read_at   TEXT                -- when the other side saw it
+            read_at   TEXT,               -- when the other side saw it
+            attachments TEXT              -- JSON list of workspace paths, or NULL
         )
     """)
+    # Homes from before attachments existed get the column added.
+    if "attachments" not in {row[1] for row in memory.db.execute("PRAGMA table_info(messages)")}:
+        memory.db.execute("ALTER TABLE messages ADD COLUMN attachments TEXT")
+        memory.db.commit()
+
+
+def files_of(attachments: str | None) -> list[str]:
+    return json.loads(attachments) if attachments else []
+
+
+def with_files(text: str, attachments: str | None) -> str:
+    """A message as the conversation shows it: Perro's own files are named
+    after its text (an owner's message already says what came with it)."""
+    files = files_of(attachments)
+    return text + (f"\n[Attached: {', '.join(files)}]" if files else "")
 
 
 def _now() -> str:
@@ -65,12 +82,14 @@ def _check(text: str) -> str:
 
 # --- owner side --------------------------------------------------------------
 
-def owner_sends(memory: Memory, text: str, knock: bool = False) -> int:
-    """Put a letter in Perro's mailbox. Nothing is logged until Perro reads it."""
+def owner_sends(memory: Memory, text: str, knock: bool = False, attachments: list[str] = ()) -> int:
+    """Put a letter in Perro's mailbox. Nothing is logged until Perro reads it.
+    attachments: workspace paths of what came with it (a photo, a file); the
+    text should say what they are, since that's what Perro reads."""
     _table(memory)
     cur = memory.db.execute(
-        "INSERT INTO messages (time, sender, text, knock) VALUES (?, 'owner', ?, ?)",
-        (_now(), _check(text), int(knock)),
+        "INSERT INTO messages (time, sender, text, knock, attachments) VALUES (?, 'owner', ?, ?, ?)",
+        (_now(), _check(text), int(knock), json.dumps(list(attachments)) if attachments else None),
     )
     memory.db.commit()
     return cur.lastrowid
@@ -80,10 +99,10 @@ def conversation(memory: Memory, limit: int = 20) -> list[tuple]:
     """(id, time, sender, text, read_at), oldest first."""
     _table(memory)
     rows = memory.db.execute(
-        "SELECT id, time, sender, text, read_at FROM messages ORDER BY id DESC LIMIT ?",
+        "SELECT id, time, sender, text, read_at, attachments FROM messages ORDER BY id DESC LIMIT ?",
         (limit,),
     ).fetchall()
-    return list(reversed(rows))
+    return [(i, t, s, with_files(x, a) if s == "perro" else x, r) for i, t, s, x, r, a in reversed(rows)]
 
 
 def describe_recent(memory: Memory, limit: int = RECENT_LIMIT,
@@ -97,14 +116,15 @@ def describe_recent(memory: Memory, limit: int = RECENT_LIMIT,
     """
     _table(memory)
     rows = memory.db.execute(
-        "SELECT time, sender, text FROM messages "
+        "SELECT time, sender, text, attachments FROM messages "
         "WHERE sender = 'perro' OR read_at IS NOT NULL ORDER BY id DESC LIMIT ?",
         (limit,),
     ).fetchall()
     lines, used = [], 0
-    for sent, sender, text in rows:
+    for sent, sender, text, files in rows:
         when = datetime.fromisoformat(sent).astimezone().strftime("%a %d %b %H:%M")
-        line = f"[{when}] {'Owner' if sender == 'owner' else 'You'}: {text}"
+        shown = with_files(text, files) if sender == "perro" else text
+        line = f"[{when}] {'Owner' if sender == 'owner' else 'You'}: {shown}"
         if lines and used + len(line) > char_limit:
             break
         lines.append(line)
@@ -124,16 +144,25 @@ def owner_reads(memory: Memory) -> None:
 # --- Perro side ---------------------------------------------------------------
 
 def deliver(memory: Memory) -> int:
-    """At wake-up: log every unread owner message as an event, mark it read."""
+    """At wake-up: log every unread owner message as an event, mark it read.
+    Photos that came with them are shown to Perro on this wake (senses.py)."""
+    from perro import senses, tools
     _table(memory)
     unread = memory.db.execute(
-        "SELECT id, time, text FROM messages WHERE sender = 'owner' AND read_at IS NULL "
+        "SELECT id, time, text, attachments FROM messages WHERE sender = 'owner' AND read_at IS NULL "
         "ORDER BY id"
     ).fetchall()
-    for msg_id, sent, text in unread:
+    for msg_id, sent, text, files in unread:
         memory.record("message", f"From the owner (sent {sent}):\n{text}")
         memory.db.execute("UPDATE messages SET read_at = ? WHERE id = ?", (_now(), msg_id))
         memory.db.commit()
+        for rel in files_of(files):
+            path = tools.workspace_root(memory) / rel
+            if senses.kind(path) == "image" and path.is_file():
+                try:
+                    senses.show(memory, path, rel)
+                except senses.SenseError:
+                    pass   # too big to send; the message still names the file
     return len(unread)
 
 
@@ -145,14 +174,19 @@ def knocked(memory: Memory) -> bool:
     ).fetchone() is not None
 
 
-def perro_sends(memory: Memory, text: str) -> str:
+def perro_sends(memory: Memory, text: str, attachments: list[str] = ()) -> str:
+    """attachments: workspace paths, already checked by the caller; the
+    Telegram bridge sends each file after the text."""
     _table(memory)
     text = _check(text)
+    files = json.dumps(list(attachments)) if attachments else None
     memory.db.execute(
-        "INSERT INTO messages (time, sender, text) VALUES (?, 'perro', ?)", (_now(), text))
+        "INSERT INTO messages (time, sender, text, attachments) VALUES (?, 'perro', ?, ?)",
+        (_now(), text, files))
     memory.db.commit()
-    memory.record("message", f"To the owner:\n{text}")
-    return "Sent. The owner will see it whenever they next check."
+    memory.record("message", f"To the owner:\n{with_files(text, files)}")
+    return "Sent" + (f", with {len(attachments)} file(s)" if attachments else "") + \
+        ". The owner will see it whenever they next check."
 
 
 # --- the owner's command line ------------------------------------------------

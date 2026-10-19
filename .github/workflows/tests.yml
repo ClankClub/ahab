@@ -23,4 +23,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - run: python -m pip install pypdf
       - run: python tests/run.py

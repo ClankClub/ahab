@@ -16,7 +16,9 @@ Your PC: Perro runtime (Python)
   │                   + home/notes.md (open tasks) + home/memory.db (every event and message, full-text searchable)
   ├─ heartbeat      → wake, show memory, model decides, save, sleep until it chose
   ├─ inbox          → messages between you and Perro; where its instructions come from
-  ├─ telegram       → bridge from a Telegram bot to the inbox, paired to your account only
+  ├─ telegram       → bridge from a Telegram bot to the inbox, paired to your account only; photos, voice notes and files both ways
+  ├─ senses         → sight (images go to the model with a call), PDFs and Office files read as text, voice notes heard (Whisper);
+  │                   everything that arrives is kept in workspace/media/
   ├─ tools          → about_yourself (its guide, docs/ABOUT_YOURSELF.md), recall and read_conversation (its whole past, word for word), list/read/write/edit files, set/cancel alarms and standing intents, message you, read web pages, Google, Notion, start/check builds, GitHub, Vercel
   ├─ web            → read-only: any public page as text, plus Wikipedia search
   ├─ search         → web search, run by a separate Codex or Claude Code call (providers in search.py)
@@ -41,7 +43,7 @@ Your PC: Perro runtime (Python)
 
 ## Setup
 
-Python 3.11+, standard library only for now. Run everything from this folder. On this PC `python` isn't on the PATH, so use the `py` launcher.
+Python 3.11+, standard library only, with optional extras for the senses (below). Run everything from this folder. On this PC `python` isn't on the PATH, so use the `py` launcher.
 
 ### On a Mac
 
@@ -68,6 +70,17 @@ Check the model client works:
 ```powershell
 py -m perro.model "Say hi in five words."
 ```
+
+### The senses (optional installs)
+
+Images need nothing extra: Codex and Claude Code take them, and an API backend does if its entry in `BACKENDS` (`perro/model.py`) says `"vision": True`. Reading PDFs needs pypdf, and hearing voice notes on this PC needs faster-whisper (about 500 MB for the speech model, downloaded once):
+
+```powershell
+py -m pip install -r requirements.txt
+py -m perro.senses --warm
+```
+
+Or skip faster-whisper and set `GROQ_API_KEY` (or `OPENAI_API_KEY`) to transcribe through that API; `PERRO_HEARING` picks one when several are set up. `py -m perro.senses` shows what's set up, and `py -m perro.senses <file>` reads or transcribes one file as Perro would.
 
 ### Codex or Claude Code as the model (instead of an API key)
 
@@ -116,6 +129,7 @@ The pairing lives in `home/telegram.json`. Delete that file and pair again to sw
 - `py -m perro.workshop` — list Perro's sites and how their latest builds went (`--setup`, `--login`: see above).
 - `py -m perro.memory` — print what Perro sees of its memory. `py -m perro.memory search <words>` searches the full log and memory files, as recall does.
 - `py -m perro.report` — the weekly memory report (writes while awake, MEMORY.md's size, lookups, "don't remember"s), which the watchdog also sends on Telegram every Sunday at 7pm. `--send` sends it now.
+- `py -m perro.senses` — what Perro can see, read and hear here; `--warm` downloads the speech model, `<file>` reads or transcribes one file.
 - `py -m perro.web <url>` — fetch a page exactly as Perro would see it (`--search <words>` for its Wikipedia search).
 - `py -m perro.browser --setup` — build and start the browser box (needs Docker Desktop); `--check` runs the fence test (what must open and what mustn't, about 20 seconds), `open <url>` prints a page as Perro sees it, `--stop` removes it. Perro starts the box itself when it first browses, as long as Docker Desktop is running.
 - `py -m perro.dream` — have Perro dream now instead of at 7:00 (only while the heartbeat is stopped). Dreams are written to `home/workspace/dreams/`.

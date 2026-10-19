@@ -1,0 +1,126 @@
+{
+ "id": "PerroDriveFile01",
+ "name": "Perro: Drive download",
+ "nodes": [
+  {
+   "parameters": {
+    "httpMethod": "GET",
+    "path": "perro/drive/download",
+    "responseMode": "responseNode",
+    "options": {},
+    "authentication": "headerAuth"
+   },
+   "id": "c3e8a5d0-1f6b-4a2c-9e47-000000000001",
+   "name": "Perro asks",
+   "type": "n8n-nodes-base.webhook",
+   "typeVersion": 2.2,
+   "position": [
+    0,
+    0
+   ],
+   "webhookId": "c3e8a5d0-1f6b-4a2c-9e47-0000000000aa",
+   "credentials": {
+    "httpHeaderAuth": {
+     "id": "PerroRelayKey001",
+     "name": "Perro relay key"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "url": "={{ 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent($json.query.id || 'missing') + '?alt=media' }}",
+    "authentication": "predefinedCredentialType",
+    "nodeCredentialType": "googleDriveOAuth2Api",
+    "options": {
+     "response": {
+      "response": {
+       "responseFormat": "file",
+       "outputPropertyName": "data"
+      }
+     }
+    }
+   },
+   "id": "c3e8a5d0-1f6b-4a2c-9e47-000000000002",
+   "name": "The file",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    240,
+    0
+   ],
+   "onError": "continueRegularOutput",
+   "credentials": {
+    "googleDriveOAuth2Api": {
+     "id": "y6CytkmDG5ZYXXop",
+     "name": "Google Drive account"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "jsCode": "// Read-only by construction: one GET of one file's bytes, handed back as\n// base64, since a webhook answers in JSON. Nothing here can write, share or delete.\nconst item = $input.first();\nif (!item.binary || !item.binary.data) {\n  const e = item.json && item.json.error;\n  return [{ json: { error: String((e && (e.message || e)) || 'The download failed.') } }];\n}\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'data');\nreturn [{ json: { data: buffer.toString('base64'), size: buffer.length, mimeType: item.binary.data.mimeType || '' } }];"
+   },
+   "id": "c3e8a5d0-1f6b-4a2c-9e47-000000000003",
+   "name": "As base64",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    480,
+    0
+   ]
+  },
+  {
+   "parameters": {
+    "respondWith": "json",
+    "responseBody": "={{ $json }}",
+    "options": {}
+   },
+   "id": "c3e8a5d0-1f6b-4a2c-9e47-000000000004",
+   "name": "Answer Perro",
+   "type": "n8n-nodes-base.respondToWebhook",
+   "typeVersion": 1.5,
+   "position": [
+    720,
+    0
+   ]
+  }
+ ],
+ "connections": {
+  "Perro asks": {
+   "main": [
+    [
+     {
+      "node": "The file",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "The file": {
+   "main": [
+    [
+     {
+      "node": "As base64",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "As base64": {
+   "main": [
+    [
+     {
+      "node": "Answer Perro",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1"
+ }
+}
