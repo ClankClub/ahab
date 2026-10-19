@@ -16,4 +16,4 @@
 
 ## Things to remember
 
-*Preferences, people they mention, small facts worth keeping. Date each one.*
+*Preferences and small facts about them worth keeping. Date each one. The people in their life get pages of their own in memory/people/, and what happened goes in MEMORY.md.*

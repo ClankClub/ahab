@@ -54,9 +54,9 @@ m.record("tool", 'fetch_page {"url": "https://evil.test"} -> Evil page (https://
 inbox.perro_sends(m, "Picked Jekyll and Hyde.")
 m.record("error", "Beat failed: ValueError: the model sent an empty reply.")
 
-FINAL = {"thought": "Done.", "notes": "Open: wait for Sam's go on Jekyll.", "dream": "Went well: the pick.\nWent wrong: ten minutes of silence."}
+FINAL = {"thought": "Done.", "notes": "Open: wait for Sam's go on Jekyll.", "day": "# My day\nSam asked for a short Gutenberg book; I picked Jekyll and Hyde.","dream": "Went well: the pick.\nWent wrong: ten minutes of silence."}
 FILES = {"USER.md": "# USER\nSam likes it short. Reads classics.", "skills/books.md": "Reading a book into a Doc\nstep 1",
-         "SOUL.md": "z" * 4500, "../escape.md": "x"}
+         "SOUL.md": "z" * 8500, "../escape.md": "x"}
 f = Fake([
     {"thought": "Check USER.", "tool": "read_file", "args": {"path": "USER.md"}},
     {"thought": "Tell Sam.", "tool": "message_owner", "args": {"text": "hi"}},
@@ -86,7 +86,12 @@ event = m.recent(1)[0]
 head = event.content.splitlines()[0]
 print(head)
 assert event.kind == "dream" and "Rewrote the notes" in head and "Changed USER.md, skills/books.md." in head
-assert "Not saved: SOUL.md (over 4000 chars); ../escape.md (write_file refused:" in head and "Tell your owner" not in head
+# The day's note goes in memory/daily/, under the day's date, with its own heading replaced.
+day_note = (ws / "memory" / "daily" / f"{datetime.now():%Y-%m-%d}.md").read_text(encoding="utf-8")
+assert day_note.startswith(f"# {datetime.now():%A %d %B %Y}\n\nSam asked") and "# My day" not in day_note, day_note
+assert f"Wrote memory/daily/{datetime.now():%Y-%m-%d}.md." in head, head
+assert "## Your memory folder (memory/)" in page and '"day"' in system
+assert "Not saved: SOUL.md (over 8000 chars); ../escape.md (write_file refused:" in head and "Tell your owner" not in head
 assert (ws / "skills" / "books.md").exists() and not (home / "escape.md").exists() and not (ws / "SOUL.md").exists()
 assert "[1 tool calls, 400 in (160 cached), 40 out" in event.content and "message_owner isn't available" in event.content
 assert "Dreamed over the day" in m.snapshot() and "Thought: Check USER." not in m.snapshot(), "page shows the header only"

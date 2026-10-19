@@ -10,13 +10,13 @@ What Perro is, built up from the bottom: everything around the model, layer by l
 
 **A pulse.** The heartbeat (`heartbeat.py`) is what makes it an agent and not a chatbot. It wakes, builds a page, asks the model, runs the tools it asks for (up to 10 calls), saves, and sleeps until whenever the model chose. A message from the owner, an email, an alarm or an approval interrupts the sleep within seconds. A lock keeps two heartbeats from running at once.
 
-**Memory, since the model has none.** `memory.db` holds an event log of everything that happened, plus a messages table. `notes.md` is its scratchpad for open tasks. `recall` searches the log. `days/` renders the log as one readable file per day. And every wake gets a page: identity files, notes, the recent conversation, recent events, the local time, the next two weeks. Each wake, the model reads its own life back from that page. That's the whole trick of persistence: it doesn't remember, it rereads.
+**Memory, since the model has none.** `memory.db` holds an event log of everything that happened, plus a messages table. `notes.md` is its scratchpad for open tasks. `MEMORY.md` is what lasts, and `memory/` holds the detail: a page per person, its opinions, a note per day written by the dream. `recall` searches all of it, log included, with a full-text index, and `read_conversation` gives back any day word for word. `days/` renders the log as one readable file per day, for the owner. And every wake gets a page: identity files and MEMORY.md, the memory folder, notes, the recent conversation, recent events, the local time, the next two weeks. Each wake, the model reads its own life back from that page. That's the whole trick of persistence: it doesn't remember, it rereads.
 
 **A body with walls.** The `workspace/` folder is the only part of the disk its file tools can touch, and every path goes through `_resolve()`.
 
-**A self.** `SOUL.md`, `USER.md`, `PROACTIVE_PREFERENCES.md` and its own `AGENTS.md`, all on the page every wake. Then `ABOUT_YOURSELF.md` and its tool, so it describes itself from facts. The prompt holds the rules it can't edit; the soul files hold everything it can.
+**A self.** `SOUL.md`, `USER.md`, `PROACTIVE_PREFERENCES.md`, its own `AGENTS.md` and `MEMORY.md`, all on the page every wake. Then `ABOUT_YOURSELF.md` and its tool, so it describes itself from facts. The prompt holds the rules it can't edit; the soul files hold everything it can.
 
-**A night shift.** The dream, at 7am, consolidates the day, prunes false beliefs and writes skills. That's how it gets better rather than just older.
+**A night shift.** The dream, at 7am, consolidates the day into its memory files and a day note, prunes false beliefs and writes skills. That's how it gets better rather than just older.
 
 **Ways to reach the owner and be reached.** The inbox, the Telegram bridge paired to the owner alone, alarms (repeating ones too), and the mail watch with its brakes for agent-to-agent emails.
 

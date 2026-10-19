@@ -12,10 +12,10 @@ built-in API for the asking part; Perro uses plain JSON so you can read every
 step in its log.
 
 Tools so far:
-  recall       search Perro's own permanent event log (read-only)
-  list_files   \
-  read_file     > Perro's workspace: a folder of its own, and nothing else
-  write_file   /
+  recall       search Perro's own permanent log and memory files (read-only; see memory.py)
+  read_conversation  a day of its conversation with the owner, word for word
+  list_files, read_file, write_file, edit_file
+               Perro's workspace: a folder of its own, and nothing else
   set_alarm    leave a message for a future wake-up (see alarms.py)
   cancel_alarm
   message_owner write to the owner (see inbox.py)
@@ -58,7 +58,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from perro import alarms, browser, github, google, inbox, mail, n8n, notion, search, vercel, web, workshop
@@ -116,22 +116,100 @@ def _this_mind(memory: Memory) -> str:
     return f"backend {name!r}, model {config.get('model', 'unknown')}{effort}, {via}"
 
 
-def recall(memory: Memory, query: str, limit: int = 10) -> str:
+def _local(iso: str, fmt: str = "%Y-%m-%d %H:%M") -> str:
+    return datetime.fromisoformat(iso).astimezone().strftime(fmt)
+
+
+def _day_bounds(day: str) -> tuple[str, str]:
+    """A date in the owner's local time, as the UTC times it starts and ends."""
+    try:
+        midnight = datetime.strptime(str(day).strip(), "%Y-%m-%d")
+    except ValueError:
+        raise ToolError(f"{day!r} isn't a date; use YYYY-MM-DD.") from None
+    # Naive local midnights, converted one at a time, so a day with a
+    # daylight-saving change still ends at midnight.
+    utc = lambda t: t.astimezone().astimezone(timezone.utc).isoformat(timespec="seconds")
+    return utc(midnight), utc(midnight + timedelta(days=1))
+
+
+def _page(header: str, text: str, start: int, again: dict) -> str:
+    """A long result, READ_CHAR_LIMIT at a time, the way read_file pages;
+    again is the args that ask for the same thing."""
+    if start < 0:
+        raise ToolError("start can't be negative.")
+    part = text[start:start + READ_CHAR_LIMIT]
+    end = start + len(part)
+    more = json.dumps({**again, "start": end}, ensure_ascii=False)
+    tail = f"\n[...chars {start}-{end} of {len(text)}; use {more} for more]" if end < len(text) else ""
+    return f"{header}\n{part}{tail}"
+
+
+def recall(memory: Memory, query: str = "", limit: int = 10, since: str = "", until: str = "",
+           id: int | None = None, start: int = 0) -> str:
+    if id is not None:
+        event = memory.get(int(id))
+        if event is None:
+            raise ToolError(f"No event #{id}.")
+        return _page(f"#{event.id} [{_local(event.time)}] {event.kind} ({len(event.content)} chars):",
+                     event.content, int(start), {"id": event.id})
     query = str(query).strip()
     if not query:
-        return "recall needs a non-empty query."
-    # Skip past tool results: they contain old search results, so including
-    # them would make every search echo the ones before it.
-    hits = memory.search(query, limit=int(limit), exclude_kinds=("tool",))
+        return "recall needs a query (or an id to see one event whole)."
+    lo = _day_bounds(since)[0] if since else ""
+    hi = _day_bounds(until)[1] if until else ""
+    hits = memory.find(query, limit=max(1, min(int(limit), 30)), since=lo, until=hi,
+                       files_root=workspace_root(memory))
     if not hits:
-        return f"No events contain {query!r}."
-    lines = [f"{len(hits)} event(s) containing {query!r}, newest first:"]
-    for e in hits:
-        text = e.content
-        if len(text) > RESULT_CHAR_LIMIT:
-            text = text[:RESULT_CHAR_LIMIT] + " [...]"
-        lines.append(f"[{e.time}] {e.kind}: {text}")
+        return f"Nothing in your log or memory files matches {query!r}."
+    lines = [f"Best matches for {query!r} (your owner's local time; «» marks what matched):"]
+    in_files = [h for h in hits if h.path]
+    if in_files:
+        lines.append("In your memory files:")
+        lines += [f"- {h.path}: {h.snippet}" for h in in_files]
+        lines.append("In your log:")
+    for h in hits:
+        if not h.path:
+            lines.append(f"- #{h.id} [{_local(h.time)}] {h.kind}: {h.snippet}")
+    lines.append('One event whole: recall {"id": <number>}. A day\'s conversation word for word: '
+                 'read_conversation {"date": "YYYY-MM-DD"} or {"around": <event number>}.')
     return "\n".join(lines)
+
+
+CONVERSATION_AROUND = 15   # messages either side of an event, for read_conversation's "around"
+
+
+def read_conversation(memory: Memory, date: str = "", around: int | None = None, start: int = 0) -> str:
+    inbox._table(memory)
+    # An owner message still waiting in the mailbox isn't part of it yet.
+    seen = "(sender = 'perro' OR read_at IS NOT NULL)"
+    query = "SELECT time, sender, text FROM messages WHERE " + seen
+    if around is not None:
+        event = memory.get(int(around))
+        if event is None:
+            raise ToolError(f"No event #{around}.")
+        before = memory.db.execute(f"{query} AND time <= ? ORDER BY id DESC LIMIT ?",
+                                   (event.time, CONVERSATION_AROUND)).fetchall()
+        after = memory.db.execute(f"{query} AND time > ? ORDER BY id LIMIT ?",
+                                  (event.time, CONVERSATION_AROUND)).fetchall()
+        rows, what = list(reversed(before)) + after, f"around event #{event.id} ({_local(event.time)})"
+    elif date:
+        lo, hi = _day_bounds(date)
+        rows = memory.db.execute(f"{query} AND time >= ? AND time < ? ORDER BY id", (lo, hi)).fetchall()
+        what = f"on {date}"
+        if not rows:
+            # Point to the nearest days that do have some.
+            prev = memory.db.execute(f"SELECT max(time) FROM messages WHERE {seen} AND time < ?", (lo,)).fetchone()[0]
+            nxt = memory.db.execute(f"SELECT min(time) FROM messages WHERE {seen} AND time >= ?", (hi,)).fetchone()[0]
+            near = [f"{label} {_local(t, '%Y-%m-%d')}" for label, t in (("before:", prev), ("after:", nxt)) if t]
+            return f"No messages on {date}." + (f" Nearest days with some, {'; '.join(near)}." if near else "")
+    else:
+        raise ToolError('give a "date" (YYYY-MM-DD, your owner\'s local time) or "around" (an event number).')
+    if not rows:
+        return f"No messages {what}."
+    text = "\n\n".join(f"[{_local(t, '%a %d %b %Y %H:%M')}] {'Owner' if s == 'owner' else 'You'}: {m}"
+                       for t, s, m in rows)
+    again = {"around": int(around)} if around is not None else {"date": date}
+    return _page(f"Your conversation {what}, word for word ({len(rows)} messages):", text, int(start), again)
 
 
 # --- the workspace fence -------------------------------------------------
@@ -237,6 +315,35 @@ def write_file(memory: Memory, path: str, content: str) -> str:
     verb = "Overwrote" if target.exists() else "Created"
     target.write_text(content, encoding="utf-8")
     return f"{verb} {_relative(memory, target)} ({len(content)} chars)."
+
+
+def edit_file(memory: Memory, path: str, old: str, new: str) -> str:
+    """Change one passage of a file, or add to its end, without rewriting
+    the rest: a long MEMORY.md shouldn't have to be retyped (and risk being
+    retyped wrong) to add one line."""
+    if not isinstance(old, str) or not isinstance(new, str):
+        raise ToolError("old and new must be strings.")
+    if len(new) > WRITE_CHAR_LIMIT:
+        raise ToolError(f"new is {len(new)} chars; the limit per edit is {WRITE_CHAR_LIMIT}.")
+    target = _resolve(memory, path)
+    if target.is_dir():
+        raise ToolError(f"{path!r} is a folder; give a file path.")
+    text = target.read_text(encoding="utf-8", errors="replace") if target.is_file() else None
+    if old == "":
+        if not new.strip():
+            raise ToolError("new is empty, so there's nothing to add.")
+        joined = new if not text else text + ("" if text.endswith("\n") else "\n") + new
+        verb = "Added to the end of" if text is not None else "Created"
+    else:
+        if text is None:
+            raise ToolError(f"{path!r} doesn't exist. To start it, use an empty old.")
+        count = text.count(old)
+        if count != 1:
+            raise ToolError(f"old appears {count} times in {path!r}; it has to match exactly once, "
+                            "so copy it exactly, with a little more around it if it repeats.")
+        joined, verb = text.replace(old, new), "Edited"
+    write_file(memory, path, joined)
+    return f"{verb} {_relative(memory, target)} (now {len(joined)} chars)."
 
 
 # --- alarms (the logic lives in alarms.py) -------------------------------
@@ -395,10 +502,18 @@ TOOLS = {
     ),
     "recall": (
         recall,
-        'Search your entire permanent log (every past wake, thought, and notes '
-        'version, not just the recent ones you see). Matches text exactly, '
-        'case-insensitive, so search one distinctive word or short phrase. '
-        'Args: {"query": "<text>"}',
+        'Search everything you\'ve ever lived and kept: your whole permanent log (every message, '
+        'thought, tool you used and notes version, back to your first wake) and your memory files '
+        '(MEMORY.md, memory/, dreams/). Matches words, best first: give a few distinctive ones, '
+        'or a "quoted phrase"; since and until (YYYY-MM-DD) narrow it to dates. With an event\'s '
+        'number instead, shows that event whole. '
+        'Args: {"query": "<words>", "since": "<date>", "until": "<date>", "limit": <n>} '
+        '(all but query optional) or {"id": <event number>}',
+    ),
+    "read_conversation": (
+        read_conversation,
+        'Your conversation with your owner word for word: a whole day of it, or the messages '
+        'around an event recall found. Args: {"date": "YYYY-MM-DD"} or {"around": <event number>}',
     ),
     "list_files": (
         list_files,
@@ -417,6 +532,13 @@ TOOLS = {
         'Create or overwrite a text file in your workspace (folders are created '
         f'as needed). Max {WRITE_CHAR_LIMIT} chars per write. '
         'Args: {"path": "<file>", "content": "<text>"}',
+    ),
+    "edit_file": (
+        edit_file,
+        'Change one passage of a workspace file without rewriting the rest: old is the exact '
+        'text to replace (it must appear once), new what replaces it. An empty old adds new '
+        'to the end (and starts the file if it\'s new). Args: {"path": "<file>", "old": "<text>", '
+        '"new": "<text>"}',
     ),
     "set_alarm": (
         set_alarm,

@@ -11,9 +11,9 @@ ws = identity.workspace_root(m)
 (ws / "SOUL.md").write_text("s" * 9000, encoding="utf-8")
 page = identity.describe(m)
 assert "a" * 9000 in page and "[cut: AGENTS.md" not in page
-assert "[cut: SOUL.md is 9000 characters, over the 4000 limit" in page
+assert "[cut: SOUL.md is 9000 characters, over the 8000 limit" in page
 (ws / "AGENTS.md").write_text("a" * 10_001, encoding="utf-8")
 assert "[cut: AGENTS.md is 10001 characters, over the 10000 limit" in identity.describe(m)
 sysp = heartbeat.system_prompt("Perro")
-assert "Keep each file under 4000 characters (AGENTS.md under 10000)." in sysp, sysp[:200]
+assert "Keep each file under 8000 characters (AGENTS.md under 10000, MEMORY.md under 20000)." in sysp, sysp[:200]
 print("caps ok")

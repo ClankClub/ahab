@@ -5,8 +5,11 @@ rewrites its notes in a hurry before sleeping. Nothing ever steps back and
 sorts what piled up. A dream is that step back, the way agents like OpenClaw
 and Muse do it: one unhurried pass early each morning that
   - rewrites the notes down to what's still open,
-  - moves what lasts into its files (USER.md, PROACTIVE_PREFERENCES.md,
-    AGENTS.md, skills, and SOUL.md, which it then tells the owner about),
+  - moves what lasts into its files (MEMORY.md and the pages in memory/,
+    USER.md, PROACTIVE_PREFERENCES.md, AGENTS.md, skills, and SOUL.md,
+    which it then tells the owner about),
+  - writes a plain note on the day in workspace/memory/daily/, which the
+    next wake-ups see and recall can find,
   - and writes a short dated reflection in workspace/dreams/.
 
 The dream sees the conversation, Perro's own thoughts, one line per tool it
@@ -48,12 +51,12 @@ DAY_CHAR_LIMIT = 60_000      # about 15k tokens of the day, at most
 THOUGHT_CHAR_LIMIT = 600
 LINE_CHAR_LIMIT = 250
 ENTRY_CHAR_LIMIT = 8_000
-MAX_DREAM_TOOL_CALLS = 8
+MAX_DREAM_TOOL_CALLS = 12
 # about_yourself so a "can't do" in the notes gets checked, not carried: on
 # 2026-10-18 a wrong one ("the Sheets tools aren't callable") sat in the notes
 # and was believed again every wake.
 DREAM_TOOLS = ("list_files", "read_file", "recall", "about_yourself")
-MAX_FILES_CHANGED = 6
+MAX_FILES_CHANGED = 12
 # A wake-up with this many tool calls is pointed out as a place a skill may be.
 BUSY_WAKE = 4
 # One skill is one how-to; past this it's a manual, and costs too much to read.
@@ -70,8 +73,9 @@ def _prompt(name: str | None) -> str:
 
 Once a day, early in the morning, you step back from the work and look at the
 past day as a whole. Nobody is waiting on you, and nothing you do here
-reaches your owner directly. You're shown your four identity files, your
-notes, your skills, and the day: your conversation with your owner, your own
+reaches your owner directly. You're shown your five files (who you are,
+your owner, their preferences, how you work, and MEMORY.md), your memory
+folder, your notes, your skills, and the day: your conversation with your owner, your own
 thoughts, one line for each tool you used, and anything that went wrong.
 What the tools returned (web pages, emails, files) is left out on purpose:
 this is where you decide what you keep about yourself and your owner, and
@@ -86,13 +90,23 @@ Do these things:
    never your own guess. A short lesson about getting work done here (a
    convention, a tool or site quirk, a mistake not to repeat) goes in
    AGENTS.md; a how-to goes in a skill (step 2). A real change in
-   who you are goes in SOUL.md. Change only what the day gives you reason to.
+   who you are goes in SOUL.md. What you'd want to know a month from now
+   goes in MEMORY.md: facts, decisions and why, projects and where they
+   stand, what happened, each dated. Change a line that's out of date
+   rather than adding one that contradicts it, and keep the file tidy
+   enough to take in at a glance, since it's on your page every wake-up.
+   Someone who came up (not your owner) gets a page in
+   memory/people/<name>.md: who they are to your owner, what happened with
+   them, dated. A view of your own you came to goes in memory/opinions.md,
+   something you learned about the world in memory/world.md. Make each
+   memory/ file's first line say what's in it. Change only what the day
+   gives you reason to.
    You make a change by putting the file's full new text in the "files"
    field of your final reply; that's the only way a file changes here.
    Saying or thinking that you changed one doesn't change it. The four
-   identity files are shown above in full; read any other file (a skill you
-   want to update) before rewriting it. Keep identity files under
-   {identity.limits_text()}.
+   files at the top are shown above in full; read any other file (a skill
+   or a memory/ page you want to update) before rewriting it. Keep the
+   files at the top under {identity.limits_text()}.
 2. Keep your skills. Ask yourself: did you work something out today that
    you'd otherwise have to work out again? A run of tools that got a job
    done, a service's quirk and the way around it, the shape your owner
@@ -122,7 +136,13 @@ Do these things:
    waking tools are the same every wake-up; they don't come and go. One can
    fail now and then (a refused call, a service down), which is worth noting
    as that, but a tool in the list is never "not available".
-4. Write your dream entry: a short reflection in plain prose, about three
+4. Write the day's note, in the "day" field: what happened, plainly and
+   specifically. What your owner asked and told you, what you did, what
+   was decided, what's still open, with times. Name things the way a
+   search would look for them (people, places, titles, projects). It's
+   saved as memory/daily/<date>.md; your next wake-ups see the latest one,
+   and recall searches them all. Under {identity.DAY_NOTE_CHAR_LIMIT} characters.
+5. Write your dream entry: a short reflection in plain prose, about three
    paragraphs. First, what you now believe about your owner and how sure
    you are, what the day changed, with guesses marked as guesses. Then
    what's open: each thing's state and whose move it is. Last, where you
@@ -157,6 +177,7 @@ You'll get the result, then reply again.
 To finish the dream:
 {{"thought": "<what you're thinking>",
   "notes": "<the full new text of your notes, under {NOTES_CHAR_LIMIT} characters>",
+  "day": "<the day's note, just the text: its heading is added for you>",
   "dream": "<your dream entry, just the prose: its heading is added for you>",
   "skill_check": "<one or two sentences: what from today was worth a skill, and what you did>",
   "files": {{"<path in your workspace>": "<its full new text>", ...}}}}
@@ -235,14 +256,15 @@ def _busy_wakes(memory: Memory) -> tuple[list[str], str]:
     return lines, rows[0][0] if rows else cutoff
 
 
-def _the_day(memory: Memory) -> tuple[list[str], bool, str]:
-    """The day as lines of text, whether it held any conversation, and where it starts."""
+def _the_day(memory: Memory) -> tuple[list[str], bool, str, str]:
+    """The day as lines of text, whether it held any conversation, where it
+    starts, and the date its conversation began (YYYY-MM-DD, local)."""
     last = memory.db.execute("SELECT id FROM events WHERE kind = 'dream' ORDER BY id DESC LIMIT 1").fetchone()
     cutoff = (datetime.now(timezone.utc) - timedelta(hours=LOOK_BACK_HOURS)).isoformat(timespec="seconds")
     rows = memory.db.execute(
         "SELECT time, kind, content FROM events WHERE id > ? AND time >= ? ORDER BY id",
         (last[0] if last else 0, cutoff)).fetchall()
-    lines, talked, start = [], False, ""
+    lines, talked, start, day = [], False, "", ""
     for when, kind, content in rows:
         if kind in SKIP_KINDS:
             continue
@@ -251,6 +273,7 @@ def _the_day(memory: Memory) -> tuple[list[str], bool, str]:
         first, _, rest = content.partition("\n")
         if kind == "message":
             talked = True
+            day = day or datetime.fromisoformat(when).astimezone().strftime("%Y-%m-%d")
             who = "Owner" if first.startswith("From the owner") else "You, to your owner"
             lines.append(f"[{stamp}] {who}: {rest.strip()}")
         elif kind == "thought":
@@ -271,7 +294,7 @@ def _the_day(memory: Memory) -> tuple[list[str], bool, str]:
                 size -= len(lines.pop(i)) + 1
             else:
                 i += 1
-    return lines, talked, start
+    return lines, talked, start, day
 
 
 # --- the dream itself ----------------------------------------------------------
@@ -286,6 +309,7 @@ def dream(memory: Memory, client: ModelClient, name: str | None) -> bool:
     # mode allows no free-form object; parse_reply makes it a dict again.
     form = reply_form(list(DREAM_TOOLS), {
         "notes": {"type": ["string", "null"], "description": "When finishing: the full new text of your notes."},
+        "day": {"type": ["string", "null"], "description": "When finishing: the day's note, just the text."},
         "dream": {"type": ["string", "null"], "description": "When finishing: your dream entry, just the prose."},
         "skill_check": {"type": ["string", "null"], "description": "When finishing: what from today was worth "
                         "a skill, and what you did about it."},
@@ -298,7 +322,7 @@ def dream(memory: Memory, client: ModelClient, name: str | None) -> bool:
 
     # Marked first, so a dream that fails isn't retried in a loop.
     _mark(memory.home, _slot(datetime.now()))
-    lines, talked, start = _the_day(memory)
+    lines, talked, start, day = _the_day(memory)
     if not talked:
         print(f"[{datetime.now():%Y-%m-%d %H:%M}] No conversation since the last dream; not dreaming.")
         return False
@@ -307,6 +331,7 @@ def dream(memory: Memory, client: ModelClient, name: str | None) -> bool:
     busy, day_start = _busy_wakes(memory)
     page = (f"Current time: your owner's local time is {now:%A %d %B %Y, %H:%M %Z}.\n\n"
             f"{identity.describe(memory)}\n\n"
+            f"{identity.memory_folder(memory)}\n\n"
             f"## Your notes\n{memory.read_notes().strip() or '(no notes yet)'}\n\n"
             f"## Your skills\n{skills.review(memory, day_start)}\n\n"
             f"## Wake-ups that took work ({BUSY_WAKE} or more tool calls)\n"
@@ -374,6 +399,23 @@ def dream(memory: Memory, client: ModelClient, name: str | None) -> bool:
     earlier = path.read_text(encoding="utf-8") + "\n\n---\n\n" if path.exists() else ""
     path.write_text(f"{earlier}# Dream, {now:%A %d %B %Y, %H:%M}\n\n"
                     f"*Looking back since {start}.*\n\n{entry}\n", encoding="utf-8")
+    # The day's note, under the date its conversation began. A missing one
+    # doesn't sink the dream; the event says so.
+    note, day_said = decision.get("day"), " Wrote no day note."
+    if isinstance(note, str) and note.strip():
+        note = note.strip()
+        while note.startswith("# "):              # its own heading, over the one added here
+            note = note.partition("\n")[2].strip()
+        if len(note) > identity.DAY_NOTE_CHAR_LIMIT * 3 // 2:
+            note = note[:identity.DAY_NOTE_CHAR_LIMIT * 3 // 2] + "\n\n[cut at the day note limit]"
+        day_path = tools.workspace_root(memory) / identity.MEMORY_FOLDER / identity.DAYS / f"{day}.md"
+        day_path.parent.mkdir(parents=True, exist_ok=True)
+        if day_path.exists():
+            text = day_path.read_text(encoding="utf-8").rstrip() + f"\n\n---\n\n*Added {now:%H:%M}.*\n\n{note}\n"
+        else:
+            text = f"# {datetime.strptime(day, '%Y-%m-%d'):%A %d %B %Y}\n\n{note}\n"
+        day_path.write_text(text, encoding="utf-8")
+        day_said = f" Wrote {identity.MEMORY_FOLDER}/{identity.DAYS}/{day}.md."
     changed, refused = [], []
     for name_, text in files.items():
         if name_ in (f for f, _ in identity.FILES) and isinstance(text, str) and len(text) > identity.limit(name_):
@@ -404,7 +446,7 @@ def dream(memory: Memory, client: ModelClient, name: str | None) -> bool:
             memory.record("error", f"The dream's notes weren't saved: {e}")
             notes_said = " Its notes were too long and weren't saved."
     check = str(decision.get("skill_check") or "").strip()
-    memory.record("dream", f"Dreamed over the day since {start}; wrote dreams/{path.name}.{notes_said}{files_said}"
+    memory.record("dream", f"Dreamed over the day since {start}; wrote dreams/{path.name}.{day_said}{notes_said}{files_said}"
                            f" [{calls} tool calls, {tokens_in} in ({tokens_cached} cached), {tokens_out} out,"
                            f" {time.time() - began:.0f}s]\n\n"
                            + (f"Skill check: {check}\n\n" if check else "") + "\n\n".join(transcript))

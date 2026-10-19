@@ -14,10 +14,20 @@ use:
                search the rest.
 
 Notes are the diary you reread each morning. The log is the box of receipts.
+What lasts beyond the week goes in workspace files Perro keeps on purpose,
+MEMORY.md and the memory/ folder (see identity.py).
+
+Finding a receipt is find(): SQLite's built-in full-text index (FTS5), the
+same kind of search engine a mail program uses. It matches words, not exact
+strings, so "whales" finds "whale", and ranks what it finds by how well it
+matches. A trigger adds every new event to the index as it's written. The
+same index also covers Perro's memory files (MEMORY.md, memory/, dreams/),
+so one search reaches both what happened and what it wrote down about it.
 """
 
 from __future__ import annotations
 
+import re
 import sqlite3
 import sys
 from dataclasses import dataclass
@@ -36,6 +46,15 @@ NOTES_CHAR_LIMIT = 4000
 # (inbox.describe_recent), so here they'd only be a second copy.
 HEADER_ONLY_KINDS = ("notes", "tool", "reasoning", "message", "dream", "email_sent")
 
+# Tool results find() leaves out: these only repeat things it searches
+# anyway (old search results, files, the guide), so every search would
+# echo the ones before it.
+ECHO_TOOLS = ("recall", "read_conversation", "read_file", "list_files", "about_yourself",
+              "message_owner")  # a sent message is its own "message" event too
+# Workspace files find() searches: the memory Perro keeps on purpose.
+MEMORY_FILES = ("MEMORY.md", "memory/**/*.md", "memory/**/*.txt", "dreams/**/*.md")
+SNIPPET_TOKENS = 30
+
 
 @dataclass
 class Event:
@@ -43,6 +62,26 @@ class Event:
     time: str   # ISO 8601, UTC
     kind: str   # free-form label: "wake", "thought", "action", "error", ...
     content: str
+
+
+@dataclass
+class Hit:
+    """One find() result: an event (id set) or a memory file (path set)."""
+    snippet: str
+    id: int | None = None
+    time: str = ""
+    kind: str = ""
+    path: str = ""
+
+
+def fts_query(text: str, any_word: bool = False) -> str:
+    """Turn what Perro typed into a safe FTS5 query: every word and every
+    "quoted phrase" becomes a quoted term, so stray punctuation or words
+    like AND and NEAR can't break the search or change what it means."""
+    phrases = [p.strip() for p in re.findall(r'"([^"]*)"', text) if p.strip()]
+    words = re.findall(r"\w+", re.sub(r'"[^"]*"', " ", text))
+    terms = [f'"{t}"' for t in phrases + words]
+    return (" OR " if any_word else " ").join(terms)
 
 
 class Memory:
@@ -61,7 +100,37 @@ class Memory:
                 content TEXT NOT NULL
             )
         """)
+        self.fts = self._index()
         self.db.commit()
+
+    def _index(self) -> bool:
+        """Set up the full-text index, building it from the whole log the
+        first time. False if this SQLite has no FTS5 (find() then falls back
+        to plain substring search)."""
+        had = self.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE name = 'events_fts'").fetchone()
+        try:
+            # content='events': the index points at the events table instead
+            # of keeping a second copy of every event's text.
+            self.db.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS events_fts USING fts5(
+                    content, content='events', content_rowid='id',
+                    tokenize='porter unicode61')
+            """)
+            self.db.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(
+                    path, body, mtime UNINDEXED, tokenize='porter unicode61')
+            """)
+        except sqlite3.OperationalError:
+            return False
+        self.db.execute("""
+            CREATE TRIGGER IF NOT EXISTS events_fts_add AFTER INSERT ON events BEGIN
+                INSERT INTO events_fts (rowid, content) VALUES (new.id, new.content);
+            END
+        """)
+        if not had:
+            self.db.execute("INSERT INTO events_fts (events_fts) VALUES ('rebuild')")
+        return True
 
     # --- the raw log -------------------------------------------------------
 
@@ -95,6 +164,88 @@ class Memory:
             (f"%{text}%", *exclude_kinds, limit),
         ).fetchall()
         return [Event(*row) for row in rows]
+
+    def get(self, event_id: int) -> Event | None:
+        row = self.db.execute(
+            "SELECT id, time, kind, content FROM events WHERE id = ?", (event_id,)).fetchone()
+        return Event(*row) if row else None
+
+    def find(self, text: str, limit: int = 10, since: str = "", until: str = "",
+             files_root: Path | None = None) -> list[Hit]:
+        """Search the whole log, and the memory files under files_root, by
+        words: best matches first, memory files ahead of events. since and
+        until are UTC ISO times that bound the events searched. Every word
+        has to match; if nothing has them all, any word will do."""
+        if not self.fts:
+            return [Hit(e.content[:300], e.id, e.time, e.kind)
+                    for e in self.search(text, limit, exclude_kinds=("tool",))]
+        if files_root is not None:
+            self.index_files(files_root)
+        for any_word in (False, True):
+            query = fts_query(text, any_word)
+            if not query:
+                return []
+            hits = self._find_files(query, limit) if files_root is not None else []
+            hits += self._find_events(query, limit, since, until)
+            if hits:
+                return hits
+        return []
+
+    def _find_events(self, query: str, limit: int, since: str, until: str) -> list[Hit]:
+        echo = " OR ".join("e.content LIKE ?" for _ in ECHO_TOOLS)
+        rows = self.db.execute(
+            "SELECT e.id, e.time, e.kind, "
+            f"snippet(events_fts, 0, '«', '»', ' ... ', {SNIPPET_TOKENS}) "
+            "FROM events_fts JOIN events e ON e.id = events_fts.rowid "
+            "WHERE events_fts MATCH ? AND e.time >= ? AND e.time < ? "
+            f"AND NOT (e.kind = 'tool' AND ({echo})) "
+            # Notes are kept in full every time they're rewritten, so one
+            # fact can sit in fifty versions; ask for extra to drop repeats.
+            "ORDER BY rank LIMIT ?",
+            (query, since or "", until or "9999", *(f"{t} %" for t in ECHO_TOOLS), limit * 3),
+        ).fetchall()
+        hits, seen = [], set()
+        for id_, time_, kind, snippet in rows:
+            key = (kind, " ".join(snippet.split()))
+            if key in seen:
+                continue
+            seen.add(key)
+            hits.append(Hit(" ".join(snippet.split()), id_, time_, kind))
+            if len(hits) == limit:
+                break
+        return hits
+
+    def _find_files(self, query: str, limit: int) -> list[Hit]:
+        rows = self.db.execute(
+            f"SELECT path, snippet(files_fts, 1, '«', '»', ' ... ', {SNIPPET_TOKENS}) "
+            "FROM files_fts WHERE files_fts MATCH ? ORDER BY rank LIMIT ?",
+            # Only the body: a match on the path alone isn't a match.
+            (f"body : ({query})", max(3, limit // 3)),
+        ).fetchall()
+        return [Hit(" ".join(snippet.split()), path=path) for path, snippet in rows]
+
+    def index_files(self, root: Path) -> None:
+        """Bring the files index up to date with the memory files under
+        root: changed files re-read, deleted ones dropped. Cheap when
+        nothing changed (one stat per file)."""
+        root = Path(root)
+        found = {}
+        for pattern in MEMORY_FILES:
+            for path in root.glob(pattern):
+                # A link planted in the folder could point anywhere.
+                if path.is_file() and path.resolve().is_relative_to(root.resolve()):
+                    found[path.relative_to(root).as_posix()] = path
+        known = dict(self.db.execute("SELECT path, mtime FROM files_fts").fetchall())
+        for rel in set(known) - set(found):
+            self.db.execute("DELETE FROM files_fts WHERE path = ?", (rel,))
+        for rel, path in found.items():
+            mtime = str(path.stat().st_mtime)
+            if known.get(rel) == mtime:
+                continue
+            self.db.execute("DELETE FROM files_fts WHERE path = ?", (rel,))
+            self.db.execute("INSERT INTO files_fts (path, body, mtime) VALUES (?, ?, ?)",
+                            (rel, path.read_text(encoding="utf-8", errors="replace"), mtime))
+        self.db.commit()
 
     # --- the curated notes -------------------------------------------------
 
@@ -142,8 +293,8 @@ if __name__ == "__main__":
     # Peek at Perro's memory: python -m perro.memory   (or: ... search <text>)
     memory = Memory()
     if sys.argv[1:2] == ["search"]:
-        for e in memory.search(" ".join(sys.argv[2:])):
-            print(f"[{e.time}] {e.kind}: {e.content}")
+        for h in memory.find(" ".join(sys.argv[2:]), 20, files_root=memory.home / "workspace"):
+            print(f"{h.path}: {h.snippet}" if h.path else f"#{h.id} [{h.time}] {h.kind}: {h.snippet}")
     else:
         print(memory.snapshot())
     memory.close()

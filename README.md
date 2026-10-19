@@ -12,11 +12,12 @@ Your PC: Perro runtime (Python)
   │                   or Codex / Claude Code run as the model only, through your subscription
   ├─ identity       → workspace/SOUL.md (who it is) + USER.md (what it knows about you) + PROACTIVE_PREFERENCES.md (what you want brought up unasked)
   │                   + AGENTS.md (its own lessons on how to work here); starters in templates/
-  ├─ memory         → home/notes.md (open tasks) + home/memory.db (event log, messages)
+  ├─ memory         → workspace/MEMORY.md (what lasts) + workspace/memory/ (people, opinions, a note per day)
+  │                   + home/notes.md (open tasks) + home/memory.db (every event and message, full-text searchable)
   ├─ heartbeat      → wake, show memory, model decides, save, sleep until it chose
   ├─ inbox          → messages between you and Perro; where its instructions come from
   ├─ telegram       → bridge from a Telegram bot to the inbox, paired to your account only
-  ├─ tools          → about_yourself (its guide, docs/ABOUT_YOURSELF.md), recall, list/read/write files, set/cancel alarms, message you, read web pages, Google, Notion, start/check builds, GitHub, Vercel
+  ├─ tools          → about_yourself (its guide, docs/ABOUT_YOURSELF.md), recall and read_conversation (its whole past, word for word), list/read/write/edit files, set/cancel alarms, message you, read web pages, Google, Notion, start/check builds, GitHub, Vercel
   ├─ web            → read-only: any public page as text, plus Wikipedia search
   ├─ search         → web search, run by a separate Codex or Claude Code call (providers in search.py)
   ├─ n8n, google    → its own Google account through your local n8n: Gmail (read; send to a list you keep),
@@ -30,7 +31,7 @@ Your PC: Perro runtime (Python)
   ├─ vercel         → puts them online on its own Vercel: previews behind Vercel's sign-in, public only by approval
   ├─ approvals      → outward actions wait for your Approve/Deny tap on Telegram, then run in code
   ├─ skills         → know-how files it keeps in workspace/skills/
-  ├─ dream          → once a day at 7:00, a quiet wake that tidies notes and files and writes workspace/dreams/
+  ├─ dream          → once a day at 7:00, a quiet wake that tidies notes and memory, writes a day note and workspace/dreams/
   ├─ backup         → commits and pushes home/ to its private repo every 6 hours, only between wakes
   ├─ days           → home/days/: the log as one readable Markdown file per day
   └─ home/workspace/ → the only part of the disk its tools may touch
@@ -111,7 +112,7 @@ The pairing lives in `home/telegram.json`. Delete that file and pair again to sw
 - `py -m perro.telegram` — run the Telegram bridge (`--pair` links it to your account first; see above).
 - `py -m perro.approvals` — list what Perro is waiting on you to approve; `--yes N` / `--no N` answers at the PC, and `--test "text"` sends a harmless test card to check the path.
 - `py -m perro.workshop` — list Perro's sites and how their latest builds went (`--setup`, `--login`: see above).
-- `py -m perro.memory` — print what Perro sees of its memory. `py -m perro.memory search <text>` searches the full log.
+- `py -m perro.memory` — print what Perro sees of its memory. `py -m perro.memory search <words>` searches the full log and memory files, as recall does.
 - `py -m perro.web <url>` — fetch a page exactly as Perro would see it (`--search <words>` for its Wikipedia search).
 - `py -m perro.browser --setup` — build and start the browser box (needs Docker Desktop); `--check` runs the fence test (what must open and what mustn't, about 20 seconds), `open <url>` prints a page as Perro sees it, `--stop` removes it. Perro starts the box itself when it first browses, as long as Docker Desktop is running.
 - `py -m perro.dream` — have Perro dream now instead of at 7:00 (only while the heartbeat is stopped). Dreams are written to `home/workspace/dreams/`.

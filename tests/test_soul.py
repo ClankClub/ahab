@@ -24,12 +24,12 @@ with tempfile.TemporaryDirectory() as d:
     home = Path(d)
     sysp, p = page(home)
     assert "## Who you are (SOUL.md)\n# SOUL" in p, p[:400]  # seeded from templates/
-    assert "wild wolf" not in sysp and "SOUL.md" in sysp and "4000" in sysp
+    assert "wild wolf" not in sysp and "SOUL.md" in sysp and "8000" in sysp
     ws = home / "workspace"; ws.mkdir(exist_ok=True)
     (ws / "SOUL.md").write_text("# SOUL\nI am a test soul.", encoding="utf-8")
     _, p = page(home)
     assert p.index("## Who you are (SOUL.md)\n# SOUL\nI am a test soul.") < p.index("## Your notes"), p[:500]
-    (ws / "SOUL.md").write_text("x" * 4500, encoding="utf-8")
+    (ws / "SOUL.md").write_text("x" * 8500, encoding="utf-8")
     _, p = page(home)
-    assert "[cut: SOUL.md is 4500 characters" in p and "x" * 4001 not in p
+    assert "[cut: SOUL.md is 8500 characters" in p and "x" * 8001 not in p
     print("ALL PASSED")
