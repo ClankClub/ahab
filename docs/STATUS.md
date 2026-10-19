@@ -27,6 +27,7 @@ What it can't: watch video (it gets a still and the sound), email anyone off its
 
 ## Next, roughly in order
 
+0. **The desktop box (now):** a Linux desktop in a locked container for computer use, offline unless the owner lists hosts. The agreed design and its three phases are in [DESIGN_DESKTOP.md](DESIGN_DESKTOP.md).
 1. **Goals:** the next genre in the agent comparison: something longer-lived than an alarm or intent that Pip works toward across wakes and reports on.
 2. **Model fallback:** when the running backend fails (a lapsed login, an outage), a wake falls back to a second one instead of not happening.
 3. **Tool grouping:** the tool list is about 20,000 characters on every wake; show some groups (browser, Notion, GitHub) only once asked for.
