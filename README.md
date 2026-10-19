@@ -113,6 +113,7 @@ The pairing lives in `home/telegram.json`. Delete that file and pair again to sw
 - `py -m perro.approvals` — list what Perro is waiting on you to approve; `--yes N` / `--no N` answers at the PC, and `--test "text"` sends a harmless test card to check the path.
 - `py -m perro.workshop` — list Perro's sites and how their latest builds went (`--setup`, `--login`: see above).
 - `py -m perro.memory` — print what Perro sees of its memory. `py -m perro.memory search <words>` searches the full log and memory files, as recall does.
+- `py -m perro.report` — the weekly memory report (writes while awake, MEMORY.md's size, lookups, "don't remember"s), which the watchdog also sends on Telegram every Sunday at 7pm. `--send` sends it now.
 - `py -m perro.web <url>` — fetch a page exactly as Perro would see it (`--search <words>` for its Wikipedia search).
 - `py -m perro.browser --setup` — build and start the browser box (needs Docker Desktop); `--check` runs the fence test (what must open and what mustn't, about 20 seconds), `open <url>` prints a page as Perro sees it, `--stop` removes it. Perro starts the box itself when it first browses, as long as Docker Desktop is running.
 - `py -m perro.dream` — have Perro dream now instead of at 7:00 (only while the heartbeat is stopped). Dreams are written to `home/workspace/dreams/`.

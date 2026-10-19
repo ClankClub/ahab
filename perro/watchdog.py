@@ -326,6 +326,13 @@ def main() -> None:
         print(f"[{datetime.now():%Y-%m-%d %H:%M}] No paired Telegram bot; can't tell the owner anything.")
     for text in check(args.home, send=send or (lambda text: False)):
         print(f"[{datetime.now():%Y-%m-%d %H:%M}] Sent: {text}")
+    # Once a week, the memory report rides along (see report.py).
+    from perro import report
+    try:
+        if text := report.send_if_due(args.home, datetime.now().astimezone(), send or (lambda text: False)):
+            print(f"[{datetime.now():%Y-%m-%d %H:%M}] Sent the memory report.")
+    except Exception as e:      # a broken report must never stop the watchdog
+        print(f"[{datetime.now():%Y-%m-%d %H:%M}] Memory report failed: {type(e).__name__}: {e}")
 
 
 if __name__ == "__main__":
