@@ -435,6 +435,29 @@ def _wikipedia_article(url: str) -> tuple[str, str] | None:
     return None
 
 
+def _page(url: str) -> tuple[str, str, str, dict[str, int], bool, bool]:
+    """(final url, title, text, links, cut off?, redirected?) for a URL."""
+    wikipedia = _wikipedia_article(url)
+    final_url, content_type, body, cut, redirected = _get(wikipedia[1] if wikipedia else url)
+    kind = _kind(content_type, body)
+    text = _decode(body, content_type, kind)
+    title, links = "", {}
+    if kind == "html":
+        title, text, links = _extract(text, final_url)
+    else:
+        text = text.strip()
+    if wikipedia:
+        title, final_url, redirected = wikipedia[0], url, False
+    return final_url, title, text, links, cut, redirected
+
+
+def page_text(url: str) -> tuple[str, str, str]:
+    """(final url, title, whole readable text) of a page, for code that reads
+    it rather than showing it (watches.py). Same fence as fetch_page."""
+    final_url, title, text, _, _, _ = _page(str(url).strip())
+    return final_url, title, text
+
+
 # --- the tools -----------------------------------------------------------
 
 def fetch_page(url: str, start: int = 0) -> str:
@@ -448,18 +471,7 @@ def fetch_page(url: str, start: int = 0) -> str:
     if start < 0:
         raise WebError("start can't be negative.")
 
-    wikipedia = _wikipedia_article(url)
-    final_url, content_type, body, cut, redirected = _get(wikipedia[1] if wikipedia else url)
-    kind = _kind(content_type, body)
-    text = _decode(body, content_type, kind)
-    title, links = "", {}
-    if kind == "html":
-        title, text, links = _extract(text, final_url)
-    else:
-        text = text.strip()
-    if wikipedia:
-        title, final_url, redirected = wikipedia[0], url, False
-
+    final_url, title, text, links, cut, redirected = _page(url)
     named = f'{final_url}: "{title}"' if title else final_url
     if not text:
         return (f"Fetched {named}, but it has no readable text "

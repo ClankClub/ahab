@@ -8,7 +8,7 @@ What Perro is, built up from the bottom: everything around the model, layer by l
 
 **A way for it to act.** The model can't actually do anything; it can only write text. So the protocol is that it answers with plain JSON, either "call this tool with these args" or "I'm done, here's my message, wake me at X." Code reads that JSON and does the thing. Every step is readable in the log. The reply form came later and makes Codex enforce that shape, so answers stop leaking out as prose.
 
-**A pulse.** The heartbeat (`heartbeat.py`) is what makes it an agent and not a chatbot. It wakes, builds a page, asks the model, runs the tools it asks for (up to 10 calls), saves, and sleeps until whenever the model chose. A message from the owner, an email, an alarm or an approval interrupts the sleep within seconds. A lock keeps two heartbeats from running at once.
+**A pulse.** The heartbeat (`heartbeat.py`) is what makes it an agent and not a chatbot. It wakes, builds a page, asks the model, runs the tools it asks for (up to 10 calls), saves, and sleeps until whenever the model chose. A message from the owner, an email, an alarm, an approval or a finished worker interrupts the sleep within seconds. Watches are checked in that same sleep loop, by code, so a page can be watched for days without a single token until it trips. A lock keeps two heartbeats from running at once.
 
 **Memory, since the model has none.** `memory.db` holds an event log of everything that happened, plus a messages table. `notes.md` is its scratchpad for open tasks. `MEMORY.md` is what lasts, and `memory/` holds the detail: a page per person, its opinions, a note per day written by the dream. `recall` searches all of it, log included, with a full-text index, and `read_conversation` gives back any day word for word. `days/` renders the log as one readable file per day, for the owner. And every wake gets a page: identity files and MEMORY.md, the memory folder, notes, the recent conversation, recent events, the local time, the next two weeks. Each wake, the model reads its own life back from that page. That's the whole trick of persistence: it doesn't remember, it rereads.
 
@@ -25,6 +25,8 @@ What Perro is, built up from the bottom: everything around the model, layer by l
 **Hands, with no keys in them.** n8n holds every sign-in, so Perro never sees a token. Through it: Google (calendar, Gmail read and send to the list, Drive, Docs, Sheets, Tasks, Contacts), its own Notion, its own GitHub, its own Vercel. Each relay is a second fence that refuses what the Python shouldn't be asking for anyway.
 
 **A workshop.** Codex in a sealed Docker box builds sites, they go to private GitHub repos, then to Vercel previews, and from there to production only through an approval.
+
+**Helpers.** Workers (`workers.py`) are separate background processes, each its own small loop with the same JSON protocol, a read-only tool list and a fixed menu of cheap models. They report back to Perro, never the owner, so one big job doesn't have to fit in a wake's ten calls.
 
 **A conscience in code.** Approvals: anything outward-facing becomes a card built from the exact payload, and only the owner's tap runs it. Add the delete cap, the email allowlist, and the rule that orders come only from the owner.
 

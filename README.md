@@ -25,6 +25,8 @@ Your PC: Perro runtime (Python)
   │                   its own tasks and contacts, 25 deletes a day; no sharing or calendar guests)
   ├─ notion         → its own Notion workspace through the same n8n (its to organize; deleting goes to Notion's trash)
   ├─ alarms         → reminders and follow-ups; the heartbeat wakes it for them
+  ├─ watches        → web pages checked in code while it sleeps ("tell me when this changes / mentions X"); no tokens until one trips
+  ├─ workers        → background helpers it starts for read-only jobs (cheap models only: its own, Haiku, DeepSeek); they report to it, not you
   ├─ workshop       → Codex builds static sites in a locked Docker box (workshop/); nothing is published
   ├─ browser        → a real Chromium in its own locked box (browser/), public sites only, never sends anything
   ├─ github         → keeps those sites in private repos on its own GitHub, through n8n; public only by approval

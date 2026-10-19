@@ -20,6 +20,10 @@ Tools so far:
   cancel_alarm
   set_intent   "when X comes up, do Y", matched in code (see intents.py)
   cancel_intent
+  watch_page   "wake me when this page changes", checked in code (see watches.py)
+  cancel_watch
+  start_worker, check_worker, cancel_worker
+               a helper run in the background, with read-only tools (see workers.py)
   message_owner write to the owner (see inbox.py)
   fetch_page   read a public web page as text (read-only; see web.py)
   search_wikipedia
@@ -63,7 +67,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from perro import alarms, browser, github, google, inbox, intents, mail, n8n, notion, search, vercel, web, workshop
+from perro import (alarms, browser, github, google, inbox, intents, mail, n8n, notion, search, vercel,
+                   watches, web, workers, workshop)
 from perro.memory import Memory
 
 # What Perro can and can't do, kept in the code repo so Perro can read it but
@@ -381,6 +386,46 @@ def cancel_intent(memory: Memory, id: int) -> str:
         raise ToolError(str(e)) from None
 
 
+# --- watches (the logic lives in watches.py) -----------------------------
+
+def watch_page(memory: Memory, url: str, then: str, when: str = "changes", phrase: str | None = None,
+               every_hours=None, times=None, days=None) -> str:
+    try:
+        return watches.add(memory, url, then, when, phrase, every_hours, times, days)
+    except (ValueError, web.WebError) as e:
+        raise ToolError(str(e)) from None
+
+
+def cancel_watch(memory: Memory, id: int) -> str:
+    try:
+        return watches.cancel(memory, id)
+    except ValueError as e:
+        raise ToolError(str(e)) from None
+
+
+# --- workers (the logic lives in workers.py) -----------------------------
+
+def start_worker(memory: Memory, task: str, model: str | None = None, max_calls=None) -> str:
+    try:
+        return workers.start(memory, task, model, max_calls)
+    except workers.WorkerError as e:
+        raise ToolError(str(e)) from None
+
+
+def check_worker(memory: Memory, id: int | None = None) -> str:
+    try:
+        return workers.check(memory, id)
+    except workers.WorkerError as e:
+        raise ToolError(str(e)) from None
+
+
+def cancel_worker(memory: Memory, id: int) -> str:
+    try:
+        return workers.cancel(memory, id)
+    except workers.WorkerError as e:
+        raise ToolError(str(e)) from None
+
+
 # --- writing to the owner (the logic lives in inbox.py) ------------------
 
 def message_owner(memory: Memory, text: str) -> str:
@@ -590,6 +635,49 @@ TOOLS = {
     "cancel_intent": (
         cancel_intent,
         'Cancel a standing intent. Args: {"id": <intent number>}',
+    ),
+    "watch_page": (
+        watch_page,
+        'Keep an eye on a public web page and be woken when it trips: when it "changes", when '
+        'it "mentions" a phrase (tickets "on sale", a price), or when it "stops_mentioning" one '
+        '("sold out"). Code checks it every "every_hours" (default '
+        f'{watches.DEFAULT_EVERY_HOURS}, at least {watches.MIN_EVERY_HOURS:g}) while you sleep, '
+        'with no tokens spent until it trips; then you\'re woken with what it found and your '
+        '"then". It reads the page the way fetch_page does (no JavaScript), and takes a first '
+        'look now so you know it can. Trips up to "times" times (default '
+        f'{watches.DEFAULT_TIMES}) and expires after "days" (default {watches.DEFAULT_DAYS}). Your '
+        'watches are listed every wake-up. Args: {"url": "<address>", "then": "<what to do when '
+        'it trips>", "when": "changes" | "mentions" | "stops_mentioning", "phrase": "<text>", '
+        '"every_hours": <n>, "times": <n>, "days": <n>} (all but url and then optional; '
+        'phrase needed for mentions and stops_mentioning)',
+    ),
+    "cancel_watch": (
+        cancel_watch,
+        'Stop a watch. Args: {"id": <watch number>}',
+    ),
+    "start_worker": (
+        start_worker,
+        'Hand a self-contained job to a worker: a helper running in the background on its own, '
+        f'with read-only tools (web, search, your files, email, Drive, Notion, calendar; up to '
+        f'{workers.DEFAULT_CALLS} calls by default, {workers.MAX_CALLS} at most) and its own '
+        'page, so a job that needs many reads doesn\'t use up your calls or crowd your page. It '
+        'knows only what you put in "task", so say what you want, why, what you already know, '
+        'and what the report should hold. It can\'t message anyone or change anything: it '
+        'writes a report for you, and you\'re woken with it (unless it judges, as the task may '
+        'tell it, that it can wait for your next wake-up). You decide what your owner hears. '
+        f'Models: {workers.model_list()}. At most {workers.MAX_RUNNING} at once and '
+        f'{workers.DAILY_LIMIT} a day. Args: {{"task": "<the job>", "model": "<model>", '
+        '"max_calls": <n>} (model and max_calls optional)',
+    ),
+    "check_worker": (
+        check_worker,
+        'No id: your recent workers. An id: how that worker is doing or how it went, its last '
+        'steps and where its report is. Args: {"id": <worker number>} (optional)',
+    ),
+    "cancel_worker": (
+        cancel_worker,
+        'Stop a running worker; it stops after its current step and writes no report. '
+        'Args: {"id": <worker number>}',
     ),
     "message_owner": (
         message_owner,

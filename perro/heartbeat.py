@@ -27,7 +27,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from perro import alarms, approvals, dream, identity, inbox, intents, mail, n8n, skills, tools, watchdog, workshop
+from perro import (alarms, approvals, dream, identity, inbox, intents, mail, n8n, skills, tools, watchdog,
+                   watches, workers, workshop)
 from perro.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from perro.model import ModelClient, ModelError
 
@@ -154,7 +155,8 @@ How to work:
   notes or a file isn't telling them.
 - Don't promise to let them know later unless something will make you look:
   an alarm for the check, a standing intent (set_intent) for "when this
-  comes up", or a task in your notes with a wake-up that gets you there.
+  comes up", a watch (watch_page) for a page, or a task in your notes
+  with a wake-up that gets you there.
   If nothing would notice, say that instead of promising.
 - Your owner does things you don't see. A missing reply or an unanswered
   suggestion doesn't mean it's still undone, so don't nag; make it easy for
@@ -163,6 +165,10 @@ How to work:
   deadline, a follow-up, or a better way to do something, go ahead with
   what your own tools can do (an alarm, a note, some research) and tell
   them what you did. Ask first before anything that's hard to undo.
+- A job that needs many reads (research across a lot of pages, digging
+  through old email) can go to a worker (start_worker), so it doesn't use
+  up your calls or your page. It knows only the task you write, so make
+  that stand on its own. Its report comes to you, not your owner.
 - If a request is unclear, make a sensible assumption and say what it was.
   Ask when a wrong guess would waste the work.
 - Before you answer a question about what you can or can't do, or how you
@@ -398,6 +404,8 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
     approvals.run_decided(memory)
     # And builds that finished while Perro slept.
     workshop.report_finished(memory)
+    # And workers' reports (workers.py), whether or not they woke Perro.
+    workers.report_finished(memory)
     # And email from the people on its list that's done waiting (see mail.py).
     mail.deliver(memory)
     # Standing intents listen to what just came in (the owner's messages, new
@@ -405,6 +413,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
     intents.check(memory, woke.id)
     asking ="\n\n".join(s for s in (approvals.describe_pending(memory),
                                     workshop.describe_running(memory),
+                                    workers.describe_running(memory),
                                     mail.describe_waiting(memory)) if s)
     messages = [
         {"role": "system", "content": prompt},
@@ -419,6 +428,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
                                     f"{memory.snapshot()}\n\n"
                                     f"## Your alarms\n{alarms.describe_pending(memory)}\n\n"
                                     f"## Your standing intents\n{intents.describe(memory)}\n\n"
+                                    f"## Your watches\n{watches.describe(memory)}\n\n"
                                     + (f"{asking}\n\n" if asking else "") +
                                     f"## Your skills\n{skills.describe(memory)}"},
     ]
@@ -728,18 +738,35 @@ def main() -> None:
                 alarm_at = alarms.next_due(memory)
                 if alarm_at is not None and alarm_at < wake_at:
                     wake_at, why = alarm_at, " (for an alarm)"
+                watch_at = watches.next_due(memory)
+                watching = watch_at is not None and watch_at < wake_at
+                if watching:
+                    wake_at, why = watch_at, " (to check a watch)"
                 dream_at = dream.next_at(args.home)
                 dreaming = dream_at < wake_at
                 if dreaming:
-                    wake_at, why = dream_at, " (to dream)"
+                    wake_at, why, watching = dream_at, " (to dream)", False
                 print(f"--- next wake at {datetime.fromtimestamp(max(wake_at, time.time())):%H:%M}"
                       f" local{why}. Ctrl+C to stop. ---\n")
                 if sleep_until(wake_at, interrupt=lambda: inbox.knocked(memory)
                                or approvals.waiting(memory) or workshop.waiting(memory)
-                               or mail.waiting(memory)):
-                    print("--- knock: a message, an approval, a finished build or an email;"
-                          " waking early. ---\n")
+                               or workers.waiting(memory) or mail.waiting(memory)):
+                    print("--- knock: a message, an approval, a finished build or worker, or an"
+                          " email; waking early. ---\n")
                     break
+                if watching:
+                    # Checked here, in code, while Perro sleeps: no model call
+                    # unless one trips (see watches.py).
+                    try:
+                        tripped = watches.check_due(memory)
+                    except Exception as e:  # a broken check mustn't stop the heartbeat
+                        memory.record("error", f"Checking watches crashed: {type(e).__name__}: {e}")
+                        time.sleep(60)
+                        tripped = 0
+                    if tripped:
+                        print(f"--- {tripped} watch(es) tripped; waking. ---\n")
+                        break
+                    continue
                 if not dreaming:
                     break
                 before = last_id(memory)
