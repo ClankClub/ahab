@@ -37,7 +37,9 @@ from ahab.memory import Memory
 
 RELAY = "ahab/github"
 BASE = "https://api.github.com/"
-OWNER = "perro-agent"
+# Which account is Ahab's is asked of GitHub (whoever the relay's token
+# belongs to), once per process; see owner().
+_owner: list[str] = []
 # The site's own source only. Briefs and house rules are Ahab's working
 # papers (and may hold the owner's details); dist/ is rebuilt from source.
 LEFT_OUT = {"briefs", "BRIEF.md", "AGENTS.md", "dist", "node_modules", ".git", ".vite", ".cache"}
@@ -69,8 +71,18 @@ def _github(path: str, method: str = "GET", query: dict | None = None, body: dic
     return result
 
 
+def owner() -> str:
+    """The GitHub account the relay signs in as: Ahab's own."""
+    if not _owner:
+        login = (_github("user") or {}).get("login")
+        if not login:
+            raise GitHubError("GitHub didn't say which account this is; check the relay's sign-in.")
+        _owner.append(str(login))
+    return _owner[0]
+
+
 def _repo_info(name: str) -> dict | None:
-    status, result = _call(f"repos/{OWNER}/{name}")
+    status, result = _call(f"repos/{owner()}/{name}")
     if status == 404:
         return None
     if not 200 <= status < 300:
@@ -127,6 +139,7 @@ def push_site(memory: Memory, name: str, message: str = "") -> str:
     if not files:
         raise GitHubError(f"{name} has no files to push yet.")
 
+    OWNER = owner()
     repo = _repo_info(name)
     made = repo is None
     if made:
@@ -165,6 +178,7 @@ def push_site(memory: Memory, name: str, message: str = "") -> str:
 
 
 def list_repos(memory: Memory) -> str:
+    OWNER = owner()
     repos = _github("user/repos", query={"affiliation": "owner", "sort": "updated", "per_page": 50})
     if not repos:
         return f"No repositories in {OWNER} yet."
@@ -180,6 +194,7 @@ def list_repos(memory: Memory) -> str:
 
 def request_make_public(memory: Memory, name: str, note: str = "") -> str:
     name = _name(name)
+    OWNER = owner()
     repo = _repo_info(name)
     if repo is None:
         raise GitHubError(f"There's no repository {OWNER}/{name}. push_site makes one.")
@@ -191,7 +206,7 @@ def request_make_public(memory: Memory, name: str, note: str = "") -> str:
         if req.kind == "github_public" and req.payload.get("repo") == name:
             raise GitHubError(f"Request #{req.id} to make {name} public is already waiting on your owner.")
     try:
-        request_id = approvals.request(memory, "github_public", {"repo": name, "commit": head}, note)
+        request_id = approvals.request(memory, "github_public", {"repo": name, "commit": head, "owner": OWNER}, note)
     except ValueError as e:
         raise GitHubError(str(e)) from None
     return (f"Asked your owner (request #{request_id}). Nothing changes until they approve on their "
@@ -201,6 +216,7 @@ def request_make_public(memory: Memory, name: str, note: str = "") -> str:
 
 def _public_card(payload: dict) -> str:
     repo, commit = str(payload.get("repo", "")), str(payload.get("commit", ""))
+    OWNER = str(payload.get("owner") or "your GitHub account")
     if not workshop.NAME.fullmatch(repo) or not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("A make-public request needs a repository name and a commit.")
     return (f"Make the GitHub repository {OWNER}/{repo} public.\n"
@@ -210,6 +226,9 @@ def _public_card(payload: dict) -> str:
 
 def _make_public(memory: Memory, payload: dict) -> str:
     repo = payload["repo"]
+    OWNER = owner()
+    if payload.get("owner") not in (None, OWNER):
+        raise RuntimeError(f"The approval was for {payload['owner']}/{repo}, but the relay now signs in as {OWNER}.")
     info = _repo_info(repo)
     if info is None:
         raise RuntimeError(f"{OWNER}/{repo} doesn't exist any more.")

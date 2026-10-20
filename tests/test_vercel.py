@@ -44,7 +44,7 @@ def fake(path, payload, limit=None):
         src = deployments[body["deploymentId"]]
         counter[0] += 1
         did = f"dpl_D{counter[0]}"
-        deployments[did] = dict(src, id=did, uid=did, url=f"{body['name']}-h{counter[0]}-perro-agent.vercel.app",
+        deployments[did] = dict(src, id=did, uid=did, url=f"{body['name']}-h{counter[0]}-example-agent.vercel.app",
                                 readyState="QUEUED", target="production", created=1792325985634 + counter[0])
         return {"status": 200, "body": {k: v for k, v in deployments[did].items() if k != "files"}}
     if url == "v13/deployments" and method == "POST":
@@ -56,13 +56,13 @@ def fake(path, payload, limit=None):
         counter[0] += 1
         did = f"dpl_D{counter[0]}"
         first = "targets" not in p
-        d = {"id": did, "uid": did, "projectId": p["id"], "url": f"{body['name']}-h{counter[0]}-perro-agent.vercel.app",
+        d = {"id": did, "uid": did, "projectId": p["id"], "url": f"{body['name']}-h{counter[0]}-example-agent.vercel.app",
              "readyState": "QUEUED", "target": "production" if first else None, "created": 1792325985634 + counter[0],
              "files": {f["file"]: stored[f["sha"]] for f in body["files"]}}
         deployments[did] = d
         if first:
             p["targets"] = {"production": {"id": did, "alias": [f"{body['name']}.vercel.app",
-                                                                f"{body['name']}-perro-agent.vercel.app"]}}
+                                                                f"{body['name']}-example-agent.vercel.app"]}}
         return {"status": 200, "body": dict(d)}
     if url.startswith("v13/deployments/"):
         d = deployments[url.split("/")[2]]
@@ -118,7 +118,7 @@ assert calls == [], calls
 
 # First preview: the project, its placeholder as production, then the site as a preview.
 out = run("preview_site", {"name": "cafe"})
-assert out.startswith("Preview of cafe is up: https://cafe-h2-perro-agent.vercel.app (deployment dpl_D2; 2 files, 2 uploaded; "
+assert out.startswith("Preview of cafe is up: https://cafe-h2-example-agent.vercel.app (deployment dpl_D2; 2 files, 2 uploaded; "
                       "made the project, whose public address https://cafe.vercel.app shows a placeholder page)."), out
 assert public_page("cafe") == {"index.html": vercel.PLACEHOLDER}, "the public page must be the placeholder"
 assert deployments["dpl_D2"]["target"] is None and set(deployments["dpl_D2"]["files"]) == {"index.html", "assets/a.js"}
@@ -159,10 +159,10 @@ assert out.startswith("Asked your owner (request #1) to publish dpl_D3."), out
 assert "already waiting" in run("request_publish", {"name": "cafe"})
 req = approvals.get(m, 1)
 assert req.payload == {"project": "cafe", "project_id": "prj_cafe", "deployment": "dpl_D3",
-                       "url": "https://cafe-h3-perro-agent.vercel.app", "public": "https://cafe.vercel.app"}, req.payload
+                       "url": "https://cafe-h3-example-agent.vercel.app", "public": "https://cafe.vercel.app"}, req.payload
 assert req.card == ("Publish the website cafe on Vercel, at https://cafe.vercel.app, replacing what's there now.\n"
                     "Anyone on the internet will be able to visit it. It will show exactly the preview at "
-                    "https://cafe-h3-perro-agent.vercel.app (deployment dpl_D3); open that first to see it."), req.card
+                    "https://cafe-h3-example-agent.vercel.app (deployment dpl_D3); open that first to see it."), req.card
 
 # A newer preview meanwhile doesn't change what gets published.
 (workshop.site_dir("cafe") / "dist/index.html").write_text("<h1>Cafe v2</h1>")

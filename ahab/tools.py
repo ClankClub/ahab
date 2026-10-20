@@ -1251,7 +1251,7 @@ TOOLS = {
     "push_site": (
         _hosting_tool(github.push_site),
         "Save a workshop site's source to a private GitHub repository of the same name in "
-        f'your account ({github.OWNER}), made on the first push. Each push is one commit of the '
+        'your own account, made on the first push. Each push is one commit of the '
         'whole site; briefs and build output stay out. '
         'Args: {"name": "<site>", "message": "<what changed>"} (message optional)',
     ),

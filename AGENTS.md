@@ -2,7 +2,7 @@
 
 Read `README.md`, then `docs/STATUS.md` (and `docs/BUILD_LOG.md` for the piece you're touching). The running agent's own reports to its builders (problems, missing abilities, ideas) are in `home/workspace/FEEDBACK.md`: read it before planning work, and when you fix or answer an entry, mark it there with the date (it's the agent's file, so mark, don't rewrite, and leave the commit to the backup). Ahab is a fork of Lobo (`../Lobo`); don't edit anything in that folder from here.
 
-**Naming:** Ahab is the software/repository, and Pip is the owner's agent instance. Everything in the code is named Ahab (package `ahab`, `AHAB_*` variables, Docker and n8n names), except Pip's own outside accounts, which keep their names (the `perro-agent` GitHub account and Vercel team). The project was called Perro until 2026-10-20; historical records (BUILD_LOG.md, Git history, Pip's memory) keep the old name.
+**Naming:** Ahab is the software/repository, and Pip is the owner's agent instance. Everything in the code is named Ahab (package `ahab`, `AHAB_*` variables, Docker and n8n names), and no account names live in it: an agent's GitHub, Vercel or other accounts are whatever its own sign-ins say (GitHub's is asked of GitHub; the relay's account is filled in at setup), never the owner's names written into code or tests. The project was called Perro until 2026-10-20; historical records (BUILD_LOG.md, Git history, Pip's memory) keep the old name.
 
 ## What Ahab is
 

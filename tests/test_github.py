@@ -24,6 +24,8 @@ def fake(path, payload, limit=None):
     assert path == "ahab/github"
     url, method, body = payload["url"][len(github.BASE):], payload["method"], payload.get("body")
     calls.append((method, url))
+    if url == "user" and method == "GET":
+        return {"status": 200, "body": {"login": "example-agent"}}
     if url == "user/repos" and method == "POST":
         assert body["private"] is True and body["auto_init"] is True
         readme = b"# auto\n"
@@ -34,13 +36,13 @@ def fake(path, payload, limit=None):
         c = sha("commit", t, "init")
         commits[c] = t
         repos[body["name"]] = {"name": body["name"], "private": True, "default_branch": "main", "head": c,
-                               "html_url": f"https://github.com/perro-agent/{body['name']}",
+                               "html_url": f"https://github.com/example-agent/{body['name']}",
                                "pushed_at": "2026-10-18T09:00:00Z"}
         return {"status": 201, "body": repos[body["name"]]}
     if url == "user/repos":
         return {"status": 200, "body": list(repos.values())}
     parts = url.split("/")
-    assert parts[:2] == ["repos", "perro-agent"], url
+    assert parts[:2] == ["repos", "example-agent"], url
     repo = repos.get(parts[2])
     rest = "/".join(parts[3:])
     if repo is None:
@@ -100,7 +102,7 @@ for rel, text in {"index.html": "<h1>Cafe</h1>", "src/main.js": "1", "README.md"
     (site / rel).write_text(text, encoding="utf-8")
 
 out = run("push_site", {"name": "cafe-site", "message": "First version"})
-assert out.startswith("Pushed cafe-site to perro-agent/cafe-site (private): commit "), out
+assert out.startswith("Pushed cafe-site to example-agent/cafe-site (private): commit "), out
 assert "3 files, 3 new or changed. Made the repository (private)." in out, out
 files = trees[commits[repos["cafe-site"]["head"]]]
 assert sorted(files) == ["README.md", "index.html", "src/main.js"], files
@@ -108,9 +110,9 @@ assert b"secret" not in b"".join(blobs[s] for s in files.values())
 
 calls.clear()
 out = run("push_site", {"name": "cafe-site"})
-assert out.startswith("Nothing changed since the last push; perro-agent/cafe-site (private)"), out
-assert ("POST", "repos/perro-agent/cafe-site/git/blobs") not in calls
-assert ("POST", "repos/perro-agent/cafe-site/git/commits") not in calls
+assert out.startswith("Nothing changed since the last push; example-agent/cafe-site (private)"), out
+assert ("POST", "repos/example-agent/cafe-site/git/blobs") not in calls
+assert ("POST", "repos/example-agent/cafe-site/git/commits") not in calls
 
 (site / "src/main.js").unlink()
 (site / "src/app.js").write_text("2")
@@ -118,7 +120,7 @@ assert ("POST", "repos/perro-agent/cafe-site/git/commits") not in calls
 calls.clear()
 out = run("push_site", {"name": "cafe-site", "message": "  Rework\n the   page "})
 assert "3 files, 2 new or changed, 1 removed." in out, out
-assert calls.count(("POST", "repos/perro-agent/cafe-site/git/blobs")) == 2
+assert calls.count(("POST", "repos/example-agent/cafe-site/git/blobs")) == 2
 assert sorted(trees[commits[repos["cafe-site"]["head"]]]) == ["README.md", "index.html", "src/app.js"]
 
 # Refusals read as refusals.
@@ -138,20 +140,29 @@ assert "the limit per file is" in run("push_site", {"name": "cafe-site"})
 big.unlink()
 
 out = run("list_repos", {})
-assert out.startswith("Your repositories (perro-agent):\ncafe-site: private, last pushed "), out
+assert out.startswith("Your repositories (example-agent):\ncafe-site: private, last pushed "), out
 
 # Making it public: an approval, for that exact commit.
 assert run("request_make_public", {"name": "ghost"}) == \
-    "request_make_public refused: There's no repository perro-agent/ghost. push_site makes one."
+    "request_make_public refused: There's no repository example-agent/ghost. push_site makes one."
 out = run("request_make_public", {"name": "cafe-site", "note": "Ready to show"})
 assert out.startswith("Asked your owner (request #1)."), out
 assert "already waiting" in run("request_make_public", {"name": "cafe-site"})
 req = approvals.get(m, 1)
 head = repos["cafe-site"]["head"]
-assert req.card == (f"Make the GitHub repository perro-agent/cafe-site public.\nAnyone on the internet will be able "
+assert req.card == (f"Make the GitHub repository example-agent/cafe-site public.\nAnyone on the internet will be able "
                     f"to see every file in it and its whole history, as of commit {head[:7]}. "
-                    "https://github.com/perro-agent/cafe-site"), req.card
-assert req.payload == {"repo": "cafe-site", "commit": head}
+                    "https://github.com/example-agent/cafe-site"), req.card
+assert req.payload == {"repo": "cafe-site", "commit": head, "owner": "example-agent"}
+# The account comes from GitHub, not the code: a relay signed in elsewhere
+# since the request doesn't get to act on it.
+github._owner[:] = ["someone-else"]
+try:
+    github._make_public(m, req.payload)
+    raise AssertionError("acted for the wrong account")
+except RuntimeError as e:
+    assert "was for example-agent/cafe-site" in str(e), e
+github._owner[:] = ["example-agent"]
 
 # Something pushed after the request: the approval refuses, the repo stays private.
 (site / "README.md").write_text("# Cafe, changed")
@@ -160,7 +171,7 @@ approvals.decide(m, 1, True, "test")
 approvals.run_decided(m)
 assert repos["cafe-site"]["private"] is True
 ev = [e.content for e in m.recent(5) if e.kind == "approval"][-1]
-assert "It failed: RuntimeError: perro-agent/cafe-site changed after the request" in ev, ev
+assert "It failed: RuntimeError: example-agent/cafe-site changed after the request" in ev, ev
 
 # Asked again, approved, nothing pushed between: it goes public.
 assert run("request_make_public", {"name": "cafe-site"}).startswith("Asked your owner (request #2).")
@@ -168,8 +179,8 @@ approvals.decide(m, 2, True, "test")
 approvals.run_decided(m)
 assert repos["cafe-site"]["private"] is False
 ev = [e.content for e in m.recent(5) if e.kind == "approval"][-1]
-assert ev.endswith("Done: perro-agent/cafe-site is public now: https://github.com/perro-agent/cafe-site"), ev
-assert run("request_make_public", {"name": "cafe-site"}).startswith("perro-agent/cafe-site is already public")
+assert ev.endswith("Done: example-agent/cafe-site is public now: https://github.com/example-agent/cafe-site"), ev
+assert run("request_make_public", {"name": "cafe-site"}).startswith("example-agent/cafe-site is already public")
 (site / "README.md").write_text("# Cafe, public")
 assert "(PUBLIC)" in run("push_site", {"name": "cafe-site"})
 

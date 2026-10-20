@@ -17,7 +17,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-RELAYS = {"relay_vercel_check.js": "ahab-vercel.json", "relay_google_cal_check.js": "ahab-google.json",
+RELAYS = {"relay_vercel_check.js": "ahab-vercel.json", "relay_github_check.js": "ahab-github.json", "relay_google_cal_check.js": "ahab-google.json",
           "relay_email_check.js": "ahab-email-send.json", "relay_notion_check.js": "ahab-notion.json"}
 
 
