@@ -18,7 +18,8 @@ with tempfile.TemporaryDirectory() as d:
     m = Memory(Path(d))
     assert inbox.describe_recent(m) == "(no messages yet)"
     inbox.owner_sends(m, "waiting letter")
-    assert inbox.describe_recent(m) == "(no messages yet)"   # not delivered yet
+    recent = inbox.describe_recent(m)                         # not delivered yet: only counted
+    assert "waiting letter" not in recent and "1 more message(s)" in recent, recent
     f = Fake([{"thought": "reply", "tool": "message_owner", "args": {"text": "hi back"}}, done])
     heartbeat.beat(m, f, heartbeat.system_prompt("Perro"))
     page = f.seen[0][1]["content"]

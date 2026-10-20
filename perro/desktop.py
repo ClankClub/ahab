@@ -421,24 +421,45 @@ def _tar_in(memory, rel: str) -> tuple[bytes, int]:
     return buffer.getvalue(), count
 
 
+_WINDOWS_DEVICE = re.compile(r"^(CON|PRN|AUX|NUL|COM\d|LPT\d)(\..*)?$", re.I)
+
+
+def _safe_name(raw: str) -> bool:
+    """A tar name from the box that means the same thing on the PC. A
+    backslash is an ordinary character in a Linux name but a separator on
+    Windows ("a\\..\\..\\SOUL.md" climbs out), so it, drive colons, the other
+    characters Windows reserves, control characters, device names (NUL,
+    COM1) and parts ending in a dot or space are all refused."""
+    name = PurePosixPath(raw)
+    if not name.parts or name.is_absolute() or ".." in name.parts:
+        return False
+    if any(c in raw for c in '\\:<>"|?*') or any(ord(c) < 32 for c in raw):
+        return False
+    return not any(p.endswith((".", " ")) or _WINDOWS_DEVICE.match(p) for p in name.parts)
+
+
 def _tar_out(memory, data: bytes, box_rel: str) -> list[str]:
     """Write a tar from the box into workspace/desktop/: regular files only,
     every name checked, within the save and workspace limits."""
     from perro import senses, tools
     root = tools.workspace_root(memory)
+    import_root = (root / "desktop").resolve()
+    if import_root != root.resolve() / "desktop":
+        raise DesktopError("workspace/desktop is a link to somewhere else; copying was refused.")
     written, total = [], 0
     room = tools.WORKSPACE_BYTE_LIMIT - tools._workspace_bytes(root)
     with tarfile.open(fileobj=io.BytesIO(data), mode="r") as tar:
         for member in tar:
             if not member.isfile():
                 continue                                    # links, devices, folders: skipped
-            name = PurePosixPath(member.name)
-            if name.is_absolute() or ".." in name.parts:
+            if not _safe_name(member.name):
                 continue
             total += member.size
             if total > senses.SAVE_BYTE_LIMIT or total > room:
                 raise DesktopError("That's more than fits (50 MB at a time, within the workspace's limit).")
-            target = tools._resolve(memory, (PurePosixPath("desktop") / name).as_posix())
+            target = tools._resolve(memory, (PurePosixPath("desktop") / member.name).as_posix())
+            if not target.is_relative_to(import_root):
+                raise DesktopError("A file would have landed outside workspace/desktop/; copying was refused.")
             target.parent.mkdir(parents=True, exist_ok=True)
             with tar.extractfile(member) as f:
                 target.write_bytes(f.read())

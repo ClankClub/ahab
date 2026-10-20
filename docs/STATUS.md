@@ -22,6 +22,7 @@ What it can't: watch video (it gets a still and the sound), email anyone off its
 - The desktop (new): whether Pip reaches for it, how well Luna clicks from screenshots (no number yet; calibration is phase 2), what a desktop wake costs with a picture on every call, and whether the home volume grows.
 - The sanity canary (new): one live probe came back clean; watch its first days on the real home. A "model_tools" event in the log means Codex's own tools are back.
 - The tool list is about 20,000 characters on every wake and growing (a third of the page). At some point tools want grouping (browser tools appearing only once asked for, say).
+- Codex's audit (2026-10-19, in its scratch fork's `docs/audit/`): three fixes are in; 23 findings remain, the worst being EX-02 (desktop and workshop output buffered whole on the PC before any limit), then interrupted approvals left `running`, the mail watch missing a burst past 25, and worker cancel and usage accounting.
 - A real email waking Pip through the mail watch hasn't been seen yet.
 - Which sites the browser's no-sending rule breaks (Google Maps half-loads).
 - Making a GitHub repository public through the approval hasn't been tried live.

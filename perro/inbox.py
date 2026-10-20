@@ -122,16 +122,26 @@ def describe_recent(memory: Memory, limit: int = RECENT_LIMIT,
     ).fetchall()
     lines, used = [], 0
     for sent, sender, text, files in rows:
-        when = datetime.fromisoformat(sent).astimezone().strftime("%a %d %b %H:%M")
-        shown = with_files(text, files) if sender == "perro" else text
-        line = f"[{when}] {'Owner' if sender == 'owner' else 'You'}: {shown}"
+        line = _line(sent, sender, text, files)
         if lines and used + len(line) > char_limit:
             break
         lines.append(line)
         used += len(line)
+    waiting = memory.db.execute(
+        "SELECT COUNT(*) FROM messages WHERE sender = 'owner' AND read_at IS NULL").fetchone()[0]
+    if waiting:
+        # Shown last: more from the owner is queued (see deliver).
+        lines.insert(0, f"({waiting} more message(s) from your owner are waiting; you'll get them on "
+                        "the wake-up right after this one, and they may change what's being asked.)")
     if not lines:
         return "(no messages yet)"
     return "\n\n".join(reversed(lines))
+
+
+def _line(sent: str, sender: str, text: str, files: str | None) -> str:
+    when = datetime.fromisoformat(sent).astimezone().strftime("%a %d %b %H:%M")
+    shown = with_files(text, files) if sender == "perro" else text
+    return f"[{when}] {'Owner' if sender == 'owner' else 'You'}: {shown}"
 
 
 def owner_reads(memory: Memory) -> None:
@@ -144,14 +154,30 @@ def owner_reads(memory: Memory) -> None:
 # --- Perro side ---------------------------------------------------------------
 
 def deliver(memory: Memory) -> int:
-    """At wake-up: log every unread owner message as an event, mark it read.
-    Photos that came with them are shown to Perro on this wake (senses.py)."""
+    """At wake-up: log unread owner messages as events and mark them read,
+    oldest first, but only as many as "Recent conversation" can show
+    (RECENT_LIMIT messages, RECENT_CHAR_LIMIT characters; the first always
+    goes in, whatever its size). Marked read is what puts a message on the
+    page, so the rest stay unread with a knock and the heartbeat wakes again
+    for them right after this wake. Photos that came with them are shown to
+    Perro on this wake (senses.py)."""
     from perro import senses, tools
     _table(memory)
-    unread = memory.db.execute(
+    waiting = memory.db.execute(
         "SELECT id, time, text, attachments FROM messages WHERE sender = 'owner' AND read_at IS NULL "
         "ORDER BY id"
     ).fetchall()
+    unread, used = [], 0
+    for row in waiting[:RECENT_LIMIT]:
+        size = len(_line(row[1], "owner", row[2], row[3]))
+        if unread and used + size > RECENT_CHAR_LIMIT:
+            break
+        unread.append(row)
+        used += size
+    if len(unread) < len(waiting):
+        memory.db.execute("UPDATE messages SET knock = 1 WHERE sender = 'owner' AND read_at IS NULL "
+                          "AND id > ?", (unread[-1][0],))
+        memory.db.commit()
     for msg_id, sent, text, files in unread:
         memory.record("message", f"From the owner (sent {sent}):\n{text}")
         memory.db.execute("UPDATE messages SET read_at = ? WHERE id = ?", (_now(), msg_id))

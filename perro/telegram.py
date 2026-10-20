@@ -169,11 +169,19 @@ def load_state(home: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
 
 
-def save_state(home: Path, state: dict) -> None:
-    path = home / STATE_FILE
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
-    tmp.replace(path)  # all at once, so a crash can't leave half a file
+# The bridge's two threads share one state dict and one file; this keeps a
+# change and its save together, so neither thread writes over the other.
+_STATE_LOCK = threading.RLock()
+
+
+def save_state(home: Path, state: dict, **changes) -> None:
+    """Apply changes (if any) to state and save it, as one step."""
+    with _STATE_LOCK:
+        state.update(changes)
+        path = home / STATE_FILE
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        tmp.replace(path)  # all at once, so a crash can't leave half a file
 
 
 def is_owner(message: dict, state: dict) -> bool:
@@ -366,8 +374,7 @@ def forward_replies(state: dict, memory: Memory, bot: Bot, home: Path) -> int:
         memory.db.execute("UPDATE messages SET read_at = ? WHERE id = ? AND read_at IS NULL",
                           (_iso_now(), msg_id))
         memory.db.commit()
-        state["last_forwarded_id"] = msg_id
-        save_state(home, state)
+        save_state(home, state, last_forwarded_id=msg_id)
         print(f"[{_now()}] Out: {len(text)} chars to the owner.")
     return len(rows)
 
@@ -464,8 +471,7 @@ def pair(home: Path, bot: Bot) -> None:
                 bot.send(state["owner_chat_id"], "Paired. Messages here now go to Perro.")
                 print(f"Paired with @{message['from'].get('username', '?')}.")
                 return
-        state["update_offset"] = offset
-        save_state(home, state)
+        save_state(home, state, update_offset=offset)
 
 
 def run(home: Path, bot: Bot) -> None:
@@ -474,6 +480,7 @@ def run(home: Path, bot: Bot) -> None:
         sys.exit("Not paired yet. Run: python -m perro.telegram --pair")
     watchdog.keep_alive(home, "telegram")
     stop = threading.Event()
+    sender_failed: list[BaseException] = []
 
     def outbox_loop() -> None:
         # Its own database connection: SQLite connections stay in one thread.
@@ -487,6 +494,11 @@ def run(home: Path, bot: Bot) -> None:
                     print(f"[{_now()}] Couldn't send: {e}")
                     stop.wait(RETRY_SECONDS)
                 stop.wait(OUTBOX_SECONDS)
+        except Exception as e:
+            # Anything else would end this thread quietly while the bridge
+            # kept taking messages in and sending nothing out.
+            sender_failed.append(e)
+            stop.set()
         finally:
             memory.close()
 
@@ -496,6 +508,9 @@ def run(home: Path, bot: Bot) -> None:
     print(f"[{_now()}] Bridge running. Ctrl+C to stop.")
     try:
         while True:
+            if sender_failed:
+                # Exit loudly; the scheduled task starts the bridge again.
+                raise RuntimeError("The bridge's sending side stopped") from sender_failed[0]
             try:
                 updates = bot.updates(state.get("update_offset", 0))
             except TelegramError as e:
@@ -504,8 +519,7 @@ def run(home: Path, bot: Bot) -> None:
                 continue
             for update in updates:
                 handle_update(update, state, memory, bot)
-                state["update_offset"] = update["update_id"] + 1
-                save_state(home, state)
+                save_state(home, state, update_offset=update["update_id"] + 1)
     except KeyboardInterrupt:
         print("\nStopped.")
     finally:
