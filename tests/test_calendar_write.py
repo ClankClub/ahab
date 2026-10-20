@@ -1,12 +1,12 @@
-"""Offline tests for add_event / update_event (perro/google.py) against a fake relay."""
+"""Offline tests for add_event / update_event (ahab/google.py) against a fake relay."""
 import sys, tempfile
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 from datetime import datetime
 from pathlib import Path
 sys.path.insert(0, ROOT)
-from perro import google, n8n, tools
-from perro.memory import Memory
+from ahab import google, n8n, tools
+from ahab.memory import Memory
 
 events, sent = {}, []
 BASE = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
@@ -14,7 +14,7 @@ BASE = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
 
 def fake(path, payload, limit=None):
     sent.append(payload)
-    assert path == "perro/google" and payload["service"] == "calendar" and payload["url"].startswith(BASE)
+    assert path == "ahab/google" and payload["service"] == "calendar" and payload["url"].startswith(BASE)
     rest, method = payload["url"][len(BASE):], payload["method"]
     if method != "GET":
         assert payload["query"] == {"sendUpdates": "none"}, payload["query"]

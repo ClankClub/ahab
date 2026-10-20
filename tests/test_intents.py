@@ -1,4 +1,4 @@
-"""Standing intents (perro.intents): matched in code, with a fire budget, cooldown and expiry."""
+"""Standing intents (ahab.intents): matched in code, with a fire budget, cooldown and expiry."""
 import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -6,8 +6,8 @@ from pathlib import Path
 
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import intents, tools
-from perro.memory import Memory
+from ahab import intents, tools
+from ahab.memory import Memory
 
 UTC = timezone.utc
 m = Memory(Path(tempfile.mkdtemp()))

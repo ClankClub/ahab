@@ -1,13 +1,13 @@
-"""Offline tests for perro/vercel.py: a fake Vercel, behind a fake relay, that behaves like the real one
+"""Offline tests for ahab/vercel.py: a fake Vercel, behind a fake relay, that behaves like the real one
 (including making a project's first deployment production, whatever is asked)."""
 import base64, hashlib, os, sys, tempfile
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 from pathlib import Path
 sys.path.insert(0, ROOT)
-os.environ["PERRO_WORKSHOP_HOME"] = tempfile.mkdtemp(prefix="vcws-")
-from perro import approvals, n8n, tools, vercel, workshop
-from perro.memory import Memory
+os.environ["AHAB_WORKSHOP_HOME"] = tempfile.mkdtemp(prefix="vcws-")
+from ahab import approvals, n8n, tools, vercel, workshop
+from ahab.memory import Memory
 
 vercel.time.sleep = lambda s: None
 projects, deployments, stored, calls = {}, {}, {}, []
@@ -17,7 +17,7 @@ counter = [0]
 
 
 def fake(path, payload, limit=None):
-    assert path == "perro/vercel" and limit == vercel.UPLOAD_BYTE_LIMIT
+    assert path == "ahab/vercel" and limit == vercel.UPLOAD_BYTE_LIMIT
     url, method, body, query = payload["url"][len(vercel.BASE):], payload["method"], payload["body"], payload["query"]
     calls.append((method, url))
     if url == "v9/projects" and method == "GET":

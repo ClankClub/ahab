@@ -9,11 +9,11 @@ import zipfile
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-os.environ["PERRO_CLI_HOME"] = tempfile.mkdtemp()   # never near a real CLI profile
-from perro import browser, google, heartbeat, inbox, n8n, senses, telegram, tools, workers
-from perro.cli_model import CliClient, flatten
-from perro.memory import Memory
-from perro.model import ModelClient, Reply
+os.environ["AHAB_CLI_HOME"] = tempfile.mkdtemp()   # never near a real CLI profile
+from ahab import browser, google, heartbeat, inbox, n8n, senses, telegram, tools, workers
+from ahab.cli_model import CliClient, flatten
+from ahab.memory import Memory
+from ahab.model import ModelClient, Reply
 
 home = Path(tempfile.mkdtemp())
 (home / "home.json").write_text(json.dumps({"name": "Pip", "backend": "codex-luna"}), encoding="utf-8")
@@ -275,12 +275,12 @@ old.db.commit()
 assert inbox.deliver(old) == 1 and inbox.owner_sends(old, "a photo", attachments=["media/x.jpg"])
 
 # --- hearing: which transcriber, by what's set up -------------------------------------------
-saved_env = {k: os.environ.pop(k, None) for k in ("PERRO_HEARING", "GROQ_API_KEY", "OPENAI_API_KEY")}
-os.environ["PERRO_HEARING"] = "groq"
+saved_env = {k: os.environ.pop(k, None) for k in ("AHAB_HEARING", "GROQ_API_KEY", "OPENAI_API_KEY")}
+os.environ["AHAB_HEARING"] = "groq"
 assert senses.hearing() is None
 os.environ["GROQ_API_KEY"] = "test"
 assert senses.hearing() == "groq"
-os.environ["PERRO_HEARING"] = "openai"
+os.environ["AHAB_HEARING"] = "openai"
 assert senses.hearing() is None
 for k, v in saved_env.items():
     os.environ.pop(k, None)
@@ -294,23 +294,23 @@ asked = []
 
 def fake_call(path, _limit=None, **params):
     asked.append(path)
-    if path == "perro/email/read":
+    if path == "ahab/email/read":
         return {"message": {"payload": {"parts": [{"filename": "notes.txt", "body": {"size": 5, "data": "aGVsbG8"}},
                                                   {"filename": "Plan.PDF", "body": {"size": 9,
                                                    "attachmentId": "ANGjdJ_abcdefghij"}}]}}}
-    if path == "perro/email/attachment":
+    if path == "ahab/email/attachment":
         return {"data": base64.urlsafe_b64encode(b"%PDF-plan").decode().rstrip("=")}
-    if path == "perro/drive/download":
+    if path == "ahab/drive/download":
         return {"data": base64.b64encode(PNG).decode()}
     raise AssertionError(path)
 
 
 n8n.call = fake_call
 text = tools.run(m, "save_attachment", {"id": "abc123def", "name": "plan.pdf (9 bytes)"})
-assert "Saved Plan.PDF" in text and "read_file reads it" in text and asked[-1] == "perro/email/attachment", text
+assert "Saved Plan.PDF" in text and "read_file reads it" in text and asked[-1] == "ahab/email/attachment", text
 assert next(ws.rglob("Plan.pdf")).read_bytes() == b"%PDF-plan"
 text = tools.run(m, "save_attachment", {"id": "abc123def", "name": "notes.txt"})
-assert "Saved notes.txt" in text and asked[-1] == "perro/email/read", "inline data needs no second call"
+assert "Saved notes.txt" in text and asked[-1] == "ahab/email/read", "inline data needs no second call"
 assert "has no attachment called" in tools.run(m, "save_attachment", {"id": "abc123def", "name": "x.zip"})
 assert "id must be" in tools.run(m, "save_attachment", {"id": "../x", "name": "a"})
 

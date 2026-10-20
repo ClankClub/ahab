@@ -4,9 +4,9 @@ from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 from pathlib import Path
 sys.path.insert(0, ROOT)
-from perro import dream, tools
-from perro.memory import Memory
-from perro.model import Reply
+from ahab import dream, tools
+from ahab.memory import Memory
+from ahab.model import Reply
 
 
 class Fake:
@@ -30,7 +30,7 @@ f = Fake([
     {"thought": "The guide lists Sheets.", "notes": "Open: make Sam a sheet with create_sheet.",
      "dream": "# Dream, Sunday\n\n*Looking back since Sun.*\n\nI believed a wrong can't.", "files": {}},
 ])
-assert dream.dream(m, f, "Perro") is True
+assert dream.dream(m, f, "Ahab") is True
 system = f.seen[0][0]["content"]
 for phrase in ("check it against your waking tools", "whose move it is", "first move for the coming day",
                "marked as a guess", "- about_yourself:", "they don't come and go"):

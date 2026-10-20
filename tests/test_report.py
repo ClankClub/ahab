@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import inbox, report
-from perro.memory import Memory
+from ahab import inbox, report
+from ahab.memory import Memory
 
 home = Path(tempfile.mkdtemp())
 (home / "home.json").write_text(json.dumps({"name": "Pip"}), encoding="utf-8")
@@ -28,7 +28,7 @@ tool("read_conversation", {"date": "2026-10-01"}, "Your conversation...")
 m.record("dream", "Dreamed over the day since Sat; wrote dreams/x.md. Wrote memory/daily/x.md. Rewrote the notes. "
                   "Changed USER.md, MEMORY.md, memory/people/ann.md. Tell your owner what changed. [0 tool calls]")
 inbox.owner_sends(m, "Remember Ann?"); inbox.deliver(m)
-inbox.perro_sends(m, "Sorry, I don't remember an Ann.")
+inbox.ahab_sends(m, "Sorry, I don't remember an Ann.")
 yesterday = datetime.now().astimezone() - timedelta(days=1)
 m.db.execute("INSERT INTO events (time, kind, content) VALUES (?, 'message', 'From the owner (sent x):\nhi')",
              (yesterday.astimezone().isoformat(),))

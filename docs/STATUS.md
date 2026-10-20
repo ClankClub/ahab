@@ -10,6 +10,8 @@ What Pip can do: talk on Telegram and by email to a short list; search, read and
 
 What it can't: watch video (it gets a still and the sound), email anyone off its list, share or delete outside its own spaces, sign in on the web, or run code anywhere but its desktop box.
 
+Moving to a Linux laptop (2026-10-20): the code is now Ahab throughout (`ahab` package, `AHAB_*` variables, `ahab-*` Docker and n8n names), so the laptop is a fresh install from `main`, with Pip's home cloned from `silascroe/pip`. The PC keeps running its old Perro-named copy until then.
+
 ## Open, and worth watching
 
 - Whether the proactive defaults bring up useful things or noise, whether AGENTS.md and the dream's skills fill with real lessons, and whether Pip reads its guide when asked about itself.
@@ -34,7 +36,7 @@ What it can't: watch video (it gets a still and the sound), email anyone off its
 3. **Goals:** the next genre in the agent comparison: something longer-lived than an alarm or intent that Pip works toward across wakes and reports on.
 4. **Model fallback:** when the running backend fails (a lapsed login, an outage), a wake falls back to a second one instead of not happening.
 5. **Skill upkeep:** the dream reviews skills it wrote for ones that went stale or never get used.
-6. **More search providers:** `brave` and `searxng` in `perro/search.py`, for homes on an API.
+6. **More search providers:** `brave` and `searxng` in `ahab/search.py`, for homes on an API.
 7. **Backend bake-off:** replay real owner messages through copies of the home on `codex-luna`, `claude-haiku` and DeepSeek, scoring JSON slips, tool choices, finishing the job, voice, time and tokens.
 8. **Small gaps:** find-and-replace in Docs; Notion restore from trash and moving into a database (both want a newer Notion API version).
 9. **Mail off the list,** if wanted, through the approval step.

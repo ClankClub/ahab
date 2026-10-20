@@ -1,11 +1,11 @@
 """The browser box's driver: one Chromium, held open by Playwright, that
-Perro's code sends commands to.
+Ahab's code sends commands to.
 
-Runs inside the perro-browser container (perro/browser.py starts it there).
+Runs inside the ahab-browser container (ahab/browser.py starts it there).
 `driver.py serve` is the container's main process: it listens on a Unix
 socket inside the box, so nothing is reachable from outside it, and starts
 Chromium when the first command comes. `driver.py call` is how a command gets
-in: perro/browser.py runs it with `docker exec`, sends one JSON line on its
+in: ahab/browser.py runs it with `docker exec`, sends one JSON line on its
 standard input and reads one back.
 
 What the browser may do is set here, whatever a page asks for:
@@ -13,7 +13,7 @@ What the browser may do is set here, whatever a page asks for:
     container anyway), which reaches public HTTPS sites and nothing private.
   - Only GET and HEAD requests go out. Anything that would create, post or
     change something (a form, a script's POST, a beacon) is stopped here and
-    listed, so a page can't be made to send things on Perro's behalf.
+    listed, so a page can't be made to send things on Ahab's behalf.
   - No WebSockets, no WebRTC, no service workers, no downloads, no popups
     (they're closed and listed), and dialogs are dismissed.
   - No logins: addresses with a user name in them are refused, and the whole
@@ -45,8 +45,8 @@ import sys
 import time
 import urllib.parse
 
-SOCKET = "/tmp/perro-driver.sock"
-PROXY = os.environ.get("PERRO_PROXY", "http://perro-browser-proxy:3128")
+SOCKET = "/tmp/ahab-driver.sock"
+PROXY = os.environ.get("AHAB_PROXY", "http://ahab-browser-proxy:3128")
 IDLE_SECONDS = 15 * 60
 NAV_TIMEOUT_MS = 30_000
 SETTLE_MS = 5_000
@@ -485,7 +485,7 @@ class Browser:
                           ["file", ""], ["text", ""]];
           fields.forEach(([type, auto], i) => {
             const input = document.createElement("input");
-            input.type = type; input.id = "perro-test-" + i;
+            input.type = type; input.id = "ahab-test-" + i;
             if (auto) input.setAttribute("autocomplete", auto);
             document.body.appendChild(input);
           });
@@ -494,7 +494,7 @@ class Browser:
         # The typing rules, on the fields just added: four refused, the plain one typed into.
         await self.look()
         numbers = await page.evaluate(
-            "attr => [0, 1, 2, 3, 4].map(i => document.getElementById('perro-test-' + i).getAttribute(attr))",
+            "attr => [0, 1, 2, 3, 4].map(i => document.getElementById('ahab-test-' + i).getAttribute(attr))",
             self.attr)
         refused = [("error" in await self.type(n, "secret")) for n in numbers[:3]]
         refused.append("error" in await self.click(numbers[3]))

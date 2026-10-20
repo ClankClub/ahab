@@ -1,8 +1,8 @@
 """The fence test's half inside the box: tries the ways out that don't go
 through Chromium, and reports what happened as JSON.
 
-Run by `python -m perro.browser --check` with `docker exec`. Each probe says
-what should happen; perro/browser.py prints them side by side. The other half
+Run by `python -m ahab.browser --check` with `docker exec`. Each probe says
+what should happen; ahab/browser.py prints them side by side. The other half
 (the same refusals seen through Chromium, and the request rules) runs through
 the driver.
 """
@@ -12,7 +12,7 @@ import os
 import socket
 import urllib.parse
 
-proxy = urllib.parse.urlsplit(os.environ.get("PERRO_PROXY", "http://perro-browser-proxy:3128"))
+proxy = urllib.parse.urlsplit(os.environ.get("AHAB_PROXY", "http://ahab-browser-proxy:3128"))
 results = []
 
 

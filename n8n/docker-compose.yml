@@ -1,4 +1,4 @@
-# n8n for Perro, self-hosted in Docker. From this folder:
+# n8n for Ahab, self-hosted in Docker. From this folder:
 #   docker compose up -d     start (and create on first run)
 #   docker compose down      stop (data stays in the n8n_data volume)
 #   docker compose pull      fetch a newer n8n, then `up -d` to switch to it

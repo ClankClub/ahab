@@ -1,7 +1,7 @@
 """The fence test's half inside the desktop box: tries the ways out and
-reports, as JSON, what happened. Run by `python -m perro.desktop --check`.
+reports, as JSON, what happened. Run by `python -m ahab.desktop --check`.
 
-With no proxy (PERRO_PROXY unset) the box should have no network at all.
+With no proxy (AHAB_PROXY unset) the box should have no network at all.
 With one, it should reach the listed hosts through it and nothing else.
 """
 
@@ -46,7 +46,7 @@ def through_proxy(proxy, target: str) -> str:
 
 
 interfaces = sorted(os.listdir("/sys/class/net"))
-proxy_url = os.environ.get("PERRO_PROXY", "")
+proxy_url = os.environ.get("AHAB_PROXY", "")
 record("running as an ordinary user", "yes", "yes" if os.getuid() != 0 else "no, root")
 record("straight out to 1.1.1.1:443", "no way out", direct("1.1.1.1", 443))
 record("straight out to the PC (n8n's port)", "no way out", direct("host.docker.internal", 5678))
@@ -55,7 +55,7 @@ if not proxy_url:
     record("looking up example.com", "no answer", resolves("example.com"))
 else:
     proxy = urllib.parse.urlsplit(proxy_url)
-    hosts = [h for h in os.environ.get("PERRO_HOSTS", "").split(",") if h and not h.startswith(".")]
+    hosts = [h for h in os.environ.get("AHAB_HOSTS", "").split(",") if h and not h.startswith(".")]
     if hosts:
         record(f"through the proxy to {hosts[0]} (listed)", "allowed", through_proxy(proxy, f"{hosts[0]}:443"))
     for target in ("unlisted-host.example.net:443", "localhost:443", "host.docker.internal:5678",

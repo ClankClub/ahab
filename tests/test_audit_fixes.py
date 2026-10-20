@@ -10,8 +10,8 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from perro import desktop, inbox, telegram, tools
-from perro.memory import Memory
+from ahab import desktop, inbox, telegram, tools
+from ahab.memory import Memory
 
 home = Path(tempfile.mkdtemp())
 m = Memory(home)
@@ -132,6 +132,14 @@ whole = "whole " + "x" * (inbox.MESSAGE_CHAR_LIMIT - 6)
 inbox.owner_sends(m, whole)
 inbox.owner_sends(m, "next one waits")
 assert inbox.deliver(m) == 1 and whole in inbox.describe_recent(m) and unread() == 1
+
+# A home from before the rename: the agent's messages said 'perro'; they're
+# relabeled the first time the table is opened, so the conversation still reads.
+m.db.execute("INSERT INTO messages (time, sender, text) VALUES ('2026-10-01T00:00:00+00:00', 'perro', 'old reply')")
+m.db.commit()
+inbox._table(m)
+assert m.db.execute("SELECT COUNT(*) FROM messages WHERE sender = 'perro'").fetchone()[0] == 0
+assert "You: old reply" in inbox.describe_recent(m, limit=100, char_limit=10**6)
 
 m.close()
 print("ok")

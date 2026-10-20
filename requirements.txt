@@ -1,12 +1,12 @@
-# Perro runs on the standard library. These are optional, for its senses
-# (perro/senses.py); without them it says what it can't do instead.
+# Ahab runs on the standard library. These are optional, for its senses
+# (ahab/senses.py); without them it says what it can't do instead.
 #   py -m pip install -r requirements.txt
 
 # Reading PDFs.
 pypdf>=5
 
 # Hearing voice notes on this PC (or set GROQ_API_KEY / OPENAI_API_KEY instead).
-# After installing, `py -m perro.senses --warm` downloads the speech model once.
+# After installing, `py -m ahab.senses --warm` downloads the speech model once.
 faster-whisper>=1.2
 # faster-whisper 1.2 calls PyAV in a way PyAV 16 dropped (metadata_errors).
 av<16

@@ -6,9 +6,9 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, ROOT)
-from perro.memory import Memory
-from perro import tools
-from perro.heartbeat import SYSTEM_PROMPT, coming_days
+from ahab.memory import Memory
+from ahab import tools
+from ahab.heartbeat import SYSTEM_PROMPT, coming_days
 
 with tempfile.TemporaryDirectory() as d:
     m = Memory(Path(d))

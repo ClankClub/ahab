@@ -1,9 +1,9 @@
-# The desktop box: a Linux desktop of Perro's own, for computer use.
+# The desktop box: a Linux desktop of Ahab's own, for computer use.
 #
 # A virtual 1024x768 screen (Xvfb), XFCE, and a handful of apps, driven with
 # xdotool. It runs as the unprivileged "pip", with no network unless the owner
 # lists hosts (then only through its proxy, ../workshop/proxy.py). How it's
-# locked down is in perro/desktop.py; what a command can do is in driver.py.
+# locked down is in ahab/desktop.py; what a command can do is in driver.py.
 
 FROM debian:trixie-slim
 

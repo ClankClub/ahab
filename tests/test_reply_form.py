@@ -1,4 +1,4 @@
-"""The reply form: a backend that takes a JSON Schema (Codex) gets Perro's reply format as
+"""The reply form: a backend that takes a JSON Schema (Codex) gets Ahab's reply format as
 one, and a reply that isn't JSON at all is asked about again instead of dropped."""
 import json
 import os
@@ -8,10 +8,10 @@ from pathlib import Path
 
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-os.environ["PERRO_CLI_HOME"] = tempfile.mkdtemp(prefix="clihome-")
-from perro import cli_model, heartbeat, inbox, tools
-from perro.memory import Memory
-from perro.model import Reply
+os.environ["AHAB_CLI_HOME"] = tempfile.mkdtemp(prefix="clihome-")
+from ahab import cli_model, heartbeat, inbox, tools
+from ahab.memory import Memory
+from ahab.model import Reply
 
 FORM = heartbeat.REPLY_FORM
 
@@ -65,7 +65,7 @@ class Fake:
         return Reply(r if isinstance(r, str) else json.dumps(r), "fake", 100, 10)
 
 
-prompt = heartbeat.system_prompt("Perro")
+prompt = heartbeat.system_prompt("Ahab")
 sent = lambda: [e.content for e in m.recent(200) if e.kind == "tool" and e.content.startswith("message_owner")]
 
 # The beat hands the client the form, and a form reply works end to end.

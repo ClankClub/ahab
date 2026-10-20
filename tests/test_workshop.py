@@ -10,10 +10,10 @@ from datetime import timedelta
 from pathlib import Path
 
 sys.path.insert(0, ROOT)
-os.environ["PERRO_WORKSHOP_HOME"] = tempfile.mkdtemp()
-from perro import heartbeat, tools, workshop
-from perro.memory import Memory
-from perro.model import Reply
+os.environ["AHAB_WORKSHOP_HOME"] = tempfile.mkdtemp()
+from ahab import heartbeat, tools, workshop
+from ahab.memory import Memory
+from ahab.model import Reply
 
 home = Path(tempfile.mkdtemp())
 m = Memory(home)
@@ -71,7 +71,7 @@ def fake_runs(codex_code, check_code, make_dist=True, check_log="ok"):
             (workshop.site_dir(name) / "dist" / "index.html").write_text("<h1>rats</h1>", encoding="utf-8")
         return check_code, check_log
     workshop.run_container = run_container
-workshop.image = lambda: "perro-workshop:test"
+workshop.image = lambda: "ahab-workshop:test"
 workshop.ensure_proxy = lambda: None
 refused = {"text": ""}
 workshop._refused_since = lambda began: refused["text"]
@@ -96,7 +96,7 @@ class Fake:
         return Reply(json.dumps({"thought": "ok", "message": None, "notes": None,
                                  "next_wake_minutes": 60}), "fake", 10, 1)
 fake = Fake()
-heartbeat.beat(m, fake, heartbeat.system_prompt("Perro"))
+heartbeat.beat(m, fake, heartbeat.system_prompt("Ahab"))
 assert "Build #1 of rats is done. Built and checked" in fake.seen[0]
 assert "## In the workshop" not in fake.seen[0]
 assert not workshop.waiting(m)
@@ -177,8 +177,8 @@ real.run_container(9, "rats", "img", real.codex_command(), 1, real.run_dir(9) / 
 check, codex = calls[-2], calls[-1]
 for a in (check, codex):
     s = " ".join(a)
-    for want in ["--read-only", "--cap-drop ALL", "no-new-privileges", "--network perro-workshop ",
-                 "--pids-limit", "--memory 4g", "HTTPS_PROXY=http://perro-workshop-proxy:3128"]:
+    for want in ["--read-only", "--cap-drop ALL", "no-new-privileges", "--network ahab-workshop ",
+                 "--pids-limit", "--memory 4g", "HTTPS_PROXY=http://ahab-workshop-proxy:3128"]:
         assert want in s, (want, s)
     assert "--privileged" not in s and "-p " not in s and "docker.sock" not in s
 assert "codex-builder" not in " ".join(check) and "codex-builder" in " ".join(codex)

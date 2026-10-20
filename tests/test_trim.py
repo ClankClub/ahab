@@ -3,9 +3,9 @@ from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 from pathlib import Path
 sys.path.insert(0, ROOT)
-from perro import heartbeat
-from perro.memory import Memory
-from perro.model import Reply
+from ahab import heartbeat
+from ahab.memory import Memory
+from ahab.model import Reply
 
 class Fake:
     def __init__(self, replies): self.replies, self.seen = list(replies), []
@@ -21,7 +21,7 @@ def run(trim):
         f = Fake(reads + [{"thought": "done", "notes": None, "next_wake_minutes": 60}])
         if not trim:
             saved = heartbeat.trim_last_result; heartbeat.trim_last_result = lambda msgs: None
-        heartbeat.beat(m, f, heartbeat.system_prompt("Perro"))
+        heartbeat.beat(m, f, heartbeat.system_prompt("Ahab"))
         if not trim: heartbeat.trim_last_result = saved
         sleep = m.recent(1)[0].content
         full_logged = all(len(e.content) > 7900 for e in m.search("big.txt", 50) if e.kind == "tool")

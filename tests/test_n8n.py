@@ -1,4 +1,4 @@
-"""Test perro.n8n and the check_calendar tool against a fake n8n on localhost."""
+"""Test ahab.n8n and the check_calendar tool against a fake n8n on localhost."""
 import json
 import os
 import sys
@@ -10,13 +10,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 sys.path.insert(0, ROOT)
-from perro import n8n, tools
-from perro.memory import Memory
+from ahab import n8n, tools
+from ahab.memory import Memory
 
 STATE = {"status": 200, "body": None, "last_path": None}
 
 EVENTS = {"events": [
-    {"calendar": "perro@example.com", "summary": "Dentist", "location": "Main St",
+    {"calendar": "ahab@example.com", "summary": "Dentist", "location": "Main St",
      "start": {"dateTime": "2026-10-19T14:00:00-04:00"}, "end": {"dateTime": "2026-10-19T15:00:00-04:00"},
      "description": "Bring   the\n\ninsurance card. " + "x" * 300},
     {"calendar": "Sam's calendar", "summary": "Day off",
@@ -31,7 +31,7 @@ EVENTS = {"events": [
 
 class Fake(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.headers.get("X-Perro-Key") != "test-key":
+        if self.headers.get("X-Ahab-Key") != "test-key":
             self.send_response(403); self.end_headers(); return
         STATE["last_path"] = self.path
         body = json.dumps(STATE["body"]).encode() if STATE["body"] is not None else b"not json"
@@ -46,26 +46,26 @@ class Fake(BaseHTTPRequestHandler):
 
 server = HTTPServer(("127.0.0.1", 0), Fake)
 threading.Thread(target=server.serve_forever, daemon=True).start()
-os.environ["PERRO_N8N_URL"] = f"http://127.0.0.1:{server.server_port}/webhook/"
-os.environ["PERRO_N8N_KEY"] = "test-key"
+os.environ["AHAB_N8N_URL"] = f"http://127.0.0.1:{server.server_port}/webhook/"
+os.environ["AHAB_N8N_KEY"] = "test-key"
 memory = Memory(Path(tempfile.mkdtemp()))
 
 # The key: missing, then wrong, then right (below)
-os.environ["PERRO_N8N_KEY"] = ""
+os.environ["AHAB_N8N_KEY"] = ""
 out = tools.run(memory, "check_calendar", {})
-assert "PERRO_N8N_KEY isn't set" in out, out
-os.environ["PERRO_N8N_KEY"] = "wrong"
+assert "AHAB_N8N_KEY isn't set" in out, out
+os.environ["AHAB_N8N_KEY"] = "wrong"
 out = tools.run(memory, "check_calendar", {})
 assert "turned away your key" in out and "wrong" not in out.split("key", 1)[1], out
-os.environ["PERRO_N8N_KEY"] = "test-key"
+os.environ["AHAB_N8N_KEY"] = "test-key"
 
 # Normal answer
 STATE["body"] = EVENTS
 out = tools.run(memory, "check_calendar", {"days": 7})
 print(out, "\n")
-assert STATE["last_path"] == "/webhook/perro/calendar?days=7", STATE["last_path"]
+assert STATE["last_path"] == "/webhook/ahab/calendar?days=7", STATE["last_path"]
 assert out.startswith("4 event(s) in the next 7 day(s)")
-assert "Mon 19 Oct 14:00-15:00: Dentist @ Main St  [perro@example.com]" in out  # machine is Eastern
+assert "Mon 19 Oct 14:00-15:00: Dentist @ Main St  [ahab@example.com]" in out  # machine is Eastern
 assert "Bring the insurance card." in out and "[...]" in out
 assert "Tue 20 Oct (all day): Day off" in out
 assert "Thu 22 Oct to Sat 24 Oct (all day): Trip" in out
@@ -99,12 +99,12 @@ assert "wasn't JSON" in tools.run(memory, "check_calendar", {})
 
 # Non-local base refused, before any request
 STATE["last_path"] = None
-os.environ["PERRO_N8N_URL"] = "http://n8n.example.com/webhook"
+os.environ["AHAB_N8N_URL"] = "http://n8n.example.com/webhook"
 r = tools.run(memory, "check_calendar", {})
 assert "must point at this computer" in r and STATE["last_path"] is None, r
 
 # n8n down
-os.environ["PERRO_N8N_URL"] = "http://127.0.0.1:1/webhook"
+os.environ["AHAB_N8N_URL"] = "http://127.0.0.1:1/webhook"
 assert "isn't answering" in tools.run(memory, "check_calendar", {})
 
 assert "check_calendar" in tools.describe()

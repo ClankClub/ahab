@@ -1,12 +1,12 @@
-"""Offline tests for perro/search.py and the CLI search switch: fake CLI runs, throwaway homes."""
+"""Offline tests for ahab/search.py and the CLI search switch: fake CLI runs, throwaway homes."""
 import json, os, sys, tempfile
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-os.environ["PERRO_CLI_HOME"] = tempfile.mkdtemp(prefix="clihome-")
-from perro import cli_model, search, tools
-from perro.memory import Memory
-from perro.model import ModelError, Reply
+os.environ["AHAB_CLI_HOME"] = tempfile.mkdtemp(prefix="clihome-")
+from ahab import cli_model, search, tools
+from ahab.memory import Memory
+from ahab.model import ModelError, Reply
 
 
 def home(config):

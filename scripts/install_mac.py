@@ -1,4 +1,4 @@
-"""Run Perro unattended on a Mac, the launchd equivalent of the Windows tasks.
+"""Run Ahab unattended on a Mac, the launchd equivalent of the Windows tasks.
 
 launchd is macOS's built-in service manager. A "LaunchAgent" is a small
 .plist file in ~/Library/LaunchAgents describing a program to run as you;
@@ -13,8 +13,8 @@ launchd starts it at login and (here) restarts it if it crashes.
   python3 scripts/install_mac.py --remove        uninstall them all
   python3 scripts/install_mac.py --dry-run       print the .plist files, change nothing
 
-Run it from a terminal where Perro already works: launchd doesn't read your
-shell's startup files, so the keys and settings Perro needs (and your PATH,
+Run it from a terminal where Ahab already works: launchd doesn't read your
+shell's startup files, so the keys and settings Ahab needs (and your PATH,
 so it can find codex) are copied from that terminal into the plists. They're
 stored as plain text, readable only by you, like `setx` on Windows.
 Output goes to home/heartbeat.log, home/telegram.log, home/watchdog.log and
@@ -33,13 +33,13 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 AGENTS = Path.home() / "Library" / "LaunchAgents"
-HEARTBEAT = "perro.heartbeat"
-TELEGRAM = "perro.telegram"
-BACKUP = "perro.backup"
-WATCHDOG = "perro.watchdog"
-# What Perro reads from the environment; whichever are set get copied.
-PASSED_ON = ("DEEPSEEK_API_KEY", "OPENROUTER_API_KEY", "PERRO_TELEGRAM_TOKEN", "PERRO_N8N_KEY",
-             "PERRO_BACKEND", "PERRO_CLI_HOME", "PERRO_CODEX_BIN", "PERRO_WORKSHOP_HOME")
+HEARTBEAT = "ahab.heartbeat"
+TELEGRAM = "ahab.telegram"
+BACKUP = "ahab.backup"
+WATCHDOG = "ahab.watchdog"
+# What Ahab reads from the environment; whichever are set get copied.
+PASSED_ON = ("DEEPSEEK_API_KEY", "OPENROUTER_API_KEY", "AHAB_TELEGRAM_TOKEN", "AHAB_N8N_KEY",
+             "AHAB_BACKEND", "AHAB_CLI_HOME", "AHAB_CODEX_BIN", "AHAB_WORKSHOP_HOME")
 
 
 def environment() -> dict[str, str]:
@@ -64,27 +64,27 @@ def plist(label: str, args: list[str], extra: dict) -> bytes:
 
 
 def heartbeat_plist() -> bytes:
-    return plist(HEARTBEAT, ["perro.heartbeat", "--log", "--scheduled"], {
+    return plist(HEARTBEAT, ["ahab.heartbeat", "--log", "--scheduled"], {
         "RunAtLoad": True,                    # start at login
         "KeepAlive": {"Crashed": True},       # restart after a crash, not after a clean exit
     })
 
 
 def telegram_plist() -> bytes:
-    return plist(TELEGRAM, ["perro.telegram", "--log"], {
+    return plist(TELEGRAM, ["ahab.telegram", "--log"], {
         "RunAtLoad": True,
         "KeepAlive": {"Crashed": True},
     })
 
 
 def watchdog_plist() -> bytes:
-    return plist(WATCHDOG, ["perro.watchdog", "--log"], {
+    return plist(WATCHDOG, ["ahab.watchdog", "--log"], {
         "StartInterval": 10 * 60,             # every 10 minutes; checks the others and n8n
     })
 
 
 def backup_plist() -> bytes:
-    return plist(BACKUP, ["perro.backup", "--log"], {
+    return plist(BACKUP, ["ahab.backup", "--log"], {
         "StartInterval": 6 * 60 * 60,         # every 6 hours; missed runs catch up after sleep
     })
 
@@ -119,7 +119,7 @@ def running_by_hand() -> bool:
     if (AGENTS / f"{HEARTBEAT}.plist").exists():
         return False                          # ours: installing again replaces it
     sys.path.insert(0, str(REPO))
-    from perro.heartbeat import acquire_lock
+    from ahab.heartbeat import acquire_lock
     lock = acquire_lock(REPO / "home")
     if lock is None:
         return True
@@ -128,23 +128,23 @@ def running_by_hand() -> bool:
 
 
 def backend() -> str:
-    """The mind this home runs on: PERRO_BACKEND, else home.json, else DeepSeek."""
+    """The mind this home runs on: AHAB_BACKEND, else home.json, else DeepSeek."""
     try:
         chosen = json.loads((REPO / "home" / "home.json").read_text(encoding="utf-8")).get("backend")
     except (OSError, ValueError, AttributeError):
         chosen = None
-    return os.environ.get("PERRO_BACKEND") or chosen or "deepseek"
+    return os.environ.get("AHAB_BACKEND") or chosen or "deepseek"
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Install Perro's launchd agents (macOS).")
+    parser = argparse.ArgumentParser(description="Install Ahab's launchd agents (macOS).")
     parser.add_argument("--with-backup", action="store_true")
     parser.add_argument("--remove", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     if sys.version_info < (3, 11):
-        sys.exit(f"Perro needs Python 3.11 or newer; this is {sys.version.split()[0]}. "
+        sys.exit(f"Ahab needs Python 3.11 or newer; this is {sys.version.split()[0]}. "
                  "Install one from python.org or with `brew install python`.")
     if args.remove:
         for label in (HEARTBEAT, TELEGRAM, WATCHDOG, BACKUP):
@@ -153,23 +153,23 @@ def main() -> None:
 
     mind = backend()
     if mind == "deepseek" and not os.environ.get("DEEPSEEK_API_KEY") and not args.dry_run:
-        sys.exit("Perro runs on DeepSeek here, and DEEPSEEK_API_KEY isn't set in this terminal. Set it "
-                 "(or pick Codex in home/home.json, see README), check Perro works, then run this again.")
+        sys.exit("Ahab runs on DeepSeek here, and DEEPSEEK_API_KEY isn't set in this terminal. Set it "
+                 "(or pick Codex in home/home.json, see README), check Ahab works, then run this again.")
     if not args.dry_run and running_by_hand():
-        sys.exit("Perro's heartbeat is running in another window. Stop it there with Ctrl+C (and the "
+        sys.exit("Ahab's heartbeat is running in another window. Stop it there with Ctrl+C (and the "
                  "Telegram bridge too, if it's running), then run this again.")
     if args.with_backup and not (REPO / "home" / ".git").is_dir():
         sys.exit("--with-backup needs home/ to be its own Git repo with a remote (see README).")
 
     plists = [(HEARTBEAT, heartbeat_plist())]
     paired = (REPO / "home" / "telegram.json").is_file()
-    if os.environ.get("PERRO_TELEGRAM_TOKEN") and paired:
+    if os.environ.get("AHAB_TELEGRAM_TOKEN") and paired:
         plists.append((TELEGRAM, telegram_plist()))
         plists.append((WATCHDOG, watchdog_plist()))   # it tells you through the bot
-    elif os.environ.get("PERRO_TELEGRAM_TOKEN"):
-        print("Skipped the Telegram bridge: pair it first (python3 -m perro.telegram --pair), then run this again.")
+    elif os.environ.get("AHAB_TELEGRAM_TOKEN"):
+        print("Skipped the Telegram bridge: pair it first (python3 -m ahab.telegram --pair), then run this again.")
     else:
-        print("Skipped the Telegram bridge: PERRO_TELEGRAM_TOKEN isn't set (see README).")
+        print("Skipped the Telegram bridge: AHAB_TELEGRAM_TOKEN isn't set (see README).")
     if args.with_backup:
         plists.append((BACKUP, backup_plist()))
 
@@ -187,7 +187,7 @@ def main() -> None:
     for label, data in plists:
         install(label, data)
     names = " and the Telegram bridge" if any(label == TELEGRAM for label, _ in plists) else ""
-    print(f"\nPerro's heartbeat{names} are running now, with no window, and start at every login.\n"
+    print(f"\nAhab's heartbeat{names} are running now, with no window, and start at every login.\n"
           "Watch it:  tail -f home/heartbeat.log\n"
           "Stop it all:  python3 scripts/install_mac.py --remove\n"
           "After changing a key or setting, run this again so the background copy gets it.")

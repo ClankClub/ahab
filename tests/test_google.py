@@ -1,4 +1,4 @@
-"""Test perro.google and its tools against a fake n8n relay on localhost."""
+"""Test ahab.google and its tools against a fake n8n relay on localhost."""
 import json
 import os
 import sys
@@ -10,8 +10,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 sys.path.insert(0, ROOT)
-from perro import google, tools
-from perro.memory import Memory
+from ahab import google, tools
+from ahab.memory import Memory
 
 SEEN = []
 REPLY = {"fn": lambda p: (200, {})}
@@ -19,7 +19,7 @@ REPLY = {"fn": lambda p: (200, {})}
 
 class Fake(BaseHTTPRequestHandler):
     def do_POST(self):
-        if self.headers.get("X-Perro-Key") != "test-key" or self.path != "/webhook/perro/google":
+        if self.headers.get("X-Ahab-Key") != "test-key" or self.path != "/webhook/ahab/google":
             self.send_response(403); self.end_headers(); return
         payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         SEEN.append(payload)
@@ -36,8 +36,8 @@ class Fake(BaseHTTPRequestHandler):
 
 server = HTTPServer(("127.0.0.1", 0), Fake)
 threading.Thread(target=server.serve_forever, daemon=True).start()
-os.environ["PERRO_N8N_URL"] = f"http://127.0.0.1:{server.server_port}/webhook"
-os.environ["PERRO_N8N_KEY"] = "test-key"
+os.environ["AHAB_N8N_URL"] = f"http://127.0.0.1:{server.server_port}/webhook"
+os.environ["AHAB_N8N_KEY"] = "test-key"
 memory = Memory(Path(tempfile.mkdtemp()))
 
 

@@ -1,4 +1,4 @@
-"""Test the mail watch (perro.mail): who wakes Perro, how fast, and the brakes on agents."""
+"""Test the mail watch (ahab.mail): who wakes Ahab, how fast, and the brakes on agents."""
 import json
 import os
 import sys
@@ -10,8 +10,8 @@ from pathlib import Path
 
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import mail, telegram, tools
-from perro.memory import Memory
+from ahab import mail, telegram, tools
+from ahab.memory import Memory
 
 INBOX = []          # what the fake Gmail search returns, newest first
 QUERIES = []
@@ -39,10 +39,10 @@ class Fake(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urllib.parse.urlsplit(self.path)
         query = dict(urllib.parse.parse_qsl(url.query))
-        if url.path == "/webhook/perro/email/search":
+        if url.path == "/webhook/ahab/email/search":
             QUERIES.append(query["q"])
             self._answer({"messages": INBOX[:int(query["max"])]})
-        elif url.path == "/webhook/perro/email/read":
+        elif url.path == "/webhook/ahab/email/read":
             m = next(m for m in INBOX if m["id"] == query["id"])
             self._answer({"message": {"id": m["id"], "threadId": m["threadId"], "payload": {"headers": [
                 {"name": k, "value": v} for k, v in m["headers"].items()]}}})
@@ -59,8 +59,8 @@ class Fake(BaseHTTPRequestHandler):
 
 server = HTTPServer(("127.0.0.1", 0), Fake)
 threading.Thread(target=server.serve_forever, daemon=True).start()
-os.environ["PERRO_N8N_URL"] = f"http://127.0.0.1:{server.server_port}/webhook"
-os.environ["PERRO_N8N_KEY"] = "test-key"
+os.environ["AHAB_N8N_URL"] = f"http://127.0.0.1:{server.server_port}/webhook"
+os.environ["AHAB_N8N_KEY"] = "test-key"
 home = Path(tempfile.mkdtemp())
 m = Memory(home)
 T0 = 1_800_000_000.0
@@ -98,7 +98,7 @@ n = len(QUERIES)
 mail.waiting(m, T0 + 10)
 assert len(QUERIES) == n
 
-# A person wakes Perro at the next check; the owner too, with a word of caution.
+# A person wakes Ahab at the next check; the owner too, with a word of caution.
 arrive(message("person001", "Friend <Friend@Example.com>", "Lunch?"), message("owner0001", "owner@example.com", "Note"))
 assert check(T0 + MIN)
 assert mail.deliver(m, T0 + MIN) == 2
@@ -135,7 +135,7 @@ assert not check(t) and check(t + MIN)
 mail.deliver(m, t + MIN)
 assert "their 1 today" in events()[-1]
 
-# The ceiling: a seventh email in a day is held. It doesn't wake Perro, Perro hears about
+# The ceiling: a seventh email in a day is held. It doesn't wake Ahab, Ahab hears about
 # it at the next wake, and send_email won't write to that agent.
 t = T0 + 5 * 24 * 60 * MIN
 for i in range(1, 8):
@@ -176,7 +176,7 @@ assert mail._agent_count(m, "bot@example.com", t2 + MIN) == 0
 assert check(t2 + MIN) and mail.deliver(m, t2 + MIN) == 4
 assert "a person on your email list" in events()[-1]
 
-# The owner's /talk on Telegram lifts every brake, in code, and doesn't reach Perro's inbox.
+# The owner's /talk on Telegram lifts every brake, in code, and doesn't reach Ahab's inbox.
 class Bot:
     said = []
 
@@ -219,7 +219,7 @@ assert check(t3) and mail.deliver(m, t3) == 7          # the held one too, as or
 assert not any("again0007" in e and "past 6" in e for e in events())
 
 # n8n down: the watch says so once and carries on.
-os.environ["PERRO_N8N_URL"] = "http://127.0.0.1:1/webhook"
+os.environ["AHAB_N8N_URL"] = "http://127.0.0.1:1/webhook"
 mail._watch["error"] = ""
 assert not check(t3 + DAY) and mail._watch["error"]
 assert not check(t3 + DAY + MIN)

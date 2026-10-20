@@ -1,12 +1,12 @@
-"""Offline tests for perro/github.py: a fake GitHub (behind a fake relay) stands in for n8n."""
+"""Offline tests for ahab/github.py: a fake GitHub (behind a fake relay) stands in for n8n."""
 import base64, hashlib, json, os, sys, tempfile
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 from pathlib import Path
 sys.path.insert(0, ROOT)
-os.environ["PERRO_WORKSHOP_HOME"] = tempfile.mkdtemp(prefix="ghws-")
-from perro import approvals, github, n8n, tools, workshop
-from perro.memory import Memory
+os.environ["AHAB_WORKSHOP_HOME"] = tempfile.mkdtemp(prefix="ghws-")
+from ahab import approvals, github, n8n, tools, workshop
+from ahab.memory import Memory
 
 
 def sha(*parts):
@@ -21,7 +21,7 @@ repos, blobs, trees, commits, calls = {}, {}, {}, {}, []
 
 
 def fake(path, payload, limit=None):
-    assert path == "perro/github"
+    assert path == "ahab/github"
     url, method, body = payload["url"][len(github.BASE):], payload["method"], payload.get("body")
     calls.append((method, url))
     if url == "user/repos" and method == "POST":

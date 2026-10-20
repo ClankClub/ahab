@@ -6,8 +6,8 @@ from datetime import datetime
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import identity, inbox, tools
-from perro.memory import Memory, fts_query
+from ahab import identity, inbox, tools
+from ahab.memory import Memory, fts_query
 
 home = Path(tempfile.mkdtemp())
 
@@ -74,7 +74,7 @@ assert "ann.md" not in run("recall", {"query": "Maine"})
 # The conversation, word for word.
 inbox.owner_sends(m, "Tell me about the lighthouse again.")
 inbox.deliver(m)
-inbox.perro_sends(m, "It was on the island Sam mentioned.")
+inbox.ahab_sends(m, "It was on the island Sam mentioned.")
 inbox.owner_sends(m, "Not seen yet.")                                    # still in the mailbox
 today = datetime.now().strftime("%Y-%m-%d")
 out = run("read_conversation", {"date": today})

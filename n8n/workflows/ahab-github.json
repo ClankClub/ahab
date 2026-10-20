@@ -1,0 +1,242 @@
+{
+  "id": "AhabGithubRelay1",
+  "name": "Ahab: GitHub relay",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ahab/github",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "8d4f0e00-5b6c-4d7e-9fa0-000000000001",
+      "name": "Ahab asks",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "8d4f0e00-5b6c-4d7e-9fa0-0000000000aa",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AhabRelayKey0001",
+          "name": "Ahab relay key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// The second fence (Ahab's Python code is the first). An allowlist: only\n// these requests, only in Ahab's own account, pass. No deleting, no\n// collaborators, hooks, keys, secrets, Actions or settings, and no files\n// under .github/ (where workflows live). A repo is made public only by the\n// one request below, which Ahab's code sends only after the owner approves.\nconst OWNER = 'perro-agent';\nconst REPO = '[A-Za-z0-9_.-]{1,100}';\nconst r = $input.first().json.body || {};\nconst method = String(r.method || 'GET').toUpperCase();\nconst url = String(r.url || '');\nconst body = r.body ?? {};\nconst bodyText = JSON.stringify(body);\nconst base = 'https://api.github.com/';\nconst path = url.startsWith(base) ? url.slice(base.length) : null;\nconst allowed = [\n  ['GET', /^user$/],\n  ['GET', /^user\\/repos$/],\n  ['POST', /^user\\/repos$/],\n  ['GET', new RegExp('^repos/' + OWNER + '/' + REPO + '(/[A-Za-z0-9_./-]*)?$')],\n  ['POST', new RegExp('^repos/' + OWNER + '/' + REPO + '/git/(blobs|trees|commits|refs)$')],\n  ['PATCH', new RegExp('^repos/' + OWNER + '/' + REPO + '/git/refs/heads/[A-Za-z0-9_.-]+$')],\n  ['PATCH', new RegExp('^repos/' + OWNER + '/' + REPO + '$')],\n];\nlet refused = '';\nif (path === null) refused = 'that address is not GitHub\\'s API';\nelse if (/[?#%\\\\]|\\.\\.|\\/\\//.test(path)) refused = 'that kind of address is not allowed (options go in query)';\nelse if (!allowed.some(([m, re]) => m === method && re.test(path))) refused = method + ' ' + path + ' is not something Ahab may do on GitHub';\nelse if (/\\.github\\//.test(bodyText)) refused = 'files under .github/ (workflows) are not allowed';\nelse if (method === 'POST' && path === 'user/repos' && (body.private !== true || 'visibility' in body)) refused = 'new repositories must be private';\nelse if (method === 'PATCH' && path.includes('/git/refs/') && body.force !== false) refused = 'branch updates must not be forced';\nelse if (method === 'PATCH' && !path.includes('/git/') && bodyText !== '{\"private\":false}') refused = 'the only repository setting Ahab may change is making it public, after approval';\nreturn [{ json: { method, url, query: r.query || {}, body, write: method !== 'GET', refused } }];"
+      },
+      "id": "8d4f0e00-5b6c-4d7e-9fa0-000000000002",
+      "name": "Check the request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 3,
+        "output": "={{ $json.refused ? 2 : ($json.write ? 1 : 0) }}"
+      },
+      "id": "8d4f0e00-5b6c-4d7e-9fa0-000000000003",
+      "name": "Read or write",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.refused ? { status: 403, body: { message: 'The relay refused: ' + $json.refused } } : { status: $json.statusCode || 500, body: $json.body ?? $json.data ?? ($json.error ? { message: String($json.error.message || $json.error) } : null) } }}",
+        "options": {}
+      },
+      "id": "8d4f0e00-5b6c-4d7e-9fa0-000000000004",
+      "name": "Answer Ahab",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1040,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify($json.query) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "8d4f0e00-5b6c-4d7e-9fa0-000000000100",
+      "name": "GitHub read",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        160
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "nMR12kxS2OZmJRCn",
+          "name": "Ahab Github"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "={{ $json.method }}",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={{ JSON.stringify($json.query) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "8d4f0e00-5b6c-4d7e-9fa0-000000000101",
+      "name": "GitHub write",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        300
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "nMR12kxS2OZmJRCn",
+          "name": "Ahab Github"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Ahab asks": {
+      "main": [
+        [
+          {
+            "node": "Check the request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check the request": {
+      "main": [
+        [
+          {
+            "node": "Read or write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read or write": {
+      "main": [
+        [
+          {
+            "node": "GitHub read",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GitHub write",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Answer Ahab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub read": {
+      "main": [
+        [
+          {
+            "node": "Answer Ahab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub write": {
+      "main": [
+        [
+          {
+            "node": "Answer Ahab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

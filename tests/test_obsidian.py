@@ -6,8 +6,8 @@ from datetime import date
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import obsidian, tools, workers
-from perro.memory import Memory
+from ahab import obsidian, tools, workers
+from ahab.memory import Memory
 
 home = Path(tempfile.mkdtemp())
 (home / "home.json").write_text(json.dumps({"name": "Pip"}), encoding="utf-8")

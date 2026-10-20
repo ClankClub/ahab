@@ -3,9 +3,9 @@ from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 from pathlib import Path
 sys.path.insert(0, ROOT)
-from perro import heartbeat, identity
-from perro.memory import Memory
-from perro.model import Reply
+from ahab import heartbeat, identity
+from ahab.memory import Memory
+from ahab.model import Reply
 
 class Fake:
     def __init__(self): self.seen = []
@@ -13,7 +13,7 @@ class Fake:
         self.seen.append([dict(m) for m in messages])
         return Reply(json.dumps({"thought": "ok", "notes": None, "next_wake_minutes": 60}), "fake", 1, 1)
 
-def page(home, name="Perro"):
+def page(home, name="Ahab"):
     m = Memory(home); f = Fake()
     heartbeat.beat(m, f, heartbeat.system_prompt(name), name)
     starts = [e.content for e in m.recent(30) if e.kind == "start"]

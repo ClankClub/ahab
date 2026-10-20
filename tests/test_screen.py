@@ -7,8 +7,8 @@ import zlib
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import screen, senses, tools, workers
-from perro.memory import Memory
+from ahab import screen, senses, tools, workers
+from ahab.memory import Memory
 
 home = Path(tempfile.mkdtemp())
 settings = lambda **kw: (home / "home.json").write_text(json.dumps({"name": "Pip", **kw}), encoding="utf-8")

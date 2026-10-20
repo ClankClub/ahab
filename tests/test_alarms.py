@@ -1,4 +1,4 @@
-"""Alarms (perro.alarms): one-offs ring once; repeating ones move on, at the same local time."""
+"""Alarms (ahab.alarms): one-offs ring once; repeating ones move on, at the same local time."""
 import sqlite3
 import sys
 import tempfile
@@ -7,8 +7,8 @@ from pathlib import Path
 
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import alarms, tools
-from perro.memory import Memory
+from ahab import alarms, tools
+from ahab.memory import Memory
 
 UTC = timezone.utc
 home = Path(tempfile.mkdtemp())

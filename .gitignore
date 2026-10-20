@@ -3,7 +3,7 @@ __pycache__/
 .venv/
 .env
 
-# Perro's own world (memory + workspace) is runtime state, not source.
+# Ahab's own world (memory + workspace) is runtime state, not source.
 home/
 homes/
 *.sqlite3

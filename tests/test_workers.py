@@ -1,4 +1,4 @@
-"""Test workers: background helpers with read-only tools, reporting to Perro, never the owner."""
+"""Test workers: background helpers with read-only tools, reporting to Ahab, never the owner."""
 import json
 import os
 import sys
@@ -7,9 +7,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import heartbeat, tools, workers
-from perro.memory import Memory
-from perro.model import ModelError, Reply
+from ahab import heartbeat, tools, workers
+from ahab.memory import Memory
+from ahab.model import ModelError, Reply
 
 home = Path(tempfile.mkdtemp())
 (home / "home.json").write_text(json.dumps({"name": "Pip", "backend": "codex-luna"}), encoding="utf-8")

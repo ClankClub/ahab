@@ -7,9 +7,9 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, ROOT)
-from perro import heartbeat, inbox
-from perro.memory import Memory
-from perro.model import Reply
+from ahab import heartbeat, inbox
+from ahab.memory import Memory
+from ahab.model import Reply
 
 
 class Fake:
@@ -21,7 +21,7 @@ class Fake:
         return Reply(json.dumps(self.replies.pop(0)), "fake", 100, 10)
 
 
-prompt = heartbeat.system_prompt("Perro")
+prompt = heartbeat.system_prompt("Ahab")
 assert '"message": "<what to send your owner now' in prompt
 assert "3. Message your owner" in prompt and "5. Choose when to wake next" in prompt
 assert "every rewrite costs your owner money" in prompt
@@ -45,9 +45,9 @@ f.backend = "deepseek"
 heartbeat.beat(m, f, prompt)
 page = f.seen[0][1]["content"]
 assert "Pricing right now: your thinking costs double at peak" in page and "deepseek" not in page.lower(), page[:600]
-from perro.model import ModelClient
+from ahab.model import ModelClient
 assert ModelClient.from_backend("local").backend == "local"   # page_note stays out of the client
-# The canary: a model call that used Codex's own tools is logged for Perro.
+# The canary: a model call that used Codex's own tools is logged for Ahab.
 assert not [e for e in m.recent(1000) if e.kind == "model_tools"]
 f = Fake([{"thought": "-", "message": None, "notes": None, "next_wake_minutes": 600}])
 f.foreign = ["command_execution", "command_execution"]
@@ -73,7 +73,7 @@ before = len(m.recent(1000))
 heartbeat.beat(m, Fake([{"thought": "x", "message": "ok", "notes": "Open: nothing.", "next_wake_minutes": 60}]), prompt)
 assert "notes" not in [e.kind for e in m.recent(1000)[before:]]
 
-# 3. A message that can't go out: logged, and Perro wakes soon instead of sleeping on it.
+# 3. A message that can't go out: logged, and Ahab wakes soon instead of sleeping on it.
 inbox.owner_sends(m, "write me a lot")
 minutes = heartbeat.beat(m, Fake([{"thought": "x", "message": "y" * (inbox.MESSAGE_CHAR_LIMIT + 1000), "notes": None, "next_wake_minutes": 600}]), prompt)
 assert minutes == heartbeat.RETRY_MINUTES, minutes
@@ -81,7 +81,7 @@ errs = [e.content for e in m.recent(5) if e.kind == "error"]
 assert errs and "final message was NOT sent" in errs[-1], errs
 assert "y" * 100 not in inbox.describe_recent(m)
 
-# 4. A message inside a tool request isn't sent, and Perro is told so right away.
+# 4. A message inside a tool request isn't sent, and Ahab is told so right away.
 inbox.owner_sends(m, "list my files")
 f = Fake([{"thought": "look", "tool": "list_files", "args": {}, "message": "Here are your files"},
           {"thought": "done", "message": "Nothing in there yet.", "notes": None, "next_wake_minutes": 60}])

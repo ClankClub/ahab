@@ -1,22 +1,22 @@
-"""Offline tests for perro/browser.py and the driver's address rules: Docker is
+"""Offline tests for ahab/browser.py and the driver's address rules: Docker is
 faked, nothing runs a browser."""
 import importlib.util, json, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from perro import browser, workshop
+from ahab import browser, workshop
 
 # --- how the box runs ---------------------------------------------------------------
-args = browser.container_args("perro-browser:abc")
+args = browser.container_args("ahab-browser:abc")
 joined = " ".join(args)
-for must in ("--network perro-browser ", "--read-only", "--cap-drop ALL", "no-new-privileges",
-             "--pids-limit", "--memory 2g", "PERRO_PROXY=http://perro-browser-proxy:3128"):
+for must in ("--network ahab-browser ", "--read-only", "--cap-drop ALL", "no-new-privileges",
+             "--pids-limit", "--memory 2g", "AHAB_PROXY=http://ahab-browser-proxy:3128"):
     assert must in joined, must
 for never in ("-p", "--publish", "--mount", "-v", "--volume", "--privileged", "--cap-add", "--add-host"):
     assert never not in args, never
-assert "docker.sock" not in joined and args[args.index("--network") + 1] == "perro-browser"
-assert args[-1] == "perro-browser:abc"
+assert "docker.sock" not in joined and args[args.index("--network") + 1] == "ahab-browser"
+assert args[-1] == "ahab-browser:abc"
 assert browser.ALLOW == ("*",) and "*" not in workshop.ALLOW     # only the browser's proxy is open
 
 # --- setting it up, with Docker faked -------------------------------------------------
@@ -30,7 +30,7 @@ def fake_docker(*a, timeout=120, check=True, stdout=None, input=None):
     if a[0] == "inspect":
         out, code = (state["container"], 0) if state["container"] else ("", 1)
     elif a[0] == "run":
-        state["container"] = next(x.split("=", 1)[1] for x in a if x.startswith("perro.hash=")) + " true"
+        state["container"] = next(x.split("=", 1)[1] for x in a if x.startswith("ahab.hash=")) + " true"
     elif a[0] == "exec" and "call" in a:
         command = json.loads(input)
         out = json.dumps({"ok": True} if command["do"] == "ping" else {"echo": command})
@@ -40,9 +40,9 @@ def fake_docker(*a, timeout=120, check=True, stdout=None, input=None):
 browser.docker = fake_docker
 proxies = []
 browser.ensure_proxy = lambda *a: proxies.append(a)
-browser.image = lambda: "perro-browser:abc"
+browser.image = lambda: "ahab-browser:abc"
 browser.ensure_box()
-assert proxies == [("perro-browser-proxy", "perro-browser", "perro-browser-out", ("*",))]
+assert proxies == [("ahab-browser-proxy", "ahab-browser", "ahab-browser-out", ("*",))]
 runs = [a for a, _ in calls if a[0] == "run"]
 assert len(runs) == 1 and "--label" in runs[0]
 calls.clear()
@@ -57,11 +57,11 @@ assert any(a[:1] == ("start",) for a, _ in calls) and not any(a[0] == "run" for 
 answer = browser.call({"do": "open", "url": "https://example.com"})
 assert answer == {"echo": {"do": "open", "url": "https://example.com"}}, answer
 exec_call = next(a for a, _ in calls if a[0] == "exec")
-assert exec_call[:3] == ("exec", "-i", "perro-browser")
+assert exec_call[:3] == ("exec", "-i", "ahab-browser")
 
 
 def gone(*a, **k):
-    return subprocess.CompletedProcess(a, 1, "", "Error response from daemon: No such container: perro-browser")
+    return subprocess.CompletedProcess(a, 1, "", "Error response from daemon: No such container: ahab-browser")
 
 
 browser.docker = gone
@@ -102,10 +102,10 @@ assert not driver.SECRET_AUTOCOMPLETE.search("email") and "password" not in driv
 assert "file" not in driver.TYPEABLE_INPUTS
 print("browser tests passed")
 
-# --- Perro's tools, with the driver faked ------------------------------------------------
+# --- Ahab's tools, with the driver faked ------------------------------------------------
 import tempfile
-from perro import tools
-from perro.memory import Memory
+from ahab import tools
+from ahab.memory import Memory
 
 memory = Memory(Path(tempfile.mkdtemp()))
 sent = []

@@ -1,8 +1,8 @@
-# The workshop: where Codex builds Perro's sites, in a box.
+# The workshop: where Codex builds Ahab's sites, in a box.
 #
 # Node, git and the Codex CLI, nothing else. It runs as the unprivileged
 # "node" user, on a Docker network with no way out except the allowlist
-# proxy (proxy.py). perro/workshop.py builds this image and runs it; the
+# proxy (proxy.py). ahab/workshop.py builds this image and runs it; the
 # details of how it's locked down are there, in run_container().
 
 FROM node:22-bookworm-slim

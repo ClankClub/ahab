@@ -1,0 +1,165 @@
+{
+  "id": "AhabEmailSearch1",
+  "name": "Ahab: email search",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "ahab/email/search",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "6c1d4a10-2b3c-4d5e-8f90-000000000001",
+      "name": "Ahab asks",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "6c1d4a10-2b3c-4d5e-8f90-0000000000aa",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "AhabRelayKey0001",
+          "name": "Ahab relay key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "={{ $json.query.q || 'in:inbox' }}"
+            },
+            {
+              "name": "maxResults",
+              "value": "={{ Math.min(Math.max(Number($json.query.max) || 10, 1), 25) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6c1d4a10-2b3c-4d5e-8f90-000000000002",
+      "name": "Find messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "or2O9yfQudisXUxX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// With no matches, pass one placeholder along so the answer still gets sent.\nconst found = $input.first().json.messages || [];\nreturn found.length ? found.map(m => ({ json: { id: m.id } })) : [{ json: { id: 'none' } }];"
+      },
+      "id": "6c1d4a10-2b3c-4d5e-8f90-000000000003",
+      "name": "One per message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.id === 'none' ? 'https://gmail.googleapis.com/gmail/v1/users/me/profile' : 'https://gmail.googleapis.com/gmail/v1/users/me/messages/' + encodeURIComponent($json.id) + '?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "options": {}
+      },
+      "id": "6c1d4a10-2b3c-4d5e-8f90-000000000004",
+      "name": "Headers of each",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "or2O9yfQudisXUxX",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { estimate: $('Find messages').first().json.resultSizeEstimate || 0, messages: $input.all().map(i => i.json).filter(m => m.id && m.payload).map(m => ({ id: m.id, threadId: m.threadId, labels: m.labelIds || [], snippet: m.snippet, headers: Object.fromEntries((m.payload.headers || []).map(h => [h.name, h.value])) })) } }}",
+        "options": {}
+      },
+      "id": "6c1d4a10-2b3c-4d5e-8f90-000000000005",
+      "name": "Answer Ahab",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        960,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Ahab asks": {
+      "main": [
+        [
+          {
+            "node": "Find messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find messages": {
+      "main": [
+        [
+          {
+            "node": "One per message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One per message": {
+      "main": [
+        [
+          {
+            "node": "Headers of each",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Headers of each": {
+      "main": [
+        [
+          {
+            "node": "Answer Ahab",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,31 +1,31 @@
 #!/usr/bin/env bash
-# Perro's installer, for a Mac (Linux works too, but there it can't install
+# Ahab's installer, for a Mac (Linux works too, but there it can't install
 # Python for you). It does four things, in order:
 #   1. finds Python 3.11 or newer, and offers to install it if there isn't one
 #      (with Homebrew if you have it, otherwise the official python.org installer)
-#   2. downloads Perro's code from GitHub as a zip (no Git needed)
-#   3. puts it in ~/Perro (or the folder you name with --dir)
+#   2. downloads Ahab's code from GitHub as a zip (no Git needed)
+#   3. puts it in ~/Ahab (or the folder you name with --dir)
 #   4. checks that it starts, and tells you what to do next
 #
 # Run it like this, reading it before you run it:
-#   curl -fsSLO https://raw.githubusercontent.com/silascroe/perro/main/install.sh
+#   curl -fsSLO https://raw.githubusercontent.com/ClankClub/ahab/main/install.sh
 #   less install.sh
 #   bash install.sh                 # or: bash install.sh --dir ~/somewhere/else
 #
-# Safe to run again: it updates Perro's code and never touches home/, the
-# folder where Perro keeps its memory. It asks before installing anything.
+# Safe to run again: it updates Ahab's code and never touches home/, the
+# folder where Ahab keeps its memory. It asks before installing anything.
 
 set -euo pipefail
 
-REPO_ZIP="${PERRO_REPO_ZIP:-https://github.com/silascroe/perro/archive/refs/heads/main.zip}"
+REPO_ZIP="${AHAB_REPO_ZIP:-https://github.com/ClankClub/ahab/archive/refs/heads/main.zip}"
 PYTHON_VERSION="3.14"
-PYTHON_PKG="${PERRO_PYTHON_PKG:-https://www.python.org/ftp/python/3.14.8/python-3.14.8-macos11.pkg}"
-DIR="$HOME/Perro"
+PYTHON_PKG="${AHAB_PYTHON_PKG:-https://www.python.org/ftp/python/3.14.8/python-3.14.8-macos11.pkg}"
+DIR="$HOME/Ahab"
 ASSUME_YES=0
 
 usage() {
   echo "Usage: bash install.sh [--dir FOLDER] [--yes]"
-  echo "  --dir FOLDER  where to put Perro (default: ~/Perro)"
+  echo "  --dir FOLDER  where to put Ahab (default: ~/Ahab)"
   echo "  --yes         don't ask before installing Python"
 }
 
@@ -63,7 +63,7 @@ find_python() {
   for name in python3.14 python3.13 python3.12 python3.11 python3; do
     path="$(command -v "$name" 2>/dev/null)" || continue
     # A Mac's own /usr/bin/python3 is a stand-in that pops up an installer
-    # for Apple's developer tools, and its Python is too old for Perro anyway.
+    # for Apple's developer tools, and its Python is too old for Ahab anyway.
     if [ "$OS" = "Darwin" ] && [ "$path" = "/usr/bin/python3" ]; then continue; fi
     if "$path" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; then
       echo "$path"; return 0
@@ -80,15 +80,15 @@ find_python() {
 
 install_python() {
   if [ "$OS" != "Darwin" ]; then
-    fail "Perro needs Python 3.11 or newer. Install it with your system's package manager (for example: sudo apt install python3), then run this again."
+    fail "Ahab needs Python 3.11 or newer. Install it with your system's package manager (for example: sudo apt install python3), then run this again."
   fi
   if command -v brew >/dev/null 2>&1; then
-    ask "Perro needs Python 3.11 or newer. Install Python $PYTHON_VERSION with Homebrew?" \
-      || fail "Perro needs Python 3.11 or newer. Install it, then run this again."
+    ask "Ahab needs Python 3.11 or newer. Install Python $PYTHON_VERSION with Homebrew?" \
+      || fail "Ahab needs Python 3.11 or newer. Install it, then run this again."
     brew install "python@$PYTHON_VERSION"
     return
   fi
-  say "Perro needs Python 3.11 or newer, and this Mac doesn't have it."
+  say "Ahab needs Python 3.11 or newer, and this Mac doesn't have it."
   say "The official installer is at: $PYTHON_PKG"
   ask "Download it and install it? (macOS will ask for your password)" \
     || fail "Install Python from https://www.python.org/downloads/, then run this again."
@@ -110,42 +110,42 @@ if ! PY="$(find_python)"; then
 fi
 say "Using $PY ($("$PY" -c 'import platform; print(platform.python_version())'))."
 
-# --- 2 and 3. Perro's code ---------------------------------------------------
+# --- 2 and 3. Ahab's code ---------------------------------------------------
 
 if [ -d "$DIR/.git" ]; then
   fail "$DIR is a Git checkout. Update it with git pull instead."
 fi
-if [ -d "$DIR" ] && [ ! -f "$DIR/perro/heartbeat.py" ] && [ -n "$(ls -A "$DIR")" ]; then
-  fail "$DIR already exists and isn't Perro. Pick another folder with --dir."
+if [ -d "$DIR" ] && [ ! -f "$DIR/ahab/heartbeat.py" ] && [ -n "$(ls -A "$DIR")" ]; then
+  fail "$DIR already exists and isn't Ahab. Pick another folder with --dir."
 fi
 
-say "Downloading Perro..."
+say "Downloading Ahab..."
 case "$REPO_ZIP" in
-  http*) curl -fsSL "$REPO_ZIP" -o "$TMP/perro.zip" || fail "Couldn't download Perro from GitHub. Check the internet connection." ;;
-  *) cp "$REPO_ZIP" "$TMP/perro.zip" ;;
+  http*) curl -fsSL "$REPO_ZIP" -o "$TMP/ahab.zip" || fail "Couldn't download Ahab from GitHub. Check the internet connection." ;;
+  *) cp "$REPO_ZIP" "$TMP/ahab.zip" ;;
 esac
 # Unzipped with Python, so the machine needs nothing else.
-"$PY" -m zipfile -e "$TMP/perro.zip" "$TMP/src"
+"$PY" -m zipfile -e "$TMP/ahab.zip" "$TMP/src"
 SRC="$(find "$TMP/src" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-[ -n "$SRC" ] && [ -f "$SRC/perro/heartbeat.py" ] || fail "The download doesn't look like Perro."
+[ -n "$SRC" ] && [ -f "$SRC/ahab/heartbeat.py" ] || fail "The download doesn't look like Ahab."
 
-if [ -f "$DIR/perro/heartbeat.py" ]; then
-  say "Updating the Perro in $DIR (its home/ stays as it is)..."
+if [ -f "$DIR/ahab/heartbeat.py" ]; then
+  say "Updating the Ahab in $DIR (its home/ stays as it is)..."
 else
-  say "Putting Perro in $DIR..."
+  say "Putting Ahab in $DIR..."
 fi
 mkdir -p "$DIR"
 # The download never has a home/ folder, so copying over an old install leaves
-# Perro's memory alone.
+# Ahab's memory alone.
 cp -R "$SRC/." "$DIR/"
 
 # --- 4. Does it start? -------------------------------------------------------
 
-(cd "$DIR" && "$PY" -c 'import perro.heartbeat, perro.tools, perro.inbox') \
-  || fail "Perro's code is in $DIR, but it didn't start. The error is above."
+(cd "$DIR" && "$PY" -c 'import ahab.heartbeat, ahab.tools, ahab.inbox') \
+  || fail "Ahab's code is in $DIR, but it didn't start. The error is above."
 
 say ""
-say "Perro is installed in $DIR."
+say "Ahab is installed in $DIR."
 say ""
 say "Next, give it a mind to think with. Pick one:"
 say ""
@@ -153,14 +153,14 @@ say "  A DeepSeek API key (pay as you go). Add it to new terminals, then open on
 say "    echo 'export DEEPSEEK_API_KEY=\"sk-...\"' >> ~/.zshrc"
 say ""
 say "  Or a ChatGPT subscription, through Codex (install Codex first). Log in once"
-say "  with Perro's own Codex profile, then tell Perro to use it:"
-say "    mkdir -p ~/.perro/codex && CODEX_HOME=~/.perro/codex codex login"
+say "  with Ahab's own Codex profile, then tell Ahab to use it:"
+say "    mkdir -p ~/.ahab/codex && CODEX_HOME=~/.ahab/codex codex login"
 say "    mkdir -p \"$DIR/home\" && echo '{\"backend\": \"codex-luna\"}' > \"$DIR/home/home.json\""
 say ""
 say "Then, to talk to it:"
 say "  cd \"$DIR\""
-say "  \"$PY\" -m perro.inbox \"Hi\"     # leave it a message"
-say "  \"$PY\" -m perro.heartbeat      # run it; Ctrl+C stops it"
+say "  \"$PY\" -m ahab.inbox \"Hi\"     # leave it a message"
+say "  \"$PY\" -m ahab.heartbeat      # run it; Ctrl+C stops it"
 say ""
 say "Once it works, \"$PY\" scripts/install_mac.py keeps it running with no window open,"
 say "and starts it at every login. README.md has the rest, Telegram included."

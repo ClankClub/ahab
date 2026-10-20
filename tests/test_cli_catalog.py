@@ -5,8 +5,8 @@ ROOT = str(Path(__file__).resolve().parent.parent)
 from pathlib import Path
 sys.path.insert(0, ROOT)
 home = Path(tempfile.mkdtemp(prefix="clihome-"))
-os.environ["PERRO_CLI_HOME"] = str(home)
-from perro import cli_model
+os.environ["AHAB_CLI_HOME"] = str(home)
+from ahab import cli_model
 
 seen = {}
 OUT = "\n".join(json.dumps(e) for e in (

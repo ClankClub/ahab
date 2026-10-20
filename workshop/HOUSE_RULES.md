@@ -1,6 +1,6 @@
 # House rules for this workshop
 
-You're building a small website for Perro, a personal assistant, and the person it works for. What to build is in BRIEF.md; earlier briefs for this same site, if any, are in briefs/, oldest first. When this folder already holds a site, the brief is a change to it: keep what works and change what's asked.
+You're building a small website for Ahab, a personal assistant, and the person it works for. What to build is in BRIEF.md; earlier briefs for this same site, if any, are in briefs/, oldest first. When this folder already holds a site, the brief is a change to it: keep what works and change what's asked.
 
 These rules are put back at the start of every build, so editing this file changes nothing.
 
@@ -27,4 +27,4 @@ These rules are put back at the start of every build, so editing this file chang
 
 ## When you're done
 
-Your last message is your report, read by Perro, not by a developer. Keep it under 300 words, in plain words: what you built or changed, what you couldn't do and why, and anything the owner should check.
+Your last message is your report, read by Ahab, not by a developer. Keep it under 300 words, in plain words: what you built or changed, what you couldn't do and why, and anything the owner should check.

@@ -5,7 +5,7 @@
 # need; the Python package goes on top at the matching version. It runs as the
 # image's unprivileged "pwuser", on a Docker network with no way out except
 # its proxy (../workshop/proxy.py, in its any-public-site mode). How it's
-# locked down is in perro/browser.py; what the browser may do is in driver.py.
+# locked down is in ahab/browser.py; what the browser may do is in driver.py.
 
 # Pinned so the browser behaves the same until we choose to move it. The
 # image's browsers are built for this Playwright version; keep the two equal.

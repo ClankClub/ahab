@@ -8,9 +8,9 @@ from pathlib import Path
 
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import dream, inbox, skills
-from perro.memory import Memory
-from perro.model import Reply
+from ahab import dream, inbox, skills
+from ahab.memory import Memory
+from ahab.model import Reply
 
 home = Path(tempfile.mkdtemp())
 m = Memory(home)
@@ -78,7 +78,7 @@ final = {"thought": "Sheets go in a skill; the old one's dead.", "notes": None, 
                    "skills/retired/gone.md": "Back from the dead?"}}
 fake = Fake([final])
 dream._mark(home, dream._slot(datetime.now()) - timedelta(days=1))
-assert dream.dream(m, fake, "Perro") is True
+assert dream.dream(m, fake, "Ahab") is True
 system, page = fake.seen[0][0]["content"], fake.seen[0][1]["content"]
 assert "2. Keep your skills." in system and "work out again" in system and "never ran isn't a skill" in system
 assert "## Wake-ups that took work (4 or more tool calls)" in page and "update_sheet x3" in page, page

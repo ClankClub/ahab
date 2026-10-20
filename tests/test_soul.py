@@ -3,9 +3,9 @@ from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 from pathlib import Path
 sys.path.insert(0, ROOT)
-from perro import heartbeat
-from perro.memory import Memory
-from perro.model import Reply
+from ahab import heartbeat
+from ahab.memory import Memory
+from ahab.model import Reply
 
 class Fake:
     def __init__(self): self.seen = []
@@ -15,7 +15,7 @@ class Fake:
 
 def page(home):
     m = Memory(home); f = Fake()
-    heartbeat.beat(m, f, heartbeat.system_prompt("Perro"))
+    heartbeat.beat(m, f, heartbeat.system_prompt("Ahab"))
     assert m.recent(1)[0].kind != "error", m.recent(3)
     m.close()
     return f.seen[0][0]["content"], f.seen[0][1]["content"]

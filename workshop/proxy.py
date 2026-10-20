@@ -1,4 +1,4 @@
-"""The only way out for Perro's boxes: an HTTPS proxy that decides, host by
+"""The only way out for Ahab's boxes: an HTTPS proxy that decides, host by
 host, what a box may reach.
 
 A box (the workshop's builder, or the browser) sits on a Docker network with

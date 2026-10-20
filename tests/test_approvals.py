@@ -9,9 +9,9 @@ from datetime import timedelta
 from pathlib import Path
 
 sys.path.insert(0, ROOT)
-from perro import approvals, heartbeat, telegram
-from perro.memory import Memory
-from perro.model import Reply
+from ahab import approvals, heartbeat, telegram
+from ahab.memory import Memory
+from ahab.model import Reply
 
 home = Path(tempfile.mkdtemp())
 m = Memory(home)
@@ -38,7 +38,7 @@ req = approvals.get(m, a)
 assert req.status == "pending" and req.note == "just checking the path", req
 assert "Text: first" in req.card and req.card.startswith("A test approval.")
 t = req.text()
-assert t.startswith(f"Perro asks your approval (#{a}):") and "Perro's note: just checking" in t
+assert t.startswith(f"Ahab asks your approval (#{a}):") and "Ahab's note: just checking" in t
 assert "Expires " in t, t
 page = approvals.describe_pending(m)
 assert page.startswith("## Waiting on your owner's approval") and f"#{a} (asked" in page, page
@@ -116,15 +116,15 @@ g = approvals.request(m, "test", {"text": "via the heartbeat"})
 h = approvals.request(m, "test", {"text": "still waiting"})
 approvals.decide(m, g, True, "owner")
 fake = Fake()
-heartbeat.beat(m, fake, heartbeat.system_prompt("Perro"))
+heartbeat.beat(m, fake, heartbeat.system_prompt("Ahab"))
 page = fake.seen[0]
 assert approvals.get(m, g).status == "done"
-assert "Done: The test went through: via the heartbeat" in page, "outcome is in the events Perro sees"
+assert "Done: The test went through: via the heartbeat" in page, "outcome is in the events Ahab sees"
 assert "## Waiting on your owner's approval" in page and f"#{h} (asked" in page
 assert page.index("## Your alarms") < page.index("## Waiting on") < page.index("## Your skills")
 approvals.decide(m, h, False, "owner")
 fake = Fake()
-heartbeat.beat(m, fake, heartbeat.system_prompt("Perro"))
+heartbeat.beat(m, fake, heartbeat.system_prompt("Ahab"))
 assert "## Waiting on" not in fake.seen[0], "no section when nothing waits"
 print("heartbeat ok")
 
@@ -193,7 +193,7 @@ n = len(bot.calls)
 telegram.forward_approvals(state, m, bot)
 assert len(bot.calls) == n, "a card is closed once"
 
-# A denial closes the card without waiting for Perro to wake.
+# A denial closes the card without waiting for Ahab to wake.
 q = approvals.request(m, "test", {"text": "deny me"})
 telegram.forward_approvals(state, m, bot)
 qmsg = approvals.get(m, q).telegram_message
@@ -207,7 +207,7 @@ print("telegram ok")
 
 # --- command line ----------------------------------------------------------------
 m.close()
-run = lambda *a: subprocess.run([sys.executable, "-m", "perro.approvals", "--home", str(home), *a],
+run = lambda *a: subprocess.run([sys.executable, "-m", "ahab.approvals", "--home", str(home), *a],
                                 cwd=ROOT, capture_output=True, text=True)
 out = run("--test", "from the cli").stdout
 assert out.startswith("Filed test request #"), out

@@ -3,8 +3,8 @@ from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 from pathlib import Path
 sys.path.insert(0, ROOT)
-from perro import tools
-from perro.memory import Memory
+from ahab import tools
+from ahab.memory import Memory
 home = Path(tempfile.mkdtemp())
 m = Memory(home)
 ws = home / "workspace"; ws.mkdir(exist_ok=True)

@@ -1,4 +1,4 @@
-"""The watchdog (perro.watchdog): what counts as down or stuck, and when the owner hears."""
+"""The watchdog (ahab.watchdog): what counts as down or stuck, and when the owner hears."""
 import json
 import os
 import sys
@@ -11,8 +11,8 @@ from pathlib import Path
 
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import watchdog
-from perro.memory import Memory
+from ahab import watchdog
+from ahab.memory import Memory
 
 HEALTHY = [True]
 
@@ -29,8 +29,8 @@ class Fake(BaseHTTPRequestHandler):
 
 server = HTTPServer(("127.0.0.1", 0), Fake)
 threading.Thread(target=server.serve_forever, daemon=True).start()
-os.environ["PERRO_N8N_URL"] = f"http://127.0.0.1:{server.server_port}/webhook"
-os.environ["PERRO_N8N_KEY"] = "test-key"
+os.environ["AHAB_N8N_URL"] = f"http://127.0.0.1:{server.server_port}/webhook"
+os.environ["AHAB_N8N_KEY"] = "test-key"
 
 home = Path(tempfile.mkdtemp())
 (home / "home.json").write_text(json.dumps({"name": "Pip"}))
@@ -129,18 +129,18 @@ assert len(check()) == 1 and "n8n isn't answering" in said[-1]
 HEALTHY[0] = True
 assert len(check()) == 1 and "Back to normal: n8n" in said[-1]
 # Two at once go in one message.
-os.environ["PERRO_N8N_URL"] = "http://127.0.0.1:1/webhook"
+os.environ["AHAB_N8N_URL"] = "http://127.0.0.1:1/webhook"
 alive("telegram", 20 * MIN)
 check()
 check()
 assert "n8n isn't answering" in said[-1] and "Telegram bridge isn't running" in said[-1]
 # Without the n8n key, n8n isn't watched at all.
-del os.environ["PERRO_N8N_KEY"]
+del os.environ["AHAB_N8N_KEY"]
 assert "n8n" not in watchdog.problems(home, m, NOW)
 print("watchdog ok")
 
 # The sanity probe: the model, asked with nothing on the table, has no tools.
-from perro.model import ModelError, Reply
+from ahab.model import ModelError, Reply
 
 
 class Mind:

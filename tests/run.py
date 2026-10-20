@@ -1,4 +1,4 @@
-"""Run Perro's tests: py tests/run.py (or python3 tests/run.py).
+"""Run Ahab's tests: py tests/run.py (or python3 tests/run.py).
 
 Each test_*.py is a plain script that exits non-zero on failure; nothing here
 needs a network, a model, Docker or real keys. The relay checks run the n8n
@@ -17,15 +17,15 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-RELAYS = {"relay_vercel_check.js": "perro-vercel.json", "relay_google_cal_check.js": "perro-google.json",
-          "relay_email_check.js": "perro-email-send.json", "relay_notion_check.js": "perro-notion.json"}
+RELAYS = {"relay_vercel_check.js": "ahab-vercel.json", "relay_google_cal_check.js": "ahab-google.json",
+          "relay_email_check.js": "ahab-email-send.json", "relay_notion_check.js": "ahab-notion.json"}
 
 
 def main() -> int:
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
     if os.name != "nt":                             # Windows ignores TZ; set the clock there instead
         env["TZ"] = "America/New_York"
-    env.pop("PERRO_N8N_KEY", None)                  # never let a test near the real relays
+    env.pop("AHAB_N8N_KEY", None)                  # never let a test near the real relays
     only = sys.argv[1:]
     jobs = [[sys.executable, "-X", "utf8", str(t)] for t in sorted(HERE.glob("test_*.py"))
             if not only or t.stem in only or t.name in only]

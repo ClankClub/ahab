@@ -1,16 +1,16 @@
-# Registers Perro's Windows scheduled tasks, hidden. No admin needed.
+# Registers Ahab's Windows scheduled tasks, hidden. No admin needed.
 #
-#   "Perro heartbeat"  wakes Perro on the schedule it chooses (starts at login)
-#   "Perro telegram"   the Telegram bridge (starts at login; only if
-#                      PERRO_TELEGRAM_TOKEN is set)
-#   "Perro watchdog"   every 10 minutes, checks the other two and n8n and tells
+#   "Ahab heartbeat"  wakes Ahab on the schedule it chooses (starts at login)
+#   "Ahab telegram"   the Telegram bridge (starts at login; only if
+#                      AHAB_TELEGRAM_TOKEN is set)
+#   "Ahab watchdog"   every 10 minutes, checks the other two and n8n and tells
 #                      you on Telegram if one's down (also only with the token)
 #
 #   .\scripts\install-task.ps1            install (or update) the tasks
 #   .\scripts\install-task.ps1 -Remove    uninstall them
 #
-# Start/stop by hand:  Start-ScheduledTask "Perro heartbeat"
-#                      Stop-ScheduledTask  "Perro heartbeat"   (same for "Perro telegram")
+# Start/stop by hand:  Start-ScheduledTask "Ahab heartbeat"
+#                      Stop-ScheduledTask  "Ahab heartbeat"   (same for "Ahab telegram")
 # Output goes to home\heartbeat.log, home\telegram.log and home\watchdog.log.
 param(
     [switch]$Remove,
@@ -18,13 +18,13 @@ param(
 )
 
 $Tasks = @(
-    @{ Name = "Perro heartbeat"; Module = "perro.heartbeat --log --scheduled"
-       Description = "Perro's heartbeat: wakes the agent on the schedule it chooses." },
-    @{ Name = "Perro telegram"; Module = "perro.telegram --log"
-       Description = "Perro's Telegram bridge: passes chat between your phone and Perro." }
+    @{ Name = "Ahab heartbeat"; Module = "ahab.heartbeat --log --scheduled"
+       Description = "Ahab's heartbeat: wakes the agent on the schedule it chooses." },
+    @{ Name = "Ahab telegram"; Module = "ahab.telegram --log"
+       Description = "Ahab's Telegram bridge: passes chat between your phone and Ahab." }
 )
 
-$Watchdog = "Perro watchdog"
+$Watchdog = "Ahab watchdog"
 
 if ($Remove) {
     if (Get-ScheduledTask -TaskName $Watchdog -ErrorAction SilentlyContinue) {
@@ -62,14 +62,14 @@ $settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew `
     -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
 
-$hasToken = [bool][Environment]::GetEnvironmentVariable("PERRO_TELEGRAM_TOKEN", "User")
+$hasToken = [bool][Environment]::GetEnvironmentVariable("AHAB_TELEGRAM_TOKEN", "User")
 
 foreach ($t in $Tasks) {
-    if ($t.Name -eq "Perro telegram" -and -not $hasToken) {
-        Write-Host "Skipped '$($t.Name)': PERRO_TELEGRAM_TOKEN isn't set (see README)."
+    if ($t.Name -eq "Ahab telegram" -and -not $hasToken) {
+        Write-Host "Skipped '$($t.Name)': AHAB_TELEGRAM_TOKEN isn't set (see README)."
         continue
     }
-    # The working directory is the repo so `-m perro...` finds the package. API
+    # The working directory is the repo so `-m ahab...` finds the package. API
     # keys come from your user environment variables, which a task running as
     # you inherits at login.
     $action = New-ScheduledTaskAction -Execute $Pythonw `
@@ -82,7 +82,7 @@ foreach ($t in $Tasks) {
 # ~10 years. StartWhenAvailable runs a missed check as soon as the PC is back.
 if ($hasToken) {
     $action = New-ScheduledTaskAction -Execute $Pythonw `
-        -Argument "-X utf8 -m perro.watchdog --log" -WorkingDirectory $repo
+        -Argument "-X utf8 -m ahab.watchdog --log" -WorkingDirectory $repo
     $every = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
         -RepetitionInterval (New-TimeSpan -Minutes 10) -RepetitionDuration (New-TimeSpan -Days 3650)
     $quick = New-ScheduledTaskSettingsSet `
@@ -90,9 +90,9 @@ if ($hasToken) {
         -ExecutionTimeLimit (New-TimeSpan -Minutes 2) -MultipleInstances IgnoreNew
     Register-ScheduledTask -TaskName $Watchdog -Action $action -Trigger $every `
         -Settings $quick -Force `
-        -Description "Checks every 10 minutes that Perro's heartbeat, bridge and n8n are up; tells you on Telegram if not." | Out-Null
+        -Description "Checks every 10 minutes that Ahab's heartbeat, bridge and n8n are up; tells you on Telegram if not." | Out-Null
     Write-Host "Installed '$Watchdog': every 10 minutes, first check in about a minute."
 } else {
-    Write-Host "Skipped '$Watchdog': it tells you through the Telegram bot, so it needs PERRO_TELEGRAM_TOKEN."
+    Write-Host "Skipped '$Watchdog': it tells you through the Telegram bot, so it needs AHAB_TELEGRAM_TOKEN."
 }
-Write-Host "Start them now with:  Start-ScheduledTask 'Perro heartbeat'; Start-ScheduledTask 'Perro telegram'"
+Write-Host "Start them now with:  Start-ScheduledTask 'Ahab heartbeat'; Start-ScheduledTask 'Ahab telegram'"

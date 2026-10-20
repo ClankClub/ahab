@@ -1,9 +1,9 @@
-"""Offline tests for perro/notion.py: a fake relay stands in for n8n."""
+"""Offline tests for ahab/notion.py: a fake relay stands in for n8n."""
 import json, sys
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import notion, tools, n8n
+from ahab import notion, tools, n8n
 
 PAGE = "3fd0cd27dc04800abc14edb2d6f562c3"
 DB = "3fd0cd27dc0480fe9772ecb72a3b5a4f"
@@ -21,7 +21,7 @@ sent = []
 
 
 def fake(path, payload):
-    assert path == "perro/notion"
+    assert path == "ahab/notion"
     sent.append(payload)
     url, method = payload["url"][len(notion.BASE):], payload["method"]
     if url == "search":
@@ -138,7 +138,7 @@ for p in sent:
     assert p["method"] in ("GET", "POST", "PATCH") and "archived" not in json.dumps(p) and "in_trash" not in json.dumps(p)
 
 # through the tool layer: refusals come back as text
-from perro.memory import Memory
+from ahab.memory import Memory
 import tempfile, pathlib
 m = Memory(pathlib.Path(tempfile.mkdtemp()))
 n8n.send = lambda path, payload: {"status": 403, "body": {"error": {"message": "The relay refused: nope"}}}

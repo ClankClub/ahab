@@ -1,12 +1,12 @@
-"""Test watches: a page checked in code, logged and waking Perro only when it trips."""
+"""Test watches: a page checked in code, logged and waking Ahab only when it trips."""
 import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import tools, watches, web
-from perro.memory import Memory
+from ahab import tools, watches, web
+from ahab.memory import Memory
 
 pages, reads = {}, []
 
@@ -54,7 +54,7 @@ assert "changed between two reads" in r and "mentions" in r, r
 pages["https://gone.test"] = web.WebError("The site answered HTTP 404 Not Found.")
 assert "404" in tools.run(m, "watch_page", {"url": "https://gone.test", "then": "x"})
 
-# "mentions" with the phrase already there: not armed, and Perro is told what it says.
+# "mentions" with the phrase already there: not armed, and Ahab is told what it says.
 pages["https://shop.test"] = "Tickets\n  Sold   out  for now."
 r = tools.run(m, "watch_page", {"url": "https://shop.test", "then": "x", "when": "mentions",
                                 "phrase": "sold OUT"})

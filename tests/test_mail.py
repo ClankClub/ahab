@@ -1,4 +1,4 @@
-"""Test perro.mail (send_email) against a fake n8n relay on localhost."""
+"""Test ahab.mail (send_email) against a fake n8n relay on localhost."""
 import json
 import os
 import sys
@@ -9,8 +9,8 @@ from pathlib import Path
 
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import mail, tools
-from perro.memory import Memory
+from ahab import mail, tools
+from ahab.memory import Memory
 
 SENT = []
 ORIGINAL = {"id": "abc123def", "threadId": "18f2a3b4c5d6e7f8", "payload": {"headers": [
@@ -32,13 +32,13 @@ class Fake(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        if self.headers.get("X-Perro-Key") != "test-key" or not self.path.startswith("/webhook/perro/email/read?"):
+        if self.headers.get("X-Ahab-Key") != "test-key" or not self.path.startswith("/webhook/ahab/email/read?"):
             self.send_response(403); self.end_headers(); return
         found = {m["id"]: m for m in (ORIGINAL, STRANGER)}.get(self.path.split("id=")[1])
         self._answer({"message": found} if found else {"error": "No message with that id."})
 
     def do_POST(self):
-        if self.headers.get("X-Perro-Key") != "test-key" or self.path != "/webhook/perro/email/send":
+        if self.headers.get("X-Ahab-Key") != "test-key" or self.path != "/webhook/ahab/email/send":
             self.send_response(403); self.end_headers(); return
         SENT.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
         self._answer({"id": f"sent{len(SENT):04d}", "threadId": "t1"})
@@ -49,8 +49,8 @@ class Fake(BaseHTTPRequestHandler):
 
 server = HTTPServer(("127.0.0.1", 0), Fake)
 threading.Thread(target=server.serve_forever, daemon=True).start()
-os.environ["PERRO_N8N_URL"] = f"http://127.0.0.1:{server.server_port}/webhook"
-os.environ["PERRO_N8N_KEY"] = "test-key"
+os.environ["AHAB_N8N_URL"] = f"http://127.0.0.1:{server.server_port}/webhook"
+os.environ["AHAB_N8N_KEY"] = "test-key"
 home = Path(tempfile.mkdtemp())
 m = Memory(home)
 send = lambda **a: tools.run(m, "send_email", a)
@@ -97,7 +97,7 @@ for i in range(mail.DAILY_LIMIT - mail.sent_today(m)):
     assert "Sent to" in send(to="friend@example.com", subject=f"n{i}", body="x")
 assert "daily limit" in send(to="friend@example.com", subject="one more", body="x")
 
-# The list lives outside the workspace, so Perro's own file tools can't touch it.
+# The list lives outside the workspace, so Ahab's own file tools can't touch it.
 tools.run(m, "write_file", {"path": "../email.json", "content": "{}"})
 assert json.loads((home / "email.json").read_text())["allowed"] == ["friend@example.com"]
 print("mail ok")

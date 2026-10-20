@@ -9,8 +9,8 @@ import time
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from perro import desktop, senses, tools, workers
-from perro.memory import Memory
+from ahab import desktop, senses, tools, workers
+from ahab.memory import Memory
 
 home = Path(tempfile.mkdtemp())
 settings = lambda **kw: (home / "home.json").write_text(json.dumps({"name": "Pip", **kw}), encoding="utf-8")
@@ -21,12 +21,12 @@ desktop.state_dir = lambda: (home / ".desk").mkdir(exist_ok=True) or home / ".de
 
 # The box: no network unless hosts are listed, and nothing of the PC mounted.
 args = desktop.container_args("img", [])
-assert args[args.index("--network") + 1] == "none" and "PERRO_PROXY" not in " ".join(args)
+assert args[args.index("--network") + 1] == "none" and "AHAB_PROXY" not in " ".join(args)
 assert "--read-only" in args and args[args.index("--cap-drop") + 1] == "ALL" and "-p" not in args
 mounts = [args[i + 1] for i, a in enumerate(args) if a in ("--mount", "-v")]
 assert mounts == [f"type=volume,src={desktop.VOLUME},dst=/home/pip"], mounts
 args = desktop.container_args("img", ["example.com"])
-assert args[args.index("--network") + 1] == desktop.NETWORK and "PERRO_HOSTS=example.com" in args
+assert args[args.index("--network") + 1] == desktop.NETWORK and "AHAB_HOSTS=example.com" in args
 
 # The owner's host list: a list of plain names, nothing else.
 assert desktop.hosts(home) == []
