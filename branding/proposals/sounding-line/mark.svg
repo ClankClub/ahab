@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Ahab — Sounding Line mark</title>
+  <desc id="desc">A whale fluke held in concentric sonar rings on deep navy.</desc>
+  <rect width="512" height="512" rx="112" fill="#08151E"/>
+  <g fill="none" stroke="#DDE7DF" stroke-linecap="round">
+    <circle cx="256" cy="256" r="174" stroke-opacity=".22" stroke-width="3"/>
+    <circle cx="256" cy="256" r="133" stroke="#3F8486" stroke-opacity=".62" stroke-width="3"/>
+    <circle cx="256" cy="256" r="91" stroke="#D1A15C" stroke-opacity=".76" stroke-width="2" stroke-dasharray="2 12"/>
+    <path d="M82 256h94M336 256h94M256 82v86M256 344v86" stroke-width="2" stroke-opacity=".42"/>
+  </g>
+  <circle cx="256" cy="120" r="8" fill="#D1A15C"/>
+  <path d="M256 285c-20-3-36-13-52-30-16-17-32-39-52-49 5 29 13 52 28 71 18 23 42 34 69 29v38c0 10 14 10 14 0v-38c27 5 51-6 69-29 15-19 23-42 28-71-20 10-36 32-52 49-16 17-32 27-52 30z" fill="#DDE7DF"/>
+  <path d="M256 298v70" stroke="#3F8486" stroke-width="4" stroke-linecap="round"/>
+</svg>

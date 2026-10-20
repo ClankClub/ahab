@@ -1,4 +1,8 @@
-# Ahab
+<p align="center">
+  <img src="branding/proposals/logbook/banner.jpg" alt="Ahab — Logbook banner" width="100%">
+</p>
+
+<h1 align="center"><img src="branding/proposals/logbook/mark.svg" alt="" width="48" valign="middle"> Ahab</h1>
 
 A persistent personal assistant in the spirit of Muse or OpenClaw. It wakes on a schedule it picks, takes on work you hand it, keeps track of what's going on, brings things up on its own, and is someone you can just talk to. Its sense of who it is grows in its notes over time.
 
