@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Ahab — Logbook mark</title>
+  <desc id="desc">An engraved whale back, depth lines, and a vermilion navigation buoy on warm paper.</desc>
+  <rect width="512" height="512" rx="112" fill="#F1E5CC"/>
+  <circle cx="256" cy="256" r="190" fill="none" stroke="#9D7B47" stroke-opacity=".5" stroke-width="2"/>
+  <g fill="none" stroke="#9D7B47" stroke-opacity=".42" stroke-width="2">
+    <path d="M78 181c52-26 108-26 160 0s108 26 196 0"/>
+    <path d="M66 205c58-22 112-22 166 0s112 22 214 0"/>
+    <path d="M80 332c48 25 102 25 160 0s108-25 192 0"/>
+  </g>
+  <path d="M100 295c42-1 63-18 88-45 29-31 53-52 83-49 35 3 55 31 85 50 21 13 38 18 61 20l-12 34H106z" fill="#122C3B"/>
+  <path d="M112 312c43-8 80-8 117 0 34 7 62 7 93 0 27-6 52-7 81-1" fill="none" stroke="#122C3B" stroke-width="8" stroke-linecap="round"/>
+  <path d="M150 346c38-5 67-5 98 1 28 6 57 6 86 0 21-4 41-5 61-2" fill="none" stroke="#122C3B" stroke-opacity=".62" stroke-width="5" stroke-linecap="round"/>
+  <path d="M375 196v87" stroke="#122C3B" stroke-width="7" stroke-linecap="round"/>
+  <path d="M357 196h36l-7-20h-22z" fill="#C75D3A"/>
+  <circle cx="375" cy="288" r="9" fill="#C75D3A"/>
+</svg>

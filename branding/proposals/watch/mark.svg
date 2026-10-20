@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Ahab — The Watch mark</title>
+  <desc id="desc">A geometric lighthouse sending a vermilion beam over a dark sea.</desc>
+  <rect width="512" height="512" rx="112" fill="#080D16"/>
+  <circle cx="256" cy="256" r="185" fill="none" stroke="#384654" stroke-width="3"/>
+  <path d="M282 176 462 107v92l-180-22z" fill="#F25B28" fill-opacity=".72"/>
+  <path d="M282 176 462 107v92l-180-22z" fill="none" stroke="#F25B28" stroke-width="3"/>
+  <path d="M212 205h88l28 191H184z" fill="#E9E3D8"/>
+  <path d="m201 205 11-45h88l11 45z" fill="#E9E3D8"/>
+  <path d="M224 160v-20h64v20" fill="none" stroke="#E9E3D8" stroke-width="10" stroke-linejoin="round"/>
+  <rect x="236" y="176" width="40" height="29" rx="3" fill="#F25B28"/>
+  <path d="M175 399h162" stroke="#E9E3D8" stroke-width="8" stroke-linecap="round"/>
+  <path d="M125 427c30-13 58-13 88 0s58 13 88 0 58-13 88 0" fill="none" stroke="#384654" stroke-width="7" stroke-linecap="round"/>
+</svg>
