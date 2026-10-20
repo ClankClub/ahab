@@ -4,7 +4,7 @@
 
 <h1 align="center"><img src="branding/proposals/logbook/mark.svg" alt="" width="48" valign="middle"> Ahab</h1>
 
-A persistent personal assistant in the spirit of Muse or OpenClaw. It wakes on a schedule it picks, takes on work you hand it, keeps track of what's going on, brings things up on its own, and is someone you can just talk to. Its sense of who it is grows in its notes over time.
+Ahab is a self-built, persistent personal assistant. It wakes on a schedule it picks, takes on work you hand it, keeps track of what's going on, brings things up on its own, and is someone you can just talk to. Its sense of who it is grows in its notes over time.
 
 Originally named **Perro**, this software grew out of the Lobo (`../Lobo`) runtime. It is now called **Ahab**; **Pip** is the continuing personal agent running on it. The runtime is a fork of Lobo's, adapted for a persistent personal assistant. See [AGENTS.md](AGENTS.md) for the rules, [docs/ANATOMY.md](docs/ANATOMY.md) for the overview, [docs/STATUS.md](docs/STATUS.md) for what exists and what's next, and [docs/BUILD_LOG.md](docs/BUILD_LOG.md) for the details.
 
