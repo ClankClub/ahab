@@ -6,7 +6,7 @@ Agreed with the owner on 2026-10-19. Phase 1 is built (see BUILD_LOG), with a fo
 
 A personal agent that can only read text misses a lot. Some apps have no API. Some layouts only make sense as pictures (Obsidian's graph, a spreadsheet's formatting, the site the workshop just built). And "click through this for me" is a whole class of errands. Computer use is how an agent does all of that: it sees a screen, moves a mouse, types, and sees the result.
 
-It can't happen on the owner's real desktop. Window screenshots (`perro/screen.py`) stay look-only on purpose, and AGENTS.md already says where clicking belongs: in a machine of its own. This is that machine. It also gives Perro's builders a place to test and debug computer use for the product, which they can't safely do on anyone's real PC.
+It can't happen on the owner's real desktop. Window screenshots (`perro/screen.py`) stay look-only on purpose, and AGENTS.md already says where clicking belongs: in a machine of its own. This is that machine. It also gives Ahab's builders a place to test and debug computer use for the product, which they can't safely do on anyone's real PC.
 
 ## What it is
 
@@ -15,7 +15,7 @@ A Linux desktop in a Docker container, the way Anthropic's computer-use referenc
 - **Screen.** Xvfb draws a virtual 1024x768 monitor into memory, with `-nolisten tcp`. Why 1024x768 and nothing bigger: the model sees a screenshot and answers with pixel coordinates, so the picture it sees has to be the same size as the screen. OpenAI scales images down until the short side is 768 or less, and Anthropic scales anything much past about a megapixel. A 1024x768 picture passes through both untouched, so x,y in the picture is x,y on the screen. A bigger screen means silent scaling, and every click lands off by the scale factor. That's the most common bug in homemade computer use.
 - **Desktop.** XFCE, started piece by piece (xfwm4, xfce4-panel, xfdesktop, Thunar's daemon) rather than through `xfce4-session`, so there's no power manager, screensaver, lock screen or first-run dialog. Compositing is off and the DPI is fixed at 96. It's an ordinary-looking desktop that models have seen plenty of.
 - **Apps, all installed in the image:** Firefox ESR, LibreOffice (Writer and Calc), Mousepad (a text editor), Thunar (files), Ristretto (images), xfce4-terminal, galculator, and Obsidian (the AppImage unpacked at build time with `--appimage-extract`, since AppImages need FUSE; run with `--no-sandbox`, because the container is the sandbox). Pin Obsidian's version and check its SHA-256 in the Dockerfile.
-- **Hands:** xdotool for the mouse and keyboard, xclip for the clipboard, ImageMagick's `import` for screenshots, and Pillow (`python3-pil`) to draw the cursor, the optional grid and zooms. These are packages inside the box, not dependencies of Perro: Perro's own code stays standard library.
+- **Hands:** xdotool for the mouse and keyboard, xclip for the clipboard, ImageMagick's `import` for screenshots, and Pillow (`python3-pil`) to draw the cursor, the optional grid and zooms. These are packages inside the box, not dependencies of Ahab: Ahab's own code stays standard library.
 - **Base:** `debian:trixie-slim`. Expect an image around 2 GB.
 
 ## The fence
@@ -64,7 +64,7 @@ Nothing is published and nothing listens on the PC. Commands go in with `docker 
 | `copy` | none | reads the clipboard as text (8,000 chars max): select, ctrl+c, copy, and Pip has exact text instead of squinting at pixels |
 | `wait` | `seconds` (up to 5) | for something slow |
 
-Coordinates outside 0-1023 by 0-767 are refused with that message, not clamped. Every action is logged in the driver's answer and in Perro's tool log, like browse actions.
+Coordinates outside 0-1023 by 0-767 are refused with that message, not clamped. Every action is logged in the driver's answer and in Ahab's tool log, like browse actions.
 
 **Looking without acting** (`desktop_look`): a screenshot with the window list, plus two options.
 - `zoom: [x0, y0, x1, y1]` crops that region and scales it up to fit 1024 wide, for small text. The answer says the zoomed picture's coordinates aren't the screen's, and gives the offset and scale.

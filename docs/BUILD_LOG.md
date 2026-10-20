@@ -1,6 +1,8 @@
 # Build log
 
-Every piece of Perro in detail: how it works, why it's built that way, what testing found, and the gotchas met on the way. It's the long version. [STATUS.md](STATUS.md) is the short one (where things stand and what's next), and [ANATOMY.md](ANATOMY.md) is the overview. Add a piece here when it lands; correct an entry when it changes rather than appending history, since Git keeps that.
+Every piece of Ahab (originally Perro) in detail: how it works, why it's built that way, what testing found, and the gotchas met on the way. It's the long version. [STATUS.md](STATUS.md) is the short one (where things stand and what's next), and [ANATOMY.md](ANATOMY.md) is the overview. Add a piece here when it lands; correct an entry when it changes rather than appending history, since Git keeps that.
+
+**Naming note (19 October 2026):** The software and code repository were renamed **Ahab**; the owner's continuing assistant is **Pip**. The descriptions below retain historical *Perro* references, and existing package names, services, OAuth projects, and external credentials have not yet been migrated.
 
 ## The pieces
 

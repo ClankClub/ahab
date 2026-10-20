@@ -1,6 +1,6 @@
 # Anatomy
 
-What Perro is, built up from the bottom: everything around the model, layer by layer. For where things stand, see [STATUS.md](STATUS.md); for each piece in detail, [BUILD_LOG.md](BUILD_LOG.md).
+What Ahab is, built up from the bottom: everything around the model, layer by layer. For where things stand, see [STATUS.md](STATUS.md); for each piece in detail, [BUILD_LOG.md](BUILD_LOG.md).
 
 **Layer zero: the starting point.** A language model is a stateless function. Text goes in, text comes out, and it remembers nothing between calls. It has no clock, no hands, no idea who you are, and it never does anything unless someone calls it. Everything else is scaffolding around that one fact.
 
@@ -20,18 +20,18 @@ What Perro is, built up from the bottom: everything around the model, layer by l
 
 **Ways to reach the owner and be reached.** The inbox, the Telegram bridge paired to the owner alone, alarms (repeating ones too), standing intents ("when this comes up"), and the mail watch with its brakes for agent-to-agent emails.
 
-**Senses.** For the web: `fetch_page` and Wikipedia, `web_search` as a separate search-only run, and the browser box for pages built by JavaScript. For everything else (`senses.py`): whatever arrives is saved in `workspace/media/`; images ride along on the model call (Codex's `--image`, Claude Code's image blocks, an API's image parts), PDFs and Office files are read as text, and voice notes are transcribed by Whisper before Perro wakes. And out: files and pictures attached to its messages. And hands: the desktop box (`desktop.py`), a Linux desktop in a container where it looks, clicks, types and runs commands, offline unless the owner lists hosts.
+**Senses.** For the web: `fetch_page` and Wikipedia, `web_search` as a separate search-only run, and the browser box for pages built by JavaScript. For everything else (`senses.py`): whatever arrives is saved in `workspace/media/`; images ride along on the model call (Codex's `--image`, Claude Code's image blocks, an API's image parts), PDFs and Office files are read as text, and voice notes are transcribed by Whisper before Ahab wakes. And out: files and pictures attached to its messages. And hands: the desktop box (`desktop.py`), a Linux desktop in a container where it looks, clicks, types and runs commands, offline unless the owner lists hosts.
 
-**Hands, with no keys in them.** n8n holds every sign-in, so Perro never sees a token. Through it: Google (calendar, Gmail read and send to the list, Drive, Docs, Sheets, Tasks, Contacts), its own Notion, its own GitHub, its own Vercel. Each relay is a second fence that refuses what the Python shouldn't be asking for anyway.
+**Hands, with no keys in them.** n8n holds every sign-in, so Ahab never sees a token. Through it: Google (calendar, Gmail read and send to the list, Drive, Docs, Sheets, Tasks, Contacts), its own Notion, its own GitHub, its own Vercel. Each relay is a second fence that refuses what the Python shouldn't be asking for anyway.
 
 **A workshop.** Codex in a sealed Docker box builds sites, they go to private GitHub repos, then to Vercel previews, and from there to production only through an approval.
 
-**Helpers.** Workers (`workers.py`) are separate background processes, each its own small loop with the same JSON protocol, a read-only tool list and a fixed menu of cheap models. They report back to Perro, never the owner, so one big job doesn't have to fit in a wake's twenty calls.
+**Helpers.** Workers (`workers.py`) are separate background processes, each its own small loop with the same JSON protocol, a read-only tool list and a fixed menu of cheap models. They report back to Ahab, never the owner, so one big job doesn't have to fit in a wake's twenty calls.
 
 **A conscience in code.** Approvals: anything outward-facing becomes a card built from the exact payload, and only the owner's tap runs it. Add the delete cap, the email allowlist, and the rule that orders come only from the owner.
 
 **Taming the borrowed brain.** Separate CLI profiles so it never reads the owner's own setup, Codex's own tools stripped out, the model-catalog fix for the hidden `exec` box, trimming old tool results, the one-call `message` field, and the retry when a reply comes back malformed.
 
-**Staying alive unattended.** Login tasks, the watchdog (checking that Perro is alive, and once a day that its model is sane), the six-hourly backup of its home to a private repo, the Mac installer, and tests on every push.
+**Staying alive unattended.** Login tasks, the watchdog (checking that Ahab is alive, and once a day that its model is sane), the six-hourly backup of its home to a private repo, the Mac installer, and tests on every push.
 
-The model is maybe 10% of what Perro is. The other 90% is deciding what a stateless function needs in order to behave like someone.
+The model is maybe 10% of what Ahab is. The other 90% is deciding what a stateless function needs in order to behave like someone.

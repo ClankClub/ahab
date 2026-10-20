@@ -1,6 +1,6 @@
 # Status
 
-The short version: where Perro stands and what's next. Every piece in detail, with its reasons and gotchas, is in [BUILD_LOG.md](BUILD_LOG.md); the overview is [ANATOMY.md](ANATOMY.md).
+The short version: where Ahab stands and what's next. Every piece in detail, with its reasons and gotchas, is in [BUILD_LOG.md](BUILD_LOG.md); the overview is [ANATOMY.md](ANATOMY.md).
 
 ## Where it stands (2026-10-18)
 
@@ -38,4 +38,4 @@ What it can't: watch video (it gets a still and the sound), email anyone off its
 8. **Small gaps:** find-and-replace in Docs; Notion restore from trash and moving into a database (both want a newer Notion API version).
 9. **Mail off the list,** if wanted, through the approval step.
 10. **A reply form for API backends** (`response_format: json_schema`), if an OpenAI or OpenRouter backend is used.
-11. **Later:** a Windows `install.ps1`; browser sign-in to Perro's own accounts through approvals; a model ladder and a spend cap.
+11. **Later:** a Windows `install.ps1`; browser sign-in to Pip's own accounts through approvals; a model ladder and a spend cap.

@@ -13,6 +13,8 @@ Starter versions of the files that make each agent who it is. A new install has 
 
 All but FEEDBACK.md are shown at the top of every wake-up page, capped at 8,000 characters each (AGENTS.md at 10,000, MEMORY.md at 20,000). The rules the agent works by (who may give it orders, its tools, the reply format) are in the code, not here, so no file in the workspace can talk it out of them.
 
+**Naming note:** The software/repository is now called **Ahab**; the runtime's current default name and identifiers still say `Perro` until the code itself is migrated. Existing agents, including Pip, retain their own names.
+
 `{name}` is replaced with the agent's name from `home/home.json` (Perro by default) when the file is copied. Italic lines tell the agent what each part is for; it's free to rewrite them along with the rest.
 
 To start an agent's file over, delete its copy in `home/workspace/`; the next wake-up puts a fresh starter in its place.
