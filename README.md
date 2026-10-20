@@ -101,7 +101,7 @@ Pip keeps its own vault in `home/workspace/vault/`; open that folder as a vault 
 
 ### Codex or Claude Code as the model (instead of an API key)
 
-Ahab can think through your Codex or Claude Code subscription: backends `codex-luna` (GPT-6 Luna, max effort) and `claude-haiku` (Claude Haiku). Each CLI runs as the model only, with its own tools off, and uses a separate profile folder under `%LOCALAPPDATA%\Ahab` (`~/.ahab` on a Mac; `AHAB_CLI_HOME` to move it), so it never sees your own CLAUDE.md, AGENTS.md, memories or plugins. Log in once per profile, in a terminal you close afterwards:
+Ahab can think through your Codex or Claude Code subscription: backends `codex-luna` (GPT-6 Luna, max effort), `claude-sonnet` (Claude Sonnet, medium effort) and `claude-haiku` (Claude Haiku). Each CLI runs as the model only, with its own tools off, and uses a separate profile folder under `%LOCALAPPDATA%\Ahab` (`~/.ahab` on a Mac; `AHAB_CLI_HOME` to move it), so it never sees your own CLAUDE.md, AGENTS.md, memories or plugins. Log in once per profile, in a terminal you close afterwards:
 
 ```powershell
 New-Item -ItemType Directory -Force "$env:LOCALAPPDATA\Ahab\codex", "$env:LOCALAPPDATA\Ahab\claude" | Out-Null

@@ -52,7 +52,7 @@ def last_event(kind="worker"):
 # Refusals: too short, a model not on the list (only cheap ones are), bad call budgets.
 assert "too short" in start("look")
 r = start(model="astra")
-assert "isn't a worker model" in r and "luna, haiku, deepseek" in r, r
+assert "isn't a worker model" in r and "luna, sonnet, haiku, deepseek" in r, r
 assert "max_calls" in start(max_calls=99) and "max_calls" in start(max_calls=0)
 saved = os.environ.pop("DEEPSEEK_API_KEY", None)
 assert "can't be used right now" in start(model="deepseek")

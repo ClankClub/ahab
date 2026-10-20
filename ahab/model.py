@@ -4,7 +4,7 @@ Every backend Ahab might use (DeepSeek, OpenAI, a local llama.cpp or Ollama
 server) speaks the same "OpenAI-compatible chat completions" protocol:
 POST a JSON list of messages to <base_url>/chat/completions, get JSON back.
 So swapping models means changing a URL and a model name, nothing else.
-The exceptions are the CLI backends (codex-luna, claude-haiku), which run
+The exceptions are the CLI backends (codex-luna, claude-haiku, claude-sonnet), which run
 Codex or Claude Code as the model instead; they live in cli_model.py and
 answer the same complete() call.
 
@@ -59,6 +59,7 @@ BACKENDS = {
     # for each (see cli_model.py). No API key: the CLI holds the sign-in.
     "codex-luna": {"cli": "codex", "model": "gpt-6-luna", "effort": "max"},
     "claude-haiku": {"cli": "claude", "model": "haiku"},
+    "claude-sonnet": {"cli": "claude", "model": "sonnet", "effort": "medium"},
 }
 
 # How many times to ask when JSON mode comes back empty or with leaked markup.

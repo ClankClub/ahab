@@ -50,8 +50,9 @@ from ahab.model import ModelClient, ModelError
 REPO = Path(__file__).resolve().parent.parent
 
 # Friendly name -> backend in model.py. All no pricier than Ahab's own brain.
-MODELS = {"luna": "codex-luna", "haiku": "claude-haiku", "deepseek": "deepseek"}
+MODELS = {"luna": "codex-luna", "sonnet": "claude-sonnet", "haiku": "claude-haiku", "deepseek": "deepseek"}
 MODEL_NOTES = {"luna": "GPT-6 Luna at max effort: the deepest thinker here, and the slowest",
+               "sonnet": "Claude Sonnet at medium effort: careful and thorough, slower and pricier than Haiku",
                "haiku": "Claude Haiku: quick, good at plain reading and summing up",
                "deepseek": "DeepSeek Flash: cheap and capable"}
 FALLBACK_MODEL = "haiku"         # the default when Ahab's own model isn't in MODELS
