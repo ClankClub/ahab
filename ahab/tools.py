@@ -77,10 +77,9 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ahab import (agents, alarms, browser, desktop, github, goals, google, hostshell, inbox, intents, mail, n8n,
-                   notion, obsidian,
-                   screen,
-                   search, senses, sources, supabase, vercel, watches, web, workers, workshop)
+from ahab import agents, alarms, goals, inbox, intents, search, senses, sources, watches, web, workers, workshop
+from ahab.boxes import browser, desktop, hostshell, screen
+from ahab.connections import github, google, mail, n8n, notion, obsidian, supabase, vercel
 from ahab.memory import Memory
 
 # What Ahab can and can't do, kept in the code repo so Ahab can read it but

@@ -1,9 +1,10 @@
-"""Offline tests for ahab/notion.py: a fake relay stands in for n8n."""
+"""Offline tests for ahab/connections/notion.py: a fake relay stands in for n8n."""
 import json, sys
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from ahab import notion, tools, n8n
+from ahab import tools
+from ahab.connections import notion, n8n
 
 PAGE = "3fd0cd27dc04800abc14edb2d6f562c3"
 DB = "3fd0cd27dc0480fe9772ecb72a3b5a4f"

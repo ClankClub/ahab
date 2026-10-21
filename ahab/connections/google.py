@@ -33,7 +33,7 @@ import re
 import urllib.parse
 from datetime import date, datetime, timedelta
 
-from ahab import n8n
+from ahab.connections import n8n
 
 RELAY = "ahab/google"
 BASES = {

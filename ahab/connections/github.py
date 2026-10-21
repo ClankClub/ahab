@@ -32,7 +32,8 @@ import hashlib
 import re
 from datetime import datetime
 
-from ahab import approvals, n8n, workshop
+from ahab import approvals, workshop
+from ahab.connections import n8n
 from ahab.memory import Memory
 
 RELAY = "ahab/github"

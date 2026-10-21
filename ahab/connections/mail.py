@@ -34,7 +34,7 @@ call, so a quiet inbox costs nothing. Mail from anyone else never wakes it.
 - Past AGENT_CEILING emails from one agent in a day, Ahab isn't woken for
   that agent at all, and send_email won't write to it, until the owner
   lifts the brake: by writing in one of that agent's threads (any person on
-  the list does too), or with /talk on Telegram, or `py -m ahab.mail --lift`.
+  the list does too), or with /talk on Telegram, or `py -m ahab.connections.mail --lift`.
   Ahab hears about held mail at its next wake and is asked to tell the owner.
 Counting is per agent, not per thread, so a new thread doesn't start over.
 
@@ -50,7 +50,7 @@ import re
 import time
 from datetime import datetime, timezone
 
-from ahab import n8n
+from ahab.connections import n8n
 from ahab.memory import DEFAULT_HOME, Memory
 
 SETTINGS = "email.json"

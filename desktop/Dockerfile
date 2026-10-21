@@ -3,7 +3,7 @@
 # A virtual 1024x768 screen (Xvfb), XFCE, and a handful of apps, driven with
 # xdotool. It runs as the unprivileged "pip", with no network unless the owner
 # lists hosts (then only through its proxy, ../workshop/proxy.py). How it's
-# locked down is in ahab/desktop.py; what a command can do is in driver.py.
+# locked down is in ahab/boxes/desktop.py; what a command can do is in driver.py.
 
 FROM debian:trixie-slim
 

@@ -1,4 +1,4 @@
-"""Test ahab.google and its tools against a fake n8n relay on localhost."""
+"""Test ahab.connections.google and its tools against a fake n8n relay on localhost."""
 import json
 import os
 import sys
@@ -10,7 +10,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 sys.path.insert(0, ROOT)
-from ahab import google, tools
+from ahab import tools
+from ahab.connections import google
 from ahab.memory import Memory
 
 SEEN = []

@@ -24,10 +24,10 @@ Ahab sees a page as a text snapshot with its links, buttons and fields
 numbered, and acts with the browse tools below (open, look, click, type,
 scroll, back), up to DAILY_LIMIT a day.
 
-  python -m ahab.browser --setup     build the image, start the proxy and the box
-  python -m ahab.browser --check     the fence test: what must open, and what mustn't
-  python -m ahab.browser open <url>  open a page and print it as Ahab sees it
-  python -m ahab.browser --stop      stop and remove the box and its proxy
+  python -m ahab.boxes.browser --setup     build the image, start the proxy and the box
+  python -m ahab.boxes.browser --check     the fence test: what must open, and what mustn't
+  python -m ahab.boxes.browser open <url>  open a page and print it as Ahab sees it
+  python -m ahab.boxes.browser --stop      stop and remove the box and its proxy
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ from urllib.parse import urlsplit
 
 from ahab.workshop import WorkshopError, _hash, docker, ensure_proxy
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]
 FILES = REPO / "browser"
 IMAGE = "ahab-browser"
 CONTAINER = "ahab-browser"

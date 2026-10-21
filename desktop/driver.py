@@ -1,6 +1,6 @@
 """The desktop box's driver: one command in, one answer out.
 
-ahab/desktop.py runs `docker exec -i ahab-desktop python3 /app/driver.py`,
+ahab/boxes/desktop.py runs `docker exec -i ahab-desktop python3 /app/driver.py`,
 sends one JSON line on standard input and reads one back. It keeps no state
 of its own: the state is the X server's (where the windows are, where the
 mouse is), so there's nothing to serve and nothing listening.

@@ -1,11 +1,11 @@
 """The browser box's driver: one Chromium, held open by Playwright, that
 Ahab's code sends commands to.
 
-Runs inside the ahab-browser container (ahab/browser.py starts it there).
+Runs inside the ahab-browser container (ahab/boxes/browser.py starts it there).
 `driver.py serve` is the container's main process: it listens on a Unix
 socket inside the box, so nothing is reachable from outside it, and starts
 Chromium when the first command comes. `driver.py call` is how a command gets
-in: ahab/browser.py runs it with `docker exec`, sends one JSON line on its
+in: ahab/boxes/browser.py runs it with `docker exec`, sends one JSON line on its
 standard input and reads one back.
 
 What the browser may do is set here, whatever a page asks for:

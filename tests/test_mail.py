@@ -1,4 +1,4 @@
-"""Test ahab.mail (send_email) against a fake n8n relay on localhost."""
+"""Test ahab.connections.mail (send_email) against a fake n8n relay on localhost."""
 import json
 import os
 import sys
@@ -9,7 +9,8 @@ from pathlib import Path
 
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from ahab import mail, tools
+from ahab import tools
+from ahab.connections import mail
 from ahab.memory import Memory
 
 SENT = []

@@ -1,11 +1,12 @@
-"""Offline tests for add_event / update_event (ahab/google.py) against a fake relay."""
+"""Offline tests for add_event / update_event (ahab/connections/google.py) against a fake relay."""
 import sys, tempfile
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 from datetime import datetime
 from pathlib import Path
 sys.path.insert(0, ROOT)
-from ahab import google, n8n, tools
+from ahab import tools
+from ahab.connections import google, n8n
 from ahab.memory import Memory
 
 events, sent = {}, []

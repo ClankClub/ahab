@@ -30,7 +30,7 @@ from __future__ import annotations
 import re
 from datetime import date, datetime
 
-from ahab import n8n
+from ahab.connections import n8n
 
 RELAY = "ahab/notion"
 BASE = "https://api.notion.com/v1/"

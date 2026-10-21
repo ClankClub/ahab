@@ -9,7 +9,8 @@ import time
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from ahab import desktop, senses, tools, workers
+from ahab import senses, tools, workers
+from ahab.boxes import desktop
 from ahab.memory import Memory
 
 home = Path(tempfile.mkdtemp())

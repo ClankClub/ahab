@@ -2,7 +2,8 @@
 import json, os, sys, tempfile
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from ahab import supabase, tools
+from ahab import tools
+from ahab.connections import supabase
 from ahab.memory import Memory
 
 KEY = "sb-secret-test-key"

@@ -6,7 +6,8 @@ import sys
 import tempfile
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from ahab import hostshell, tools, workers
+from ahab import tools, workers
+from ahab.boxes import hostshell
 from ahab.memory import Memory
 
 home = Path(tempfile.mkdtemp())

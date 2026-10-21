@@ -1,11 +1,12 @@
-"""Offline tests for ahab/github.py: a fake GitHub (behind a fake relay) stands in for n8n."""
+"""Offline tests for ahab/connections/github.py: a fake GitHub (behind a fake relay) stands in for n8n."""
 import base64, hashlib, json, os, sys, tempfile
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 from pathlib import Path
 sys.path.insert(0, ROOT)
 os.environ["AHAB_WORKSHOP_HOME"] = tempfile.mkdtemp(prefix="ghws-")
-from ahab import approvals, github, n8n, tools, workshop
+from ahab import approvals, tools, workshop
+from ahab.connections import github, n8n
 from ahab.memory import Memory
 
 

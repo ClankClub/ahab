@@ -10,7 +10,8 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from ahab import desktop, inbox, telegram, tools
+from ahab import inbox, telegram, tools
+from ahab.boxes import desktop
 from ahab.memory import Memory
 
 home = Path(tempfile.mkdtemp())

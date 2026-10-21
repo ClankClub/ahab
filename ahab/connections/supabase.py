@@ -211,7 +211,7 @@ def sql(memory, query) -> str:
     except SupabaseError as e:
         if "exec_sql" in str(e) and ("find the function" in str(e) or "404" in str(e)):
             raise SupabaseError("The project can't run SQL yet: your owner has to run the setup SQL once in "
-                                "Supabase's SQL Editor (py -m ahab.supabase prints it), with the secret key set.") from None
+                                "Supabase's SQL Editor (py -m ahab.connections.supabase prints it), with the secret key set.") from None
         raise
     return _cut("SQL ran. " + json.dumps(result, ensure_ascii=False, indent=1))
 

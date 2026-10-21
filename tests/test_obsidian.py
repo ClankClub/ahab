@@ -6,7 +6,8 @@ from datetime import date
 from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from ahab import obsidian, tools, workers
+from ahab import tools, workers
+from ahab.connections import obsidian
 from ahab.memory import Memory
 
 home = Path(tempfile.mkdtemp())

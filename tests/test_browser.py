@@ -1,11 +1,12 @@
-"""Offline tests for ahab/browser.py and the driver's address rules: Docker is
+"""Offline tests for ahab/boxes/browser.py and the driver's address rules: Docker is
 faked, nothing runs a browser."""
 import importlib.util, json, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from ahab import browser, workshop
+from ahab import workshop
+from ahab.boxes import browser
 
 # --- how the box runs ---------------------------------------------------------------
 args = browser.container_args("ahab-browser:abc")

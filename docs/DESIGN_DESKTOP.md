@@ -6,7 +6,7 @@ Agreed with the owner on 2026-10-19. Phase 1 is built (see BUILD_LOG), with a fo
 
 A personal agent that can only read text misses a lot. Some apps have no API. Some layouts only make sense as pictures (Obsidian's graph, a spreadsheet's formatting, the site the workshop just built). And "click through this for me" is a whole class of errands. Computer use is how an agent does all of that: it sees a screen, moves a mouse, types, and sees the result.
 
-It can't happen on the owner's real desktop. Window screenshots (`ahab/screen.py`) stay look-only on purpose, and AGENTS.md already says where clicking belongs: in a machine of its own. This is that machine. It also gives Ahab's builders a place to test and debug computer use for the product, which they can't safely do on anyone's real PC.
+It can't happen on the owner's real desktop. Window screenshots (`ahab/boxes/screen.py`) stay look-only on purpose, and AGENTS.md already says where clicking belongs: in a machine of its own. This is that machine. It also gives Ahab's builders a place to test and debug computer use for the product, which they can't safely do on anyone's real PC.
 
 ## What it is
 
@@ -43,7 +43,7 @@ run -d --name ahab-desktop --restart no --init
 ```
 Nothing is published and nothing listens on the PC. Commands go in with `docker exec`, like the browser's. There's no Docker socket and no host network.
 
-**It stops when idle.** After 15 minutes without a command the code stops the container, giving back its memory (a desktop with Firefox and LibreOffice open uses about 1 to 2 GB). It starts again on the next command in a few seconds. Open windows don't survive that; files do. That's `--restart no` plus an idle check in `ahab/desktop.py`, run by the heartbeat on each tick.
+**It stops when idle.** After 15 minutes without a command the code stops the container, giving back its memory (a desktop with Firefox and LibreOffice open uses about 1 to 2 GB). It starts again on the next command in a few seconds. Open windows don't survive that; files do. That's `--restart no` plus an idle check in `ahab/boxes/desktop.py`, run by the heartbeat on each tick.
 
 ## What Pip sees and does
 
@@ -102,12 +102,12 @@ Desktop screenshots aren't saved in the workspace, because `workspace/media/` go
 
 This is half the point, so it gets real tools on the owner's side:
 
-- `py -m ahab.desktop --setup`: build the image and start the box (and the proxy, if hosts are listed).
-- `py -m ahab.desktop --check`: the fence test (below). It must pass after any change to the box, the driver or the host list.
-- `py -m ahab.desktop look | click X Y | type TEXT | key KEYS | launch APP`: drive it by hand from the PC, the same driver Pip uses. That's how a builder reproduces what Pip saw.
-- `py -m ahab.desktop --watch`: a small page on `http://127.0.0.1:<port>/`, served by the standard library only while the command runs, showing the newest screenshot every second next to the last 20 actions (who, what, result line). The box still listens on nothing; the page reads the shots folder and the log. It's for watching Pip work live.
-- `py -m ahab.desktop --replay [session]`: writes one HTML file, a flipbook of a session's screenshots with each step's thought, action and result under it. Debugging computer use is mostly this: seeing exactly what the model saw when it clicked the wrong thing.
-- `py -m ahab.desktop --calibrate` (phase 2): shows a test card of 12 numbered targets at known spots, then asks the home's brain model, through `model.py` like any call, for the coordinates of each from a screenshot, and prints the misses in pixels. It costs a dozen model calls. It answers the biggest open question (below) with a number, and it reruns whenever the brain changes.
+- `py -m ahab.boxes.desktop --setup`: build the image and start the box (and the proxy, if hosts are listed).
+- `py -m ahab.boxes.desktop --check`: the fence test (below). It must pass after any change to the box, the driver or the host list.
+- `py -m ahab.boxes.desktop look | click X Y | type TEXT | key KEYS | launch APP`: drive it by hand from the PC, the same driver Pip uses. That's how a builder reproduces what Pip saw.
+- `py -m ahab.boxes.desktop --watch`: a small page on `http://127.0.0.1:<port>/`, served by the standard library only while the command runs, showing the newest screenshot every second next to the last 20 actions (who, what, result line). The box still listens on nothing; the page reads the shots folder and the log. It's for watching Pip work live.
+- `py -m ahab.boxes.desktop --replay [session]`: writes one HTML file, a flipbook of a session's screenshots with each step's thought, action and result under it. Debugging computer use is mostly this: seeing exactly what the model saw when it clicked the wrong thing.
+- `py -m ahab.boxes.desktop --calibrate` (phase 2): shows a test card of 12 numbered targets at known spots, then asks the home's brain model, through `model.py` like any call, for the coordinates of each from a screenshot, and prints the misses in pixels. It costs a dozen model calls. It answers the biggest open question (below) with a number, and it reruns whenever the brain changes.
 
 **The fence test**, like the browser's, has rows that each print PASS or FAIL.
 - *From outside*, `docker inspect`: the network is `none` (or `ahab-desktop` when hosts are listed), the only mount is the home volume, CapDrop is ALL, the root is read-only, the user isn't root, nothing is published, and it isn't privileged.
@@ -119,7 +119,7 @@ This is half the point, so it gets real tools on the owner's side:
 ## Files
 
 - `desktop/Dockerfile`, `desktop/start.sh`, `desktop/driver.py`, `desktop/fence_probe.py`, and `desktop/policies.json` (Firefox: no updates, no telemetry, no first-run page, and the proxy when there is one).
-- `ahab/desktop.py`: the image (tagged by a hash of `desktop/`, as the browser's is), `container_args(hosts)`, `ensure_box()`, `call()`, the idle stop, the lock, the shots folder, the three tools, the fence test, `--watch`, `--replay`, `--calibrate`, and the CLI.
+- `ahab/boxes/desktop.py`: the image (tagged by a hash of `desktop/`, as the browser's is), `container_args(hosts)`, `ensure_box()`, `call()`, the idle stop, the lock, the shots folder, the three tools, the fence test, `--watch`, `--replay`, `--calibrate`, and the CLI.
 - `ahab/tools.py`: the three tools, with `DesktopError` caught in `run()`. `ahab/workers.py`: the `desktop` flag (its own tool set, call cap and daily count, a check that the model can see, the lock). `ahab/heartbeat.py`: the idle check on each tick.
 - `tests/test_desktop.py`, offline, with Docker faked as in the browser tests:
   - `container_args` says `--network none` with no hosts, and the internal network and proxy with them;
@@ -136,7 +136,7 @@ This is half the point, so it gets real tools on the owner's side:
 ## Phases
 
 1. **The box and the hands.**
-   - What's built: the Dockerfile, the driver, `ahab/desktop.py` (setup, check, the CLI, `--watch`), the three tools, and the tests. Offline only: the `desktop_hosts` code path exists and is tested, but no host is listed.
+   - What's built: the Dockerfile, the driver, `ahab/boxes/desktop.py` (setup, check, the CLI, `--watch`), the three tools, and the tests. Offline only: the `desktop_hosts` code path exists and is tested, but no host is listed.
    - Done when: `--check` passes, and the owner can watch a hand-driven session.
    - Done when: Pip, asked to open its vault in Obsidian and show the graph, does it in one wake.
    - (Copying the vault in is `desktop_files put vault`; Obsidian's "open folder as vault" is a few clicks.)

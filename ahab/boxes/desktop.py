@@ -28,11 +28,11 @@ Screenshots are 1024x768, the screen's own size, so x,y in the picture is
 x,y on the screen. They're kept outside Ahab's home (shots_dir()), since the
 workspace goes into the backup repo; save: true copies one into it.
 
-  python -m ahab.desktop --setup     build the image and start the box
-  python -m ahab.desktop --check     the fence test
-  python -m ahab.desktop --watch     watch the screen live in a browser on this PC
-  python -m ahab.desktop --stop      stop and remove the box (its home volume stays)
-  python -m ahab.desktop look | windows | click X Y | type TEXT | key KEYS | launch APP | shell CMD
+  python -m ahab.boxes.desktop --setup     build the image and start the box
+  python -m ahab.boxes.desktop --check     the fence test
+  python -m ahab.boxes.desktop --watch     watch the screen live in a browser on this PC
+  python -m ahab.boxes.desktop --stop      stop and remove the box (its home volume stays)
+  python -m ahab.boxes.desktop look | windows | click X Y | type TEXT | key KEYS | launch APP | shell CMD
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ from pathlib import Path, PurePosixPath
 
 from ahab.workshop import WorkshopError, _docker_exe, _hash, docker, ensure_proxy
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]
 FILES = REPO / "desktop"
 IMAGE = "ahab-desktop"
 CONTAINER = "ahab-desktop"

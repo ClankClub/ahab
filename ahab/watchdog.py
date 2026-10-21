@@ -114,7 +114,7 @@ def _stuck(memory: Memory, now: float) -> str | None:
 
 
 def _n8n_down() -> str | None:
-    from ahab import n8n
+    from ahab.connections import n8n
     if not os.environ.get(n8n.KEY_ENV):
         return None                                # this install doesn't use n8n
     base = urllib.parse.urlsplit(os.environ.get(n8n.BASE_ENV) or n8n.DEFAULT_BASE)

@@ -10,7 +10,9 @@ from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
 os.environ["AHAB_CLI_HOME"] = tempfile.mkdtemp()   # never near a real CLI profile
-from ahab import browser, google, heartbeat, inbox, n8n, senses, telegram, tools, workers
+from ahab import heartbeat, inbox, senses, telegram, tools, workers
+from ahab.boxes import browser
+from ahab.connections import google, n8n
 from ahab.cli_model import CliClient, flatten
 from ahab.memory import Memory
 from ahab.model import ModelClient, Reply

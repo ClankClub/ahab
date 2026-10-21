@@ -1,4 +1,4 @@
-"""Test the mail watch (ahab.mail): who wakes Ahab, how fast, and the brakes on agents."""
+"""Test the mail watch (ahab.connections.mail): who wakes Ahab, how fast, and the brakes on agents."""
 import json
 import os
 import sys
@@ -10,7 +10,8 @@ from pathlib import Path
 
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
-from ahab import mail, telegram, tools
+from ahab import telegram, tools
+from ahab.connections import mail
 from ahab.memory import Memory
 
 INBOX = []          # what the fake Gmail search returns, newest first

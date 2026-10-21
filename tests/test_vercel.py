@@ -1,4 +1,4 @@
-"""Offline tests for ahab/vercel.py: a fake Vercel, behind a fake relay, that behaves like the real one
+"""Offline tests for ahab/connections/vercel.py: a fake Vercel, behind a fake relay, that behaves like the real one
 (including making a project's first deployment production, whatever is asked)."""
 import base64, hashlib, os, sys, tempfile
 from pathlib import Path
@@ -6,7 +6,8 @@ ROOT = str(Path(__file__).resolve().parent.parent)
 from pathlib import Path
 sys.path.insert(0, ROOT)
 os.environ["AHAB_WORKSHOP_HOME"] = tempfile.mkdtemp(prefix="vcws-")
-from ahab import approvals, n8n, tools, vercel, workshop
+from ahab import approvals, tools, workshop
+from ahab.connections import n8n, vercel
 from ahab.memory import Memory
 
 vercel.time.sleep = lambda s: None

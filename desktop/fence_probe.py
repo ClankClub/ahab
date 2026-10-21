@@ -1,5 +1,5 @@
 """The fence test's half inside the desktop box: tries the ways out and
-reports, as JSON, what happened. Run by `python -m ahab.desktop --check`.
+reports, as JSON, what happened. Run by `python -m ahab.boxes.desktop --check`.
 
 With no proxy (AHAB_PROXY unset) the box should have no network at all.
 With one, it should reach the listed hosts through it and nothing else.

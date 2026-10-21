@@ -28,8 +28,10 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ahab import (agents, alarms, approvals, desktop, digest, dream, goals, identity, inbox, intents, mail, n8n, senses,
-                   session, skills, tools, watchdog, watches, workers, workshop)
+from ahab import (agents, alarms, approvals, digest, dream, goals, identity, inbox, intents, senses, session, skills,
+                  tools, watchdog, watches, workers, workshop)
+from ahab.boxes import desktop
+from ahab.connections import mail, n8n
 from ahab.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from ahab.model import ModelClient, ModelError, with_fallback
 

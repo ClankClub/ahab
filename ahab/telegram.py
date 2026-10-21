@@ -52,7 +52,8 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ahab import approvals, goals, inbox, mail, senses, tools, watchdog
+from ahab import approvals, goals, inbox, senses, tools, watchdog
+from ahab.connections import mail
 from ahab.memory import DEFAULT_HOME, Memory
 
 TOKEN_ENV = "AHAB_TELEGRAM_TOKEN"

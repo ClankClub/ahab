@@ -1,4 +1,4 @@
-"""Test ahab.n8n and the check_calendar tool against a fake n8n on localhost."""
+"""Test ahab.connections.n8n and the check_calendar tool against a fake n8n on localhost."""
 import json
 import os
 import sys
@@ -10,7 +10,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 sys.path.insert(0, ROOT)
-from ahab import n8n, tools
+from ahab import tools
+from ahab.connections import n8n
 from ahab.memory import Memory
 
 STATE = {"status": 200, "body": None, "last_path": None}

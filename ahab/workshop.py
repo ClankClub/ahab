@@ -154,7 +154,7 @@ def image() -> str:
 def ensure_proxy(proxy: str = PROXY, network: str = NETWORK, out_network: str = OUT_NETWORK,
                  allow: tuple[str, ...] = ALLOW) -> None:
     """A box's networks and its proxy, (re)made when proxy.py or the allowlist
-    changed. The workshop's by default; the browser (ahab/browser.py) has its
+    changed. The workshop's by default; the browser (ahab/boxes/browser.py) has its
     own, with its own networks."""
     for name, internal in ((network, True), (out_network, False)):
         if docker("network", "inspect", name, check=False).returncode:
