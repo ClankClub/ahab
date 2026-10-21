@@ -28,7 +28,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ahab import (alarms, approvals, desktop, dream, identity, inbox, intents, mail, n8n, senses, skills, tools,
+from ahab import (alarms, approvals, desktop, digest, dream, identity, inbox, intents, mail, n8n, senses, skills, tools,
                    watchdog, watches, workers, workshop)
 from ahab.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from ahab.model import ModelClient, ModelError
@@ -833,6 +833,11 @@ def main() -> None:
                 if not dreaming:
                     break
                 before = last_id(memory)
+                # First the sources, so the dream reads fresh pages; a quiet day costs nothing.
+                try:
+                    digest.run_all(memory, client)
+                except Exception as e:  # nor must a bad digest
+                    memory.record("error", f"Digest crashed: {type(e).__name__}: {e}")
                 try:
                     dream.dream(memory, client, config["name"])
                 except Exception as e:  # a bad dream mustn't stop the heartbeat

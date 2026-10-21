@@ -118,7 +118,9 @@ def memory_folder(memory: Memory) -> str:
     root = workspace_root(memory)
     files = _memory_files(root)
     days = [p for p in files if p.parent == root / MEMORY_FOLDER / DAYS and p.suffix == ".md"]
-    pages = [p for p in files if p not in days]
+    # The digest's pages (memory/sources/<name>/) are shown as their index, below, not one by one.
+    digested = root / MEMORY_FOLDER / "sources"
+    pages = [p for p in files if p not in days and not p.is_relative_to(digested)]
     lines = [f"- {p.relative_to(root / MEMORY_FOLDER).as_posix()}: {skills._describe(p)}"
              for p in pages[:MAX_LISTED]]
     if len(pages) > MAX_LISTED:
@@ -136,4 +138,6 @@ def memory_folder(memory: Memory) -> str:
         if len(text) > DAY_NOTE_CHAR_LIMIT:
             text = text[:DAY_NOTE_CHAR_LIMIT] + f"\n[cut: the rest is in {MEMORY_FOLDER}/{DAYS}/{latest.name}]"
         section += f"\n\n## Your last day, in short ({MEMORY_FOLDER}/{DAYS}/{latest.name})\n{text or '(empty)'}"
-    return section
+    from ahab import digest   # here: digest imports tools, which the top of this module mustn't wait on
+    known = digest.known(memory)
+    return section + (f"\n\n{known}" if known else "")
