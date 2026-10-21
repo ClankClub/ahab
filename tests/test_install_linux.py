@@ -53,4 +53,9 @@ assert inst.wanted(kept, home)[-1] == "ahab-backup"
 # home.json keeps what's there and gains the shell.
 assert inst.with_host_shell({"name": "X", "host_shell": {"user": "old"}}, "agent") == \
     {"name": "X", "host_shell": {"user": "agent"}}
+# The status screen: on tty1 as ahab, taking no input, in place of the login prompt.
+con = inst.console_unit("/usr/bin/python3")
+assert "User=ahab" in con and "TTYPath=/dev/tty1" in con and "StandardInput=null" in con
+assert "Conflicts=getty@tty1.service" in con and "-m ahab.console" in con and "Restart=always" in con
+assert "EnvironmentFile" not in con                    # it needs no keys
 print("ok")

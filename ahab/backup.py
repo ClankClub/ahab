@@ -128,7 +128,7 @@ def backup(home: Path) -> int:
 
     # Push even when nothing was committed, so a push that failed last time
     # (network down) gets retried.
-    push = git(home, "push", "-q")
+    push = git(home, "-c", "push.autoSetupRemote=true", "push", "-q")   # a new repo has no upstream yet
     if push.returncode != 0:
         print(f"Push failed (the commit is kept locally and will be retried):\n{push.stderr}")
         return 1

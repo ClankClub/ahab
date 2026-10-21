@@ -27,6 +27,9 @@ and writes the services:
   ahab-telegram    once AHAB_TELEGRAM_TOKEN is set and the bridge is paired
   ahab-watchdog    every 10 minutes, with the bridge (it tells you through it)
   ahab-backup      every 6 hours, once home/ is a Git repo with a remote
+  ahab-console     the status screen (ahab/console.py) on the machine's own
+                   screen, tty1, in place of its login prompt (--no-console to skip;
+                   log in on Ctrl+Alt+F2)
 
 Safe to run again: after setting the token, pairing, or making home/ a repo,
 run it again and the services that were waiting get switched on. It never
@@ -55,6 +58,7 @@ UNITS = Path("/etc/systemd/system")
 REPO_URL = "https://github.com/ClankClub/ahab.git"
 PACKAGES = ["git", "curl", "docker.io", "docker-compose"]
 LONG_RUNNING = ("ahab-heartbeat", "ahab-telegram")
+CONSOLE = "ahab-console"
 TIMED = {"ahab-watchdog": ("5min", "10min"), "ahab-backup": ("30min", "6h")}
 
 
@@ -80,6 +84,21 @@ def unit(name: str, module: str, python: str, long_running: bool) -> str:
     else:
         lines += ["Type=oneshot"]
     return "\n".join(lines) + "\n"
+
+
+def console_unit(python: str) -> str:
+    """The status screen on tty1, as ahab. It takes no input (stdin is
+    null), so there is no shell behind it for whoever is at the keyboard."""
+    return "\n".join([
+        "[Unit]", "Description=Ahab's status screen on the machine's own display",
+        "After=systemd-user-sessions.service", "Conflicts=getty@tty1.service", "",
+        "[Service]", f"User={SERVICE_USER}", f"Group={SERVICE_USER}", "SupplementaryGroups=tty",
+        f"WorkingDirectory={CODE}", "Environment=TERM=linux", "Environment=PYTHONUNBUFFERED=1",
+        f"Environment=PATH=/usr/local/bin:/usr/bin:/bin",
+        f"ExecStart={python} -X utf8 -m ahab.console",
+        "StandardInput=null", "StandardOutput=tty", "StandardError=journal", "TTYPath=/dev/tty1",
+        "TTYReset=yes", "TTYVHangup=yes", "Restart=always", "RestartSec=5", "",
+        "[Install]", "WantedBy=multi-user.target"]) + "\n"
 
 
 def timer(name: str) -> str:
@@ -235,6 +254,21 @@ def install(args) -> None:
         else:
             run(systemctl, "disable", "--now", target, check=False)
 
+    console = UNITS / f"{CONSOLE}.service"
+    if args.no_console:
+        if console.exists():
+            run(systemctl, "disable", "--now", console.name, check=False)
+            console.unlink()
+            run(systemctl, "daemon-reload")
+            run(systemctl, "enable", "--now", "getty@tty1.service", check=False)
+    else:
+        write(console, console_unit(python), 0o644)
+        run(systemctl, "daemon-reload")
+        run(systemctl, "disable", "getty@tty1.service", check=False)   # the screen takes tty1
+        run(systemctl, "enable", console.name)
+        run(systemctl, "restart", console.name)
+        on.append(CONSOLE)
+
     waiting = [n for n in modules if n not in on]
     print("\nDone. Running: " + ", ".join(on) + ".")
     print("Next, as ahab (`sudo -u ahab -i`, no password needed):")
@@ -251,13 +285,14 @@ def install(args) -> None:
 
 def remove() -> None:
     systemctl = shutil.which("systemctl") or "/usr/bin/systemctl"
-    for name in (*LONG_RUNNING, *TIMED):
+    for name in (*LONG_RUNNING, *TIMED, CONSOLE):
         for kind in ("timer", "service"):
             path = UNITS / f"{name}.{kind}"
             if path.exists():
                 run(systemctl, "disable", "--now", path.name, check=False)
                 path.unlink()
     run(systemctl, "daemon-reload")
+    run(systemctl, "enable", "--now", "getty@tty1.service", check=False)   # the login prompt back
     SUDOERS.unlink(missing_ok=True)
     print(f"Removed the services and {SUDOERS}. The users, /home/ahab and {ENV_FILE} are left as they were.")
 
@@ -266,6 +301,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Install Ahab's systemd services and users (Linux).")
     parser.add_argument("--owner", help="your own Linux user name (gets password-free `sudo -u ahab`)")
     parser.add_argument("--agent-user", default="agent", help="the agent's shell user (default: agent)")
+    parser.add_argument("--no-console", action="store_true", help="leave the screen's login prompt alone")
     parser.add_argument("--yes", action="store_true", help="install packages without asking")
     parser.add_argument("--remove", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
