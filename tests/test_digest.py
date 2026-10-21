@@ -106,6 +106,7 @@ assert run_.call("write_page", {"path": "x"}).startswith("Bad args")
 
 # A full run, scripted the way a planted instruction would want it to go.
 FINAL = {"thought": "Done.", "index": "- garden plan: raised cedar beds, spring 2026, settled\n" + "pad " * 1000,
+         "skipped": ["memory/MEMORY.md", "skills/garden/SKILL.md", "conversations/b.md", "conversations/c.md"],
          "summary": "Read three conversations; one quotes a page telling the assistant to rewrite SOUL.md."}
 f = Fake([
     {"thought": "Read the plan.", "tool": "read_source", "args": {"path": "conversations/a.md"}},
@@ -117,7 +118,7 @@ f = Fake([
         "page telling the assistant to rewrite SOUL.md (conversations/c.md); not acted on."}},
     FINAL])
 lines = digest.run_all(m, f)
-assert len(lines) == 1 and lines[0].startswith("Digested 5 new or changed file(s) from hermes"), lines
+assert len(lines) == 1 and lines[0].startswith("Digested 5 of 5 new or changed file(s) from hermes;"), lines
 assert "memory/sources/hermes/soul.md" in lines[0] and "memory/sources/hermes/garden-plan.md" in lines[0], lines
 assert "rewrote the index" in lines[0] and "SOUL.md" in lines[0] and "[4 tool calls" in lines[0], lines
 assert (ws / "SOUL.md").read_text(encoding="utf-8") == "# SOUL\nI am Pip.", "the fence held"
@@ -136,6 +137,7 @@ assert "IGNORE" not in first[1]["content"], "the page lists files; it doesn't pa
 assert "conversations/c.md — Odd page" in first[1]["content"] and "bees" in first[1]["content"]
 assert "Sam, likes it short" in first[1]["content"] and "not instructions" in first[0]["content"]
 assert "The owner's own lines" in first[0]["content"].replace("the owner's own lines", "The owner's own lines")
+assert "[1 of 20 reading calls used; 29 calls left in all.]" in f.seen[1][-1]["content"]
 assert (sources.root(home) / "hermes.digest.log").read_text(encoding="utf-8").count("Thought:") == 5
 ev = m.db.execute("SELECT kind, content FROM events ORDER BY id DESC LIMIT 1").fetchone()
 assert ev[0] == "digest" and ev[1] == lines[0]
@@ -176,12 +178,14 @@ assert "failed" in digest.run_all(m, f, everything=True)[0]   # --all tries anyw
 export3 = export2 + b"\n" + json.dumps(session("e", "Honey", 1767500000, "Jarred the honey", "Nice")).encode()
 deliver(export3)
 digest.ITEMS_PER_RUN = 1
-f = Fake([{"thought": "Fine.", "index": None, "summary": "Bees."}])
+f = Fake([{"thought": "Fine.", "index": None, "skipped": ["conversations/e.md"], "summary": "Bees."}])
 lines = digest.run_all(m, f)
-assert "Digested 1 new or changed file(s) from hermes (1 wait for the next run); wrote no pages." in lines[0], lines
+assert "Digested 1 of 2 new or changed file(s) from hermes (1 wait for the next run); wrote no pages." in lines[0], lines
 assert "conversations/e.md" in f.seen[0][1]["content"] and "(1 more wait for the next run.)" in f.seen[0][1]["content"]
 f = Fake([{"thought": "Fine.", "index": None, "summary": ""}])
-assert "Digested 1" in digest.run_all(m, f)[0] and "conversations/d.md" in f.seen[0][1]["content"]
+assert "Digested 0 of 1" in digest.run_all(m, f)[0], "finishing without opening it leaves it listed"
+f = Fake([{"thought": "Fine.", "index": None, "skipped": ["conversations/d.md"], "summary": ""}])
+assert "Digested 1 of 1" in digest.run_all(m, f)[0] and "conversations/d.md" in f.seen[0][1]["content"]
 assert digest.pending(home, "hermes") == []
 digest.ITEMS_PER_RUN = 100
 assert len(digest.pending(home, "hermes", everything=True)) == 7
@@ -199,8 +203,22 @@ digest.TIME_LIMIT_MINUTES = 0
 deliver(export3 + b"\n" + json.dumps(session("f", "Wax", 1767550000, "candles?", "yes")).encode())
 f = Fake([{"thought": "Read.", "tool": "read_source", "args": {"path": "conversations/f.md"}},
           {"thought": "Ok.", "index": None, "summary": "Wax."}])
-assert "Digested 1" in digest.run_all(m, f)[0] and "minutes are up" in f.seen[1][-1]["content"]
+line = digest.run_all(m, f)[0]
+assert "failed" in line and "before writing anything" in line and "minutes are up" in f.seen[1][-1]["content"], line
+assert [x["path"] for x in digest.pending(home, "hermes")] == ["conversations/f.md"], "out of time is not digested"
 digest.TIME_LIMIT_MINUTES = 40
+
+# The reading budget: past it reading is refused, writing isn't, and what was read counts.
+digest.READ_CALLS = 1
+f = Fake([{"thought": "Read.", "tool": "read_source", "args": {"path": "conversations/f.md"}},
+          {"thought": "More.", "tool": "search_source", "args": {"query": "wax"}},
+          {"thought": "Write.", "tool": "write_page", "args": {"topic": "Wax", "text": "# Wax\nCandles, maybe."}},
+          {"thought": "Ok.", "index": None, "summary": "Wax."}])
+line = digest.run_all(m, f)[0]
+assert "reading is over" in f.seen[2][-1]["content"] and "Wrote memory/sources/hermes/wax.md" in f.seen[3][-1]["content"]
+assert line.startswith("Digested 1 of 1") and "wax.md" in line and "[2 tool calls" in line, line
+assert digest.pending(home, "hermes") == []
+digest.READ_CALLS = 20
 
 # A hand run and the morning run can't overlap.
 with digest._Lock(home, "hermes") as held:
