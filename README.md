@@ -64,6 +64,16 @@ bash install.sh
 
 Running it again updates the code and leaves `home/` alone. On a Mac use `python3` where this README says `py`, and `~/.ahab` where it says `%LOCALAPPDATA%\Ahab`. Tested on Linux with faked Mac tools, not yet on a real Mac. A Windows version is still to come.
 
+### On Linux (a machine of its own)
+
+For a computer that's Ahab's to live on (Debian or similar, with systemd), `scripts/install_linux.py` sets it up as services under three users: you, an `ahab` user that runs the code and holds the keys (the n8n key and Telegram token in `/etc/ahab/env`, the Claude login, `memory.db`, n8n through Docker), and the agent's own shell user (`agent` by default, `--agent-user` to change), which gets the network and its own home but none of `ahab`'s files, no Docker and no sudo. The only bridge between them is one sudo rule letting `ahab` run commands as that user, which the `shell` and `shell_files` tools use (`ahab/hostshell.py`); `home.json`'s `"host_shell": {"user": "agent"}` turns them on, and the installer writes it. It installs git, curl and Docker from Debian's packages (asking first), clones this repo into `/home/ahab/ahab`, and writes the heartbeat and Telegram services and the watchdog and backup timers, each switched on once what it needs is there. Run it as root, once (the only time it needs your password), and read `--dry-run` first:
+
+```bash
+sudo python3 scripts/install_linux.py --owner YOUR-LINUX-USER --dry-run
+```
+
+Afterwards you manage Ahab as its user without a password (`sudo -u ahab -i`): sign in the Claude CLI there, start n8n, pair Telegram, then run the installer again to switch the waiting services on; it prints those steps. `--remove` takes the services and sudo rule away and leaves the users and files.
+
 Set your DeepSeek key as an environment variable (never in a file here), then open a new terminal, since `setx` only affects new ones:
 
 ```powershell
@@ -158,6 +168,7 @@ The pairing lives in `home/telegram.json`. Delete that file and pair again to sw
 - `py -m ahab.heartbeat --restart` — restart the unattended heartbeat, for example to load new code.
 - `.\scripts\install-backup-task.ps1` — registers "Ahab backup", which commits and pushes `home/` to its private repo every 6 hours, only while Ahab is asleep (`-EveryHours N` to change, `-Remove` to uninstall). `py -m ahab.backup` does one backup by hand. `home/` must be its own Git repo with a remote.
 - `python3 scripts/install_mac.py` — the Mac equivalent: launchd agents for the heartbeat and, once it's paired, the Telegram bridge, running with no window, at every login, restarted after a crash (`--with-backup` adds the backup, `--remove` uninstalls, `--dry-run` shows the files). Run it from a terminal where Ahab already works, after stopping any copy running there with Ctrl+C: it copies that terminal's keys, settings and PATH into the agents, since launchd doesn't read `~/.zshrc`. Run it again after changing a key.
+- `sudo python3 scripts/install_linux.py --owner YOU` — the Linux equivalent, for a machine of Ahab's own: systemd services running as an `ahab` user, and a separate user for the agent's shell (see "On Linux" above; `--dry-run`, `--remove`). As `ahab`, `python3 -m ahab.heartbeat --restart` reloads the heartbeat and `journalctl -u ahab-heartbeat` shows its log.
 - `py -m ahab.desktop --setup | --check | --watch | --stop` — the desktop box; `look`, `windows`, `click X Y`, `type TEXT`, `key KEYS`, `launch APP` and `shell CMD` drive it by hand.
 
 ## License

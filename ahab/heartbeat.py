@@ -58,6 +58,7 @@ RESTART_NOTE_MAX_AGE = 5 * 60
 # Names the install scripts give the unattended heartbeat.
 WINDOWS_TASK = "Ahab heartbeat"
 MAC_LABEL = "ahab.heartbeat"
+LINUX_UNIT = "ahab-heartbeat.service"
 # A home can say who lives there and what mind it runs on, in home.json:
 # {"name": "...", "backend": "..."}. With no file it's Ahab on DeepSeek, as
 # always. "name": null gives the resident no name at all. The file sits
@@ -632,7 +633,7 @@ def start_message(home: Path, once: bool, scheduled: bool) -> str:
         # took restarts as a nudge and messaged the owner about each one.
         return ("Heartbeat restarted (by the owner or the agent that helps them build you,"
                 " usually to load new code); woke immediately. Nothing to answer by itself.")
-    scheduler = "Windows Task Scheduler" if sys.platform == "win32" else "launchd"
+    scheduler = {"win32": "Windows Task Scheduler", "darwin": "launchd"}.get(sys.platform, "systemd")
     return (f"Heartbeat started automatically by {scheduler} (at login, or after the "
             "previous heartbeat crashed); woke immediately.")
 
@@ -652,8 +653,13 @@ def restart(home: Path) -> None:
         target = f"gui/{os.getuid()}"
         plist = Path.home() / "Library" / "LaunchAgents" / f"{MAC_LABEL}.plist"
         stop, start = ["launchctl", "bootout", f"{target}/{MAC_LABEL}"], ["launchctl", "bootstrap", target, str(plist)]
+    elif sys.platform.startswith("linux"):
+        # A system service run as the ahab user, which may start and stop
+        # only Ahab's own services without a password (install_linux.py).
+        stop, start = (["sudo", "-n", "systemctl", "stop", LINUX_UNIT],
+                       ["sudo", "-n", "systemctl", "start", LINUX_UNIT])
     else:
-        sys.exit("--restart works with the Windows task or the Mac launchd agent only.")
+        sys.exit("--restart works with the Windows task, the Mac launchd agent or the Linux service only.")
 
     home.mkdir(parents=True, exist_ok=True)
     (home / RESTART_NOTE).write_text(datetime.now(timezone.utc).isoformat(), encoding="utf-8")
