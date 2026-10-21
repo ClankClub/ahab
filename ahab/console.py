@@ -134,6 +134,38 @@ def source_ages(home: Path, c) -> list[str]:
     return out
 
 
+def cpu_temp(sys_class: Path = Path("/sys/class")) -> float | None:
+    """The processor's temperature in degrees C, or None where the machine doesn't say.
+    The package sensor of Intel's coretemp (or AMD's k10temp) is preferred, then any
+    thermal zone that looks like the CPU's."""
+    def millidegrees(file: Path) -> float | None:
+        try:
+            value = int(file.read_text().strip()) / 1000
+        except (OSError, ValueError):
+            return None
+        return value if -50 < value < 150 else None   # -273 is how a dead sensor reports
+
+    for hwmon in sorted((sys_class / "hwmon").glob("hwmon*")):
+        try:
+            name = (hwmon / "name").read_text().strip()
+        except OSError:
+            continue
+        if name in ("coretemp", "k10temp", "zenpower"):
+            temp = millidegrees(hwmon / "temp1_input")
+            if temp is not None:
+                return temp
+    for zone in sorted((sys_class / "thermal").glob("thermal_zone*")):
+        try:
+            kind = (zone / "type").read_text().strip().lower()
+        except OSError:
+            continue
+        if kind in ("x86_pkg_temp", "tcpu", "cpu-thermal"):
+            temp = millidegrees(zone / "temp")
+            if temp is not None:
+                return temp
+    return None
+
+
 def machine(home: Path) -> str:
     parts = []
     try:
@@ -145,6 +177,9 @@ def machine(home: Path) -> str:
         parts.append("load " + Path("/proc/loadavg").read_text().split()[0])
     except (OSError, IndexError):
         pass
+    temp = cpu_temp()
+    if temp is not None:
+        parts.append(f"CPU {temp:.0f}°C")
     try:
         info = dict(l.split(":", 1) for l in Path("/proc/meminfo").read_text().splitlines() if ":" in l)
         total, free = (int(info[k].split()[0]) / 2**20 for k in ("MemTotal", "MemAvailable"))
@@ -153,7 +188,8 @@ def machine(home: Path) -> str:
         pass
     try:
         d = shutil.disk_usage(home)
-        parts.append(f"disk {d.used * 100 // d.total}%")
+        # Used of total, not a percentage: on a big drive 2.6G of 453G rounds to "0%".
+        parts.append(f"disk {d.used / 2**30:.1f}/{d.total / 2**30:.0f}G")
     except OSError:
         pass
     return " · ".join(parts)

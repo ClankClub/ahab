@@ -98,4 +98,23 @@ m.db.execute("UPDATE agent_tasks SET status = 'failed', finished = ? WHERE statu
 m.db.commit()
 assert "helpers idle · 3 finished in the last day, 1 failed" in "\n".join(console.frame(home2, 100, 30, now=now, color=False))
 m.close()
+
+# CPU temperature: the package sensor of coretemp wins; a dead sensor (-273) and a missing tree are no reading.
+root = Path(tempfile.mkdtemp())
+assert console.cpu_temp(root) is None
+def sensor(folder, name, file, text):
+    d = root / folder
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "name" if folder.startswith("hwmon") else d / "type").write_text(name)
+    (d / file).write_text(text)
+sensor("thermal/thermal_zone0", "acpitz", "temp", "36000")
+assert console.cpu_temp(root) is None, "a board sensor isn't the CPU's"
+sensor("thermal/thermal_zone1", "x86_pkg_temp", "temp", "38000")
+assert console.cpu_temp(root) == 38.0
+sensor("hwmon/hwmon5", "coretemp", "temp1_input", "41000")
+assert console.cpu_temp(root) == 41.0, "coretemp is preferred"
+sensor("hwmon/hwmon5", "coretemp", "temp1_input", "-273150")
+assert console.cpu_temp(root) == 38.0, "a dead sensor falls through to the next"
+line = console.machine(home)
+assert "disk " in line and "G" in line and "%" not in line.split("disk ")[1], line
 print("ok")
