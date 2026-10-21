@@ -33,14 +33,14 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ahab import sources
+from ahab import session, sources
 from ahab.memory import BACKGROUND_KINDS, DEFAULT_HOME, TOKEN_STATS
 from ahab.model import BACKENDS
 
 REFRESH = 5                      # seconds between frames
 MARGIN = 2                       # columns left empty at the right edge: a line that fills the last
                                  # column gets its final character wiped by the clear-to-end-of-line
-USAGE_KINDS = ("sleep", "dream", "digest", "web_search")   # events whose first line says what they cost
+USAGE_KINDS = ("sleep", "dream", "digest", "web_search", "session")   # events whose first line says what they cost
 HELPER_LINES = 3                 # running helpers listed before "and N more"
 BAD_ENDS = ("failed", "timed_out", "interrupted")
 STALE = 3 * 60                   # an .alive file older than this means not running
@@ -254,6 +254,20 @@ def spent(home: Path) -> tuple[int, int]:
     return t_in, t_out
 
 
+def session_size(home: Path, settings: dict) -> str:
+    """'session 42k/100k': how much of its size the running session uses (session.py)."""
+    db = _db(home)
+    if db is None:
+        return ""
+    try:
+        chars = db.execute("SELECT COALESCE(SUM(LENGTH(content)), 0) FROM session WHERE folded = 0").fetchone()[0]
+    except sqlite3.Error:
+        return ""                                     # the table appears with the first wake-up
+    finally:
+        db.close()
+    return f"session {chars // session.CHARS_PER_TOKEN // 1000}k/{session.limit(settings) // 1000}k"
+
+
 def helpers(home: Path, now: float, show_chat: bool, c, width: int) -> list[str]:
     """Workers and crew-agent tasks: a line for each one running (what it was asked, unless the chat
     is hidden), or, when none is, a count of those that finished in the last day."""
@@ -348,7 +362,8 @@ def frame(home: Path, width: int = 80, height: int = 24, now: float | None = Non
             *helpers(home, now, show_chat, c, width),
             *goals_line(home, now, show_chat, c, width),
             "  ".join([ok(alive(home, "heartbeat", now), "heartbeat"), ok(alive(home, "telegram", now), "bridge"),
-                       f"backup {last_backup(home)}", *source_ages(home, c)]),
+                       f"backup {last_backup(home)}", *([s] if (s := session_size(home, settings)) else []),
+                       *source_ages(home, c)]),
             c(DIM, _clip(machine(home), width))]
 
     body_room = max(0, height - 3 - len(foot))

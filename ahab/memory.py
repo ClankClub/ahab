@@ -42,8 +42,8 @@ DEFAULT_HOME = Path(__file__).resolve().parent.parent / "home"
 NOTES_CHAR_LIMIT = 8000
 
 # Event kinds whose full text is too long for the page; snapshot() shows only
-# their first line. Messages are shown in full in their own section instead
-# (inbox.describe_recent), so here they'd only be a second copy.
+# their first line. Messages are shown in full in the session instead
+# (session.news), so here they'd only be a second copy.
 # Logged by code with Ahab asleep (a source delivery, a digest), so they say nothing about whether it's awake.
 BACKGROUND_KINDS = ("source", "digest")
 
@@ -286,7 +286,7 @@ class Memory:
             + (e.content.splitlines()[0] if e.kind in HEADER_ONLY_KINDS else e.content)
             # A message's header alone ("From the owner (sent ...):") looked
             # like an empty message, and Ahab once reported it as a bug.
-            + (" (text under Recent conversation)" if e.kind == "message" else "")
+            + (" (text in your session)" if e.kind == "message" else "")
             for e in events
         )
         return f"## Your notes\n{notes}\n\n## Recent events\n{log or '(nothing yet)'}"

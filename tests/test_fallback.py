@@ -188,7 +188,7 @@ usual = Fake("usual", [AuthError("Ahab's codex sign-in has expired or is missing
 spare = Fake("spare", [done])
 seen = []
 spare_complete = spare.complete
-spare.complete = lambda messages, *a, **k: (seen.append(messages[1]["content"]), spare_complete(messages, *a, **k))[1]
+spare.complete = lambda messages, *a, **k: (seen.append(messages[-1]["content"]), spare_complete(messages, *a, **k))[1]
 c = FallbackClient(usual, spare, retry_seconds=600, clock=Clock())
 assert heartbeat.beat(m, c, prompt) == 600
 events = [e for e in m.recent(200) if e.kind == "model_fallback"]

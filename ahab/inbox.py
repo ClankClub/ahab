@@ -12,9 +12,10 @@ heartbeat notices within a few seconds and wakes Ahab early.
 Ahab answers in the "message" field of its final reply, or mid-work with the
 message_owner tool; both end up in ahab_sends. Both directions
 are also logged as `message` events, so Ahab can recall its conversations.
-Every wake-up page shows the latest messages under "Recent conversation"
-(describe_recent), so the thread survives busy wake-ups full of tool calls;
-the event log then shows message events by their header line only.
+The owner's messages reach Ahab's page in a wake-up's opening, in its running
+session (session.py), and Ahab's own are in its replies there.
+describe_recent writes the conversation out on its own: the session's first
+summary on a home that had none, and the owner's view at the command line.
 
   python -m ahab.inbox "hello"          leave a letter (read at next wake)
   python -m ahab.inbox --now "hello"    knock: wake Ahab to read it
@@ -140,6 +141,17 @@ def describe_recent(memory: Memory, limit: int = RECENT_LIMIT,
     if not lines:
         return "(no messages yet)"
     return "\n\n".join(reversed(lines))
+
+
+def waiting_note(memory: Memory) -> str | None:
+    """A line for the page when more from the owner is queued than one wake-up takes (see deliver)."""
+    _table(memory)
+    waiting = memory.db.execute(
+        "SELECT COUNT(*) FROM messages WHERE sender = 'owner' AND read_at IS NULL").fetchone()[0]
+    if not waiting:
+        return None
+    return (f"{waiting} more message(s) from your owner are waiting; you'll get them on the wake-up right "
+            "after this one, and they may change what's being asked.")
 
 
 def _line(sent: str, sender: str, text: str, files: str | None) -> str:

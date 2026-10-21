@@ -123,7 +123,7 @@ def flatten(messages: list[Message]) -> tuple[str, str, list[dict]]:
     rest = [m for m in messages if m["role"] != "system"]
     if len(rest) == 1:
         return system, body(rest[0]), sent
-    parts = [body(rest[0]), "\n\n## This wake-up so far, oldest first"]
+    parts = [body(rest[0]), "\n\n## The session so far, oldest first"]
     for m in rest[1:]:
         who = "Your reply" if m["role"] == "assistant" else "Then"
         parts.append(f"\n--- {who}:\n{body(m)}")

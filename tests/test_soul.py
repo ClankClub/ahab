@@ -18,7 +18,7 @@ def page(home):
     heartbeat.beat(m, f, heartbeat.system_prompt("Ahab"))
     assert m.recent(1)[0].kind != "error", m.recent(3)
     m.close()
-    return f.seen[0][0]["content"], f.seen[0][1]["content"]
+    return f.seen[0][0]["content"], "\n\n".join(x["content"] for x in f.seen[0][1:])
 
 with tempfile.TemporaryDirectory() as d:
     home = Path(d)

@@ -182,7 +182,7 @@ photo = put("media/2026-01-01/photo-120000.jpg", b"\xff\xd8 a cat")
 inbox.owner_sends(m, "Look!\n[the owner sent a photo]", attachments=[photo])
 f = Fake([{"thought": "look again", "tool": "look_at", "args": {"path": "pic.png"}}, DONE])
 heartbeat.beat(m, f, prompt)
-page = f.seen[0][1]
+page = f.seen[0][-1]
 assert [i["name"] for i in page["images"]] == [photo] and "can't see images" not in page["content"]
 result = f.seen[1][-1]
 assert [i["name"] for i in result["images"]] == ["pic.png"] and "attached to this result" in result["content"]
@@ -191,7 +191,7 @@ assert senses.take_shown(m) == [], "nothing left queued after the wake"
 # On a model that can't see: told on the page, and look_at refuses.
 f = Fake([{"thought": "try", "tool": "look_at", "args": {"path": "pic.png"}}, DONE], sees=False)
 heartbeat.beat(m, f, prompt)
-assert "can't see images" in f.seen[0][1]["content"]
+assert "can't see images" in f.seen[0][-1]["content"]
 assert "look_at refused" in f.seen[1][-1]["content"] and "images" not in f.seen[1][-1]
 
 # --- out: message_owner attaches files, and the bridge sends them --------------------------

@@ -44,6 +44,8 @@ BACKENDS = {
         "base_url": "http://localhost:8080/v1",
         "model": "local",
         "api_key_env": None,
+        # A small local model's context is short: its running session folds sooner (session.py).
+        "session_tokens": 16_000,
     },
     # OpenRouter resells hundreds of models behind one key. Nemo is Mistral's
     # 12B open model, about $0.03 per million tokens each way (2026-10).
@@ -111,6 +113,7 @@ class ModelClient:
             raise ModelError(f"Unknown backend {name!r}; known: {', '.join(BACKENDS)}")
         config = dict(BACKENDS[name])
         config.pop("page_note", None)   # for Ahab's page, not the client
+        config.pop("session_tokens", None)   # for the session's size (session.limit), not the client
         # An API model sees images only if its backend says "vision": True.
         vision = config.pop("vision", False)
         if "cli" in config:

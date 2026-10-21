@@ -19,7 +19,7 @@ def page(home, name="Ahab"):
     starts = [e.content for e in m.recent(30) if e.kind == "start"]
     assert m.recent(1)[0].kind == "sleep", m.recent(3)
     m.close()
-    return f.seen[0][0]["content"], f.seen[0][1]["content"], starts
+    return f.seen[0][0]["content"], "\n\n".join(x["content"] for x in f.seen[0][1:]), starts
 
 with tempfile.TemporaryDirectory() as d:
     home = Path(d); ws = home / "workspace"
@@ -30,7 +30,7 @@ with tempfile.TemporaryDirectory() as d:
     assert len(starts) == 6, starts
     assert (ws / "AGENTS.md").read_text(encoding="utf-8").startswith("# AGENTS")
     assert (ws / "PROACTIVE_PREFERENCES.md").read_text(encoding="utf-8").startswith("# PROACTIVE PREFERENCES")
-    assert p.index("## Who you are (SOUL.md)") < p.index("## Your owner (USER.md)") < p.index("## What to bring up on your own (PROACTIVE_PREFERENCES.md)") < p.index("## How you work here (AGENTS.md)") < p.index("## What you remember (MEMORY.md)") < p.index("## Your memory folder (memory/)") < p.index("## Recent conversation") < p.index("## Your notes")
+    assert p.index("## Who you are (SOUL.md)") < p.index("## Your owner (USER.md)") < p.index("## What to bring up on your own (PROACTIVE_PREFERENCES.md)") < p.index("## How you work here (AGENTS.md)") < p.index("## What you remember (MEMORY.md)") < p.index("Woke at") < p.index("## Right now") < p.index("## Your notes") < p.index("## Your memory folder (memory/)")
     assert "USER.md" in sysp and "PROACTIVE_PREFERENCES.md is your owner's" in sysp and "Five files" in sysp and "AGENTS.md is how you get work done" in sysp and "8000" in sysp and "{identity" not in sysp
     # existing files are never overwritten; no new start events
     (ws / "USER.md").write_text("# USER\nGoes by Sam.", encoding="utf-8")

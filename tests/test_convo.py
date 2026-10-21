@@ -22,11 +22,10 @@ with tempfile.TemporaryDirectory() as d:
     assert "waiting letter" not in recent and "1 more message(s)" in recent, recent
     f = Fake([{"thought": "reply", "tool": "message_owner", "args": {"text": "hi back"}}, done])
     heartbeat.beat(m, f, heartbeat.system_prompt("Ahab"))
-    page = f.seen[0][1]["content"]
-    convo = page.split("## Recent conversation")[1].split("## Your notes")[0]
-    assert "Owner: waiting letter" in convo, convo
-    events = page.split("## Recent events")[1]
-    assert "waiting letter" not in events and "From the owner (sent" in events, events
+    page = "\n\n".join(x["content"] for x in f.seen[0][1:])
+    opening = page.split("Woke at")[1].split("## Right now")[0]
+    assert "Owner: waiting letter" in opening, opening
+    assert "## Recent conversation" not in page and "## Recent events" not in page
     after = inbox.describe_recent(m)
     assert after.index("Owner: waiting letter") < after.index("You: hi back"), after
     # budget: many long messages, newest kept, total bounded

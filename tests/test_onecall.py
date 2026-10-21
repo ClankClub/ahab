@@ -38,12 +38,12 @@ f = Fake([{"thought": "Easy.", "message": "Fine, thanks.", "notes": None, "next_
 assert heartbeat.beat(m, f, prompt) == 600
 assert len(f.seen) == 1, "one model call for a plain chat"
 # The page never names the model; DeepSeek's peak prices show only on DeepSeek.
-page = f.seen[0][1]["content"]
+page = "\n\n".join(x["content"] for x in f.seen[0][1:])
 assert "Pricing right now" not in page and "gpt-6" not in page and "deepseek" not in page.lower()
 f = Fake([{"thought": "-", "message": None, "notes": None, "next_wake_minutes": 600}])
 f.backend = "deepseek"
 heartbeat.beat(m, f, prompt)
-page = f.seen[0][1]["content"]
+page = "\n\n".join(x["content"] for x in f.seen[0][1:])
 assert "Pricing right now: your thinking costs double at peak" in page and "deepseek" not in page.lower(), page[:600]
 from ahab.model import ModelClient
 assert ModelClient.from_backend("local").backend == "local"   # page_note stays out of the client
@@ -64,7 +64,7 @@ assert "[0 tool calls" in new[-1].content, new[-1].content
 
 # The log line for a message no longer looks empty.
 snap = m.snapshot()
-assert "From the owner (sent" in snap and "(text under Recent conversation)" in snap
+assert "From the owner (sent" in snap and "(text in your session)" in snap
 assert "Second line." not in snap.split("## Recent events")[1]
 
 # 2. Same notes handed back: not rewritten.
