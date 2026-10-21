@@ -39,6 +39,7 @@ Your PC: Ahab runtime (Python)
   ├─ browser        → a real Chromium in its own locked box (browser/), public sites only, never sends anything
   ├─ github         → keeps those sites in private repos on its own GitHub, through n8n; public only by approval
   ├─ vercel         → puts them online on its own Vercel: previews behind Vercel's sign-in, public only by approval
+  ├─ supabase       → rows in its own Supabase project, directly over its REST API
   ├─ approvals      → outward actions wait for your Approve/Deny tap on Telegram, then run in code
   ├─ skills         → know-how files it keeps in workspace/skills/
   ├─ dream          → once a day at 7:00, a quiet wake that tidies notes and memory, writes a day note and workspace/dreams/
