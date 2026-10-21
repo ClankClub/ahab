@@ -47,8 +47,8 @@ ALIVE_EVERY = 60
 ALIVE_STALE = 5 * 60
 # A heartbeat this far past the wake-up it chose is stuck asleep.
 OVERDUE_GRACE = 30 * 60
-# A wake-up (up to 12 model calls of up to 5 minutes each) running this long is stuck.
-WAKE_STUCK = 90 * 60
+# A wake-up (up to 20 model calls, a slow model taking several minutes each) running this long is stuck.
+WAKE_STUCK = 3 * 3600
 CHECKS_BEFORE_TELLING = 2
 STATE_FILE = "watchdog.json"
 # How each problem is named when it clears.

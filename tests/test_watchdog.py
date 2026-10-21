@@ -107,7 +107,7 @@ assert "didn't wake when it meant to" in watchdog.problems(home, m, NOW)["heartb
 event("sleep", "Sleeping 10 min. [0 tool calls]", 30 * MIN)
 assert watchdog.problems(home, m, NOW) == {}
 # A wake-up that started long ago and never finished: stuck. A recent one: fine.
-event("wake", "Woke.", 2 * 60 * MIN)
+event("wake", "Woke.", 4 * 60 * MIN)
 assert "hasn't finished it" in watchdog.problems(home, m, NOW)["heartbeat_stuck"]
 event("wake", "Woke.", 10 * MIN)
 assert watchdog.problems(home, m, NOW) == {}

@@ -64,7 +64,7 @@ CODEX_MODEL_PLAIN = {"tool_mode": "direct", "experimental_supported_tools": [],
                      "apply_patch_tool_type": None}
 CODEX_MODEL_DROP = ("multi_agent_version",)
 CODEX_SETTINGS_OFF = ("tools.experimental_request_user_input.enabled=false",)
-CLI_TIMEOUT_SECONDS = 300
+CLI_TIMEOUT_SECONDS = 30 * 60   # Luna at max effort can think for many minutes; 5 killed real wakes (2026-10-21)
 EMPTY_REPLY_ATTEMPTS = 2
 
 
