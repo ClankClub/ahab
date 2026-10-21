@@ -109,7 +109,7 @@ Ahab can keep a copy of what you do with another agent, so it knows about it lat
 command="cd /path/to/ahab && python3 -X utf8 -m ahab.sources receive hermes",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAA...
 ```
 
-Then schedule `python send_hermes.py --ssh ahab@<ahab machine> --key <that key>` daily (or `--local <ahab folder>` when both run on one machine). The copy lands in `home/sources/hermes/`, text only, and Ahab searches and reads it with its `sources` tool. See [docs/DESIGN_SOURCES.md](docs/DESIGN_SOURCES.md).
+Then schedule `python send_hermes.py --ssh ahab@<ahab machine> --key <that key> --log <file>` daily (on Windows, as a Task Scheduler task running `pythonw.exe`, so no window opens; `--log` is where each run's outcome goes) (or `--local <ahab folder>` when both run on one machine). The copy lands in `home/sources/hermes/`, text only, and Ahab searches and reads it with its `sources` tool. See [docs/DESIGN_SOURCES.md](docs/DESIGN_SOURCES.md).
 
 ### Window screenshots (off unless you allow an app)
 
