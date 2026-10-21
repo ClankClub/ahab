@@ -34,9 +34,15 @@ assert "OnUnitActiveSec=10min" in inst.timer("ahab-watchdog")
 
 # The env file: a new one gets a fresh key and an empty token; an existing one is kept as is.
 fresh = inst.env_file()
-key = inst.env_value(fresh, "AHAB_N8N_KEY")
-assert len(key) == 64 and inst.env_value(fresh, "AHAB_TELEGRAM_TOKEN") == ""
-assert inst.env_value(inst.env_file(), "AHAB_N8N_KEY") != key
+# The n8n key starts commented out, so the watchdog doesn't look for an n8n nobody set up.
+assert inst.env_value(fresh, "AHAB_N8N_KEY") == "" and inst.env_value(fresh, "AHAB_TELEGRAM_TOKEN") == ""
+key = next(l for l in fresh.splitlines() if l.startswith("# AHAB_N8N_KEY=")).split("=", 1)[1]
+assert len(key) == 64 and key not in inst.env_file()
+
+# write() reports whether anything changed, which decides restart or leave alone.
+scratch = Path(tempfile.mkdtemp()) / "unit"
+assert inst.write(scratch, "a", 0o644) is True and inst.write(scratch, "a", 0o644) is False
+assert inst.write(scratch, "b", 0o644) is True
 kept = "AHAB_N8N_KEY=abc\nAHAB_TELEGRAM_TOKEN=123:xyz"
 assert inst.env_file(kept) == kept + "\n"
 

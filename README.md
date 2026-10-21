@@ -72,7 +72,7 @@ For a computer that's Ahab's to live on (Debian or similar, with systemd), `scri
 sudo python3 scripts/install_linux.py --owner YOUR-LINUX-USER --dry-run
 ```
 
-Afterwards you manage Ahab as its user without a password (`sudo -u ahab -i`): sign in the Claude CLI there, start n8n, pair Telegram, then run the installer again to switch the waiting services on; it prints those steps. `--remove` takes the services and sudo rule away and leaves the users and files.
+Afterwards you manage Ahab as its user without a password (`sudo -u ahab -i`): sign in the Claude CLI there, start n8n, pair Telegram, then run the installer again to switch the waiting services on; it prints those steps. `--remove` takes the services and sudo rule away and leaves the users and files. The n8n key in `/etc/ahab/env` starts commented out; uncomment it when you set up n8n, since its being set is how Ahab and its watchdog know the install uses n8n. Rerunning the installer restarts only the services whose files changed, since a heartbeat restart wakes the agent.
 
 Set your DeepSeek key as an environment variable (never in a file here), then open a new terminal, since `setx` only affects new ones:
 

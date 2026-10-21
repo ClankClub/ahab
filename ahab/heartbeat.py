@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -338,8 +339,16 @@ def parse_reply(text: str) -> tuple[dict, str]:
       - one answer split in pieces ({"thought": ...} {"notes": ...,
         "next_wake_minutes": ...}). Those are merged into one.
     Anything dropped comes back as text, so it can be logged, not lost.
+
+    Claude models sometimes write a tool call in their own trained format
+    (<invoke name="..."><parameter name="...">...</parameter></invoke>)
+    instead of the JSON asked for. When that comes before any JSON, it's
+    read as the tool request it plainly is.
     """
     text = text.strip()
+    invoked = _claude_invoke(text)
+    if invoked:
+        return invoked
     decoder = json.JSONDecoder()
     objects, position = [], 0
     while position < len(text):
@@ -359,6 +368,29 @@ def parse_reply(text: str) -> tuple[dict, str]:
     if not objects:
         raise ValueError("the model sent an empty reply")
     return _combine(objects, "")
+
+
+INVOKE = re.compile(r'<invoke name="([A-Za-z0-9_]+)">(.*?)</invoke>', re.S)
+PARAMETER = re.compile(r'<parameter name="([A-Za-z0-9_]+)">(.*?)</parameter>', re.S)
+
+
+def _claude_invoke(text: str) -> tuple[dict, str] | None:
+    """A tool call in Claude's own format, if one comes before any JSON."""
+    found = INVOKE.search(text)
+    brace = text.find("{")
+    if not found or (brace != -1 and brace < found.start()):
+        return None
+    args = {}
+    for key, value in PARAMETER.findall(found.group(2)):
+        try:
+            parsed = json.loads(value)               # numbers, true/false, lists and objects
+            args[key] = parsed if not isinstance(parsed, str) else value
+        except json.JSONDecodeError:
+            args[key] = value
+    rest = (text[:found.start()] + text[found.end():]).strip()
+    rest = re.sub(r"</?function_calls>", "", rest).strip()
+    return {"thought": "(tool call written in Claude's own format, read as one)",
+            "tool": found.group(1), "args": args}, rest
 
 
 def _unform(reply: dict) -> dict:

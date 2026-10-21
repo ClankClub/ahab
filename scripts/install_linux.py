@@ -126,13 +126,16 @@ def sudoers(owner: str | None, agent_user: str, systemctl: str) -> str:
 
 
 def env_file(existing: str = "") -> str:
-    """The services' environment. Keeps whatever is already set; a new file
-    gets a fresh n8n key (the same value goes into n8n's "Ahab relay key")."""
+    """The services' environment. Keeps whatever is already set. A new file
+    gets a fresh n8n key, commented out: setting AHAB_N8N_KEY is what tells
+    Ahab (and its watchdog) that this install uses n8n, so it's switched on
+    when n8n is set up, with the same value in n8n's "Ahab relay key"."""
     if existing.strip():
         return existing if existing.endswith("\n") else existing + "\n"
     return ("# Ahab's settings and keys, read by its services. Readable by root and ahab only.\n"
             "# After changing anything, run the installer again (or: sudo systemctl restart ahab-heartbeat).\n"
-            f"AHAB_N8N_KEY={secrets.token_hex(32)}\n"
+            "# Uncomment once n8n is running (n8n/README.md); the same value goes in its \"Ahab relay key\".\n"
+            f"# AHAB_N8N_KEY={secrets.token_hex(32)}\n"
             "AHAB_TELEGRAM_TOKEN=\n"
             "# GROQ_API_KEY=        voice notes through Groq's Whisper, instead of on this machine\n")
 
@@ -171,7 +174,13 @@ def exists(name: str) -> bool:
     return subprocess.run(["id", "-u", name], capture_output=True).returncode == 0
 
 
-def write(path: Path, text: str, mode: int, group: str | None = None) -> None:
+def write(path: Path, text: str, mode: int, group: str | None = None) -> bool:
+    """Write a file in one step; returns whether its content changed."""
+    try:
+        if path.read_text(encoding="utf-8") == text:
+            return False
+    except OSError:
+        pass
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + ".new")
     tmp.write_text(text, encoding="utf-8")
@@ -180,6 +189,7 @@ def write(path: Path, text: str, mode: int, group: str | None = None) -> None:
         shutil.chown(tmp, "root", group)
     tmp.replace(path)
     print(f"  wrote {path}")
+    return True
 
 
 def ask(question: str, yes: bool) -> bool:
@@ -225,7 +235,7 @@ def install(args) -> None:
 
     print("4. Keys and permissions")
     env_text = env_file(ENV_FILE.read_text(encoding="utf-8") if ENV_FILE.is_file() else "")
-    write(ENV_FILE, env_text, 0o640, group=SERVICE_USER)
+    env_changed = write(ENV_FILE, env_text, 0o640, group=SERVICE_USER)
     rules = sudoers(args.owner, args.agent_user, systemctl)
     check = SUDOERS.with_name("ahab.check")
     check.write_text(rules, encoding="utf-8")
@@ -240,17 +250,21 @@ def install(args) -> None:
     print("5. Services")
     modules = {"ahab-heartbeat": "ahab.heartbeat", "ahab-telegram": "ahab.telegram",
                "ahab-watchdog": "ahab.watchdog", "ahab-backup": "ahab.backup"}
+    changed = set()
     for name, module in modules.items():
-        write(UNITS / f"{name}.service", unit(name, module, python, name in LONG_RUNNING), 0o644)
-        if name in TIMED:
-            write(UNITS / f"{name}.timer", timer(name), 0o644)
+        if write(UNITS / f"{name}.service", unit(name, module, python, name in LONG_RUNNING), 0o644) or env_changed:
+            changed.add(name)
+        if name in TIMED and write(UNITS / f"{name}.timer", timer(name), 0o644):
+            changed.add(name)
     run(systemctl, "daemon-reload")
     on = wanted(env_text, HOME)
     for name in modules:
         target = f"{name}.timer" if name in TIMED else f"{name}.service"
         if name in on:
+            # Restart only what changed: a restart wakes the agent, and a wake costs tokens.
+            # Anything else is started if it isn't running and left alone if it is.
             run(systemctl, "enable", target)
-            run(systemctl, "restart", target)
+            run(systemctl, "restart" if name in changed else "start", target)
         else:
             run(systemctl, "disable", "--now", target, check=False)
 
@@ -262,11 +276,11 @@ def install(args) -> None:
             run(systemctl, "daemon-reload")
             run(systemctl, "enable", "--now", "getty@tty1.service", check=False)
     else:
-        write(console, console_unit(python), 0o644)
+        fresh = write(console, console_unit(python), 0o644)
         run(systemctl, "daemon-reload")
         run(systemctl, "disable", "getty@tty1.service", check=False)   # the screen takes tty1
         run(systemctl, "enable", console.name)
-        run(systemctl, "restart", console.name)
+        run(systemctl, "restart" if fresh else "start", console.name)
         on.append(CONSOLE)
 
     waiting = [n for n in modules if n not in on]
@@ -275,7 +289,9 @@ def install(args) -> None:
     if not shutil.which("claude", path=f"{BASE}/.local/bin"):
         print("  - the Claude CLI: curl -fsSL https://claude.ai/install.sh | bash")
     print("  - sign it in: mkdir -p ~/.ahab/claude && CLAUDE_CONFIG_DIR=~/.ahab/claude claude auth login")
-    print("  - n8n: cd ~/ahab/n8n && docker compose up -d (then n8n/README.md for the sign-ins)")
+    if not env_value(env_text, "AHAB_N8N_KEY"):
+        print("  - n8n, if you want it: cd ~/ahab/n8n && docker compose up -d, then n8n/README.md; "
+              f"uncomment AHAB_N8N_KEY in {ENV_FILE} and run this installer again")
     if "ahab-telegram" in waiting:
         print(f"  - Telegram: put the bot token in {ENV_FILE}, pair with "
               "`cd ~/ahab && python3 -m ahab.telegram --pair`, then run this installer again")
