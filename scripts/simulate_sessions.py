@@ -345,6 +345,13 @@ class RealModel:
         key = "summary" if not json_mode else "calls"
         system, prompt, _ = cli_model.flatten(messages)
         s["est_in"] += (len(system) + len(prompt)) // 4
+        sizes = [len(m["content"]) if isinstance(m["content"], str) else len(str(m["content"])) for m in messages]
+        entry = {"t": Clock.t.isoformat(timespec="seconds"), "phase": self.phase, "json": json_mode,
+                 "in": reply.prompt_tokens, "cached": reply.cached_tokens, "out": reply.completion_tokens,
+                 "est": sum(sizes) // 4, "n": len(messages), "max_chars": max(sizes), "max_at": sizes.index(max(sizes))}
+        if reply.prompt_tokens > 3 * max(1, entry["est"]) and len(s["spikes"]) < 5:
+            s["spikes"].append({**entry, "head": str(messages[entry["max_at"]]["content"])[:300]})
+        s["call_log"].append(entry)
         s["real_in"] += reply.prompt_tokens
         s["api_seconds"] += took
         s["api_calls"] += 1
@@ -524,7 +531,7 @@ def simulate(seed: int, days: float, owner: str, limit: int, fail: float, outage
              "summary_in": 0, "summary_failures": 0, "owner_messages": 0, "violations": [],
              "summary_sizes": [], "first_call_cached": [], "wall": [], "weekly": [],
              "est_in": 0, "real_in": 0, "api_seconds": 0.0, "api_calls": 0, "tokens_out": 0, "cost": 0.0,
-             "dream_calls": 0, "dream_in": 0, "dream_out": 0, "dreams": 0, "dream_failures": 0, "probes": [],
+             "call_log": [], "spikes": [], "dream_calls": 0, "dream_in": 0, "dream_out": 0, "dreams": 0, "dream_failures": 0, "probes": [],
              "stopped": None}
     real = bool(backend or client)
     if real:
