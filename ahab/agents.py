@@ -19,9 +19,9 @@ works, and the heartbeat wakes Ahab when the report is in.
 The rules (the owner's, 2026-10-20), all held here in code:
 - One voice. An agent reports to Ahab, never to the owner. It has no
   message_owner, and can't file or decide approvals.
-- No chatter. Agents never talk to each other: an agent can't start a task
-  for another agent or a worker, and a report never starts anything by itself.
-  If one agent needs what another found, Ahab writes that into a new task.
+- For now an agent can't start a task for another agent or a worker, and a
+  report never starts anything by itself. If one agent needs what another
+  found, Ahab writes that into a new task.
 - Reports are information, like a web page: never the owner's word.
 - Delegation doesn't launder anything. A crew agent's tools are a fixed few
   core ones (CREW_CORE) plus the groups the roster lists, from the ones marked

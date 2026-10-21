@@ -19,7 +19,7 @@ The owner's instinct about OpenClaw is right, and it's the model here. In OpenCl
 
 **One head, one voice.** Agents report to Pip, never to the owner. No agent has `message_owner`, and none can file approvals in phase 1. Pip reads the report and decides what the owner hears. This is the worker rule, kept.
 
-**No chatter.** Agents never talk to each other. There's no channel between them, an agent can't start a task for another agent (or a worker), and a reply never sets off another task by itself. If agent B needs what agent A found, Pip reads A's report and writes B's task. Every hop goes through Pip's judgment and shows in Pip's log. A follow-up in the same thread is a new task, counted against the limits like any other.
+**No agent-to-agent tasks yet.** There's no channel between agents yet: an agent can't start a task for another agent (or a worker), and a reply never sets off another task by itself. The owner wants agents able to work with each other, under a token budget and with a log they can read; that comes later. If agent B needs what agent A found, Pip reads A's report and writes B's task. Every hop goes through Pip's judgment and shows in Pip's log. A follow-up in the same thread is a new task, counted against the limits like any other.
 
 **Replies are information.** A report is text Pip reads, like a worker report or a web page. It can't approve, message, schedule or start anything, and nothing in it is treated as the owner's word.
 
