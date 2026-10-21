@@ -28,7 +28,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ahab import (alarms, approvals, desktop, digest, dream, identity, inbox, intents, mail, n8n, senses, skills, tools,
+from ahab import (agents, alarms, approvals, desktop, digest, dream, identity, inbox, intents, mail, n8n, senses, skills, tools,
                    watchdog, watches, workers, workshop)
 from ahab.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from ahab.model import ModelClient, ModelError
@@ -456,6 +456,8 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
     workshop.report_finished(memory)
     # And workers' reports (workers.py), whether or not they woke Ahab.
     workers.report_finished(memory)
+    # And the crew's (agents.py).
+    agents.report_finished(memory)
     # And email from the people on its list that's done waiting (see mail.py).
     mail.deliver(memory)
     # Standing intents listen to what just came in (the owner's messages, new
@@ -464,6 +466,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
     asking ="\n\n".join(s for s in (approvals.describe_pending(memory),
                                     workshop.describe_running(memory),
                                     workers.describe_running(memory),
+                                    agents.describe(memory),
                                     mail.describe_waiting(memory)) if s)
     # The tool list is filled in per wake-up: which groups this machine can run, and which
     # were used lately (tools.describe). It stays the same for every call of the wake.
@@ -813,9 +816,10 @@ def main() -> None:
                       f" local{why}. Ctrl+C to stop. ---\n")
                 if sleep_until(wake_at, interrupt=lambda: inbox.knocked(memory)
                                or approvals.waiting(memory) or workshop.waiting(memory)
-                               or workers.waiting(memory) or mail.waiting(memory)):
-                    print("--- knock: a message, an approval, a finished build or worker, or an"
-                          " email; waking early. ---\n")
+                               or workers.waiting(memory) or agents.waiting(memory)
+                               or mail.waiting(memory)):
+                    print("--- knock: a message, an approval, a finished build, worker or agent"
+                          " task, or an email; waking early. ---\n")
                     break
                 if idling:
                     try:

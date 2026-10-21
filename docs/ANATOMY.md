@@ -26,7 +26,7 @@ What Ahab is, built up from the bottom: everything around the model, layer by la
 
 **A workshop.** Codex in a sealed Docker box builds sites, they go to private GitHub repos, then to Vercel previews, and from there to production only through an approval.
 
-**Helpers.** Workers (`workers.py`) are separate background processes, each its own small loop with the same JSON protocol, a read-only tool list and a fixed menu of cheap models. They report back to Ahab, never the owner, so one big job doesn't have to fit in a wake's twenty calls.
+**Helpers.** Workers (`workers.py`) are separate background processes, each its own small loop with the same JSON protocol, a read-only tool list and a fixed menu of cheap models. They report back to Ahab, never the owner, so one big job doesn't have to fit in a wake's twenty calls. Crew agents (`agents.py`) are workers that last: each listed by the owner in `home.json`, with a folder of its own under `home/agents/<name>/` (a lane, its own log and a workspace with its notes), no heartbeat, and a run per task. Both run the same loop (`runner.py`).
 
 **A conscience in code.** Approvals: anything outward-facing becomes a card built from the exact payload, and only the owner's tap runs it. Add the delete cap, the email allowlist, and the rule that orders come only from the owner.
 

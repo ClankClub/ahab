@@ -34,6 +34,7 @@ Your PC: Ahab runtime (Python)
   ├─ alarms         → reminders and follow-ups; the heartbeat wakes it for them
   ├─ watches        → web pages checked in code while it sleeps ("tell me when this changes / mentions X"); no tokens until one trips
   ├─ workers        → background helpers it starts for read-only jobs (cheap models only: its own, Haiku, DeepSeek); they report to it, not you
+  ├─ agents         → a crew you list in home.json: named agents with a lane, notes and tools of their own, run per task; they report to it, not you
   ├─ workshop       → Codex builds static sites in a locked Docker box (workshop/); nothing is published
   ├─ browser        → a real Chromium in its own locked box (browser/), public sites only, never sends anything
   ├─ github         → keeps those sites in private repos on its own GitHub, through n8n; public only by approval
@@ -163,6 +164,7 @@ The pairing lives in `home/telegram.json`. Delete that file and pair again to sw
 - `py -m ahab.heartbeat` — run Ahab in this terminal, printing each wake-up; Ctrl+C stops it. `--once` runs a single wake-up. Only one heartbeat can run per home.
 - `py -m ahab.telegram` — run the Telegram bridge (`--pair` links it to your account first; see above).
 - `py -m ahab.approvals` — list what Ahab is waiting on you to approve; `--yes N` / `--no N` answers at the PC, and `--test "text"` sends a harmless test card to check the path.
+- `py -m ahab.agents` — Ahab's crew and their recent tasks. `py -m ahab.agents new <name> --about "what it's for" [--model claude-haiku] [--groups vault,sources] [--outward "what it can do outward"]` adds one to `home.json` and makes its folder in `home/agents/<name>/`; then write its job into that folder's `LANE.md`. An agent with an `--outward` line gets tasks only through an Approve tap; `"agent_approval"` in `home.json` (`outward`, `always` or `never`) changes that.
 - `py -m ahab.workshop` — list Ahab's sites and how their latest builds went (`--setup`, `--login`: see above).
 - `py -m ahab.memory` — print what Ahab sees of its memory. `py -m ahab.memory search <words>` searches the full log and memory files, as recall does.
 - `py -m ahab.report` — the weekly memory report (writes while awake, MEMORY.md's size, lookups, "don't remember"s), which the watchdog also sends on Telegram every Sunday at 7pm. `--send` sends it now.

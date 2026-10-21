@@ -1,6 +1,6 @@
 # Design: Pip at the head of a crew of agents
 
-Agreed in outline with the owner on 2026-10-20; nothing is built yet. When it's done, the story goes into `BUILD_LOG.md`, the fences into `AGENTS.md` and the module docstrings, and this file is deleted. The research behind it is the third comparative study (`03-orchestration.md` in the owner's reference folder, outside the repo), checked against OpenClaw's multi-agent and subagent docs and Hermes's A2A plugin source.
+Agreed in outline with the owner on 2026-10-20. Phase 1 (crew agents) is built (see BUILD_LOG); phases 2 and 3 are still to come. When it's done, the story goes into `BUILD_LOG.md`, the fences into `AGENTS.md` and the module docstrings, and this file is deleted. The research behind it is the third comparative study (`03-orchestration.md` in the owner's reference folder, outside the repo), checked against OpenClaw's multi-agent and subagent docs and Hermes's A2A plugin source.
 
 ## Why
 
@@ -84,7 +84,7 @@ home/agents/librarian/
 
 A run is one task. Its page is a short generic agent prompt, its `LANE.md`, its `MEMORY.md`, and Pip's task with the current time. It works through the same loop the workers use (the JSON reply form, one tool at a time, results trimmed as it goes, the call budget and the clock), and finishes with a report for Pip and, optionally, new notes for its `MEMORY.md`. That end-of-task note is its whole memory upkeep: it has no heartbeat, so it has no dream.
 
-Its tools: the core tools without `message_owner`, `set_alarm`, `cancel_alarm`, `set_intent` and `cancel_intent` (no heartbeat to wake, no owner to message), plus its listed groups, from the groups marked safe for agents (`tools.AGENT_GROUPS`). Phase 1 marks only groups that read, or write in the agent's own space or Pip's own accounts under the existing relay fences: sources, vault, email without `send_email`, calendar, Google files, tasks and contacts, Notion. Left out for now:
+Its tools: the core tools without `message_owner`, `set_alarm`, `cancel_alarm`, `set_intent` and `cancel_intent` (no heartbeat to wake, no owner to message), plus its listed groups, from the groups marked safe for agents (`agents.AGENT_GROUPS`, with the tools in each it may not have). Phase 1 marks only groups that read, or write in the agent's own space or Pip's own accounts under the existing relay fences: sources, vault, email without `send_email`, calendar, Google files, tasks and contacts, Notion. Left out for now:
 
 - **watches:** a watch wakes Pip, and an agent shouldn't be able to set Pip's alarm clock.
 - **browser, desktop, workshop:** each is one shared box or session, and two runs driving one box will step on each other. They come in once the code holds a lock per box (phase 3).
@@ -122,7 +122,7 @@ Reports land in `workspace/agents/<name>/<id>.md`, which Pip can read and quote.
 
 ## Phases
 
-**Phase 1, crew agents.** The shared runner pulled out of `workers.py`; the roster and `agent_approval` read from `home.json`; `ahab/agents.py` with the task table, the crew runner, `py -m ahab.agents new` and the listing; the `agents` tool group; the `agent_task` approval kind (wired now, though no crew agent can have outward powers yet); the heartbeat's wake on a finished task. Tests offline with fake models and throwaway homes: a task runs and reports, notes persist into the next run, file tools stay in the agent's workspace, the excluded tools are refused, an agent can't start an agent, the limits hold, and an `outward` entry routes through approval under each setting. Then one live run: a crew agent on Haiku doing a small vault job Pip hands it.
+**Phase 1, crew agents.** The shared runner pulled out of `workers.py`; the roster and `agent_approval` read from `home.json`; `ahab/agents.py` with the task table, the crew runner, `py -m ahab.agents new` and the listing; the `agents` tool group; the `agent_task` approval kind (a crew agent has no outward tools yet, but the owner can still give it an `outward` line to have its tasks approved); the heartbeat's wake on a finished task. Tests offline with fake models and throwaway homes: a task runs and reports, notes persist into the next run, file tools stay in the agent's workspace, the excluded tools are refused, an agent can't start an agent, the limits hold, and an `outward` entry routes through approval under each setting. Then one live run: a crew agent doing a small job in a throwaway home. (Built 2026-10-21; the live run was on DeepSeek, since this PC's Claude profile for Ahab isn't signed in.)
 
 **Phase 2, remote agents.** `ahab/a2a.py` and the courier; the roster's URL and token rules; tested against a fake A2A peer (`http.server` on localhost in the test) that answers, stalls, returns a working task to poll, refuses a token and sends junk. Then the owner sets up Hermes's side, and a live run checks what really comes back, including the approval-prompt case.
 

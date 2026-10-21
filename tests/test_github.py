@@ -195,5 +195,5 @@ for bad in ({"repo": "x"}, {"repo": "Bad Name", "commit": "a" * 40}, {"repo": "x
 # GitHub saying no reads as a refusal.
 n8n.send = lambda path, payload, limit=None: {"status": 403, "body": {"message": "The relay refused: nope"}}
 assert run("list_repos", {}) == "list_repos refused: GitHub said no (HTTP 403): The relay refused: nope"
-assert len(tools.TOOLS) == 87
+assert len(tools.TOOLS) == 91
 print("github ok")

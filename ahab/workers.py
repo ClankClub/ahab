@@ -36,14 +36,13 @@ DAILY_LIMIT in any 24 hours, TIME_LIMIT_MINUTES each.
 from __future__ import annotations
 
 import argparse
-import json
 import subprocess
 import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ahab import senses
+from ahab import runner, senses
 from ahab.memory import DEFAULT_HOME, Event, Memory
 from ahab.model import ModelClient, ModelError
 
@@ -342,80 +341,31 @@ You'll get the result, then reply again. To finish:
 {{"thought": "<what you're thinking>", "report": "<your report>", "wake_pip": true}}"""
 
 
-TIME_UP = ("\n\nTime's up: no more tools. Write your final reply now, with your report on what "
-           "you have so far and what you didn't get to.")
-OUT_OF_CALLS = ("REFUSED: that call was NOT run: you've used all {n} of your tool calls. Write your "
-                "final reply now, with your report on what you have and what you didn't get to.")
+TIME_UP, OUT_OF_CALLS = runner.TIME_UP, runner.OUT_OF_CALLS
 
 
 def _work(memory: Memory, worker_id: int, task: str, model: str, max_calls: int, created: str,
           client=None) -> tuple[str, str, bool, int, int, int, str]:
     """Run the job. Returns (status, report, wake, calls, tokens in, tokens out, summary)."""
-    from ahab import heartbeat, tools
+    from ahab import heartbeat
     client = client or ModelClient.from_backend(MODELS[model])
     name = heartbeat.home_config(memory.home).get("name") or "the assistant"
-    form = heartbeat.reply_form(list(WORKER_TOOLS), FINISH)
     own = _WorkerMemory(memory, worker_id)
     senses.set_sight(own, client)   # look_at works only on a model that sees
-    deadline = datetime.fromisoformat(created) + timedelta(minutes=TIME_LIMIT_MINUTES)
     now = datetime.now().astimezone()
     messages = [{"role": "system", "content": _prompt(name, max_calls)},
                 {"role": "user", "content": f"Current time: {now:%A %d %B %Y, %H:%M %Z}\n\n"
                                             f"## Your job, from {name}\n{task}"}]
-    calls = tokens_in = tokens_out = 0
-    asked_again = warned = False
-    for _ in range(max_calls + 4):
-        if memory.db.execute("SELECT status FROM workers WHERE id = ?", (worker_id,)).fetchone()[0] \
-                == "cancelling":
-            return "cancelled", "", False, calls, tokens_in, tokens_out, "Cancelled by you."
-        if _now() > deadline:
-            if warned:
-                return ("timed_out", "", True, calls, tokens_in, tokens_out,
-                        f"It ran out of its {TIME_LIMIT_MINUTES} minutes without a report.")
-            warned = True
-            messages[-1]["content"] += TIME_UP
-        reply = client.complete(messages, json_mode=form)
-        tokens_in += reply.prompt_tokens
-        tokens_out += reply.completion_tokens
-        if reply.reasoning:
-            _step(memory, worker_id, "reasoning", reply.reasoning)
-        try:
-            decision, dropped = heartbeat.parse_reply(reply.text)
-        except ValueError:
-            if asked_again or not reply.text.strip():
-                raise
-            asked_again = True
-            _step(memory, worker_id, "error", f"Reply wasn't one JSON object; asked again: {reply.text[:2000]}")
-            messages.append({"role": "assistant", "content": reply.text})
-            messages.append({"role": "user", "content": heartbeat.NOT_JSON})
-            continue
-        _step(memory, worker_id, "thought", str(decision.get("thought", "")).strip() or "(empty)")
-        if "tool" not in decision:
-            report = str(decision.get("report") or "").strip()
-            if not report:
-                return ("failed", "", True, calls, tokens_in, tokens_out,
-                        "It finished without writing a report.")
-            return ("done", report, decision.get("wake_pip") is not False, calls, tokens_in,
-                    tokens_out, "")
-        tool, args = str(decision["tool"]), decision.get("args", {})
-        if warned:
-            result = TIME_UP.strip()
-        elif tool not in WORKER_TOOLS:
-            result = f"{tool!r} isn't one of your tools. Yours: {', '.join(WORKER_TOOLS)}."
-        elif calls >= max_calls:
-            result = OUT_OF_CALLS.format(n=max_calls)
-        else:
-            result = tools.run(own, tool, args)
-            calls += 1
-        args_json = json.dumps(args, ensure_ascii=False)
-        _step(memory, worker_id, "tool", f"{tool} {args_json[:200]} -> {_first_line(result, 200)}\n"
-                                         f"args: {args_json}\n{result}")
-        heartbeat.trim_last_result(messages)
-        messages.append({"role": "assistant", "content": reply.text})
-        messages.append({"role": "user", "content": f"Tool result:\n{result}"})
-        senses.attach(messages[-1], senses.take_shown(own))
-    return ("failed", "", True, calls, tokens_in, tokens_out,
-            "It kept asking for tools past its limit without finishing.")
+    out = runner.run(
+        own, client, messages, heartbeat.reply_form(list(WORKER_TOOLS), FINISH), WORKER_TOOLS, max_calls,
+        datetime.fromisoformat(created) + timedelta(minutes=TIME_LIMIT_MINUTES),
+        lambda kind, content: _step(memory, worker_id, kind, content),
+        lambda: memory.db.execute("SELECT status FROM workers WHERE id = ?",
+                                  (worker_id,)).fetchone()[0] == "cancelling",
+        TIME_LIMIT_MINUTES)
+    report = str(out.final.get("report") or "").strip() if out.status == "done" else ""
+    wake = out.final.get("wake_pip") is not False if out.status == "done" else out.status != "cancelled"
+    return out.status, report, wake, out.calls, out.tokens_in, out.tokens_out, out.summary
 
 
 def _write_report(memory: Memory, worker_id: int, task: str, model: str, report: str,

@@ -27,6 +27,8 @@ Tools so far:
   cancel_watch
   start_worker, check_worker, cancel_worker
                a helper run in the background, with read-only tools (see workers.py)
+  agents, ask_agent, check_agent_task, cancel_agent_task
+               the crew: named agents with lanes, notes and tools of their own (see agents.py)
   message_owner write to the owner (see inbox.py)
   fetch_page   read a public web page as text (read-only; see web.py)
   search_wikipedia
@@ -73,7 +75,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ahab import (alarms, browser, desktop, github, google, hostshell, inbox, intents, mail, n8n, notion, obsidian,
+from ahab import (agents, alarms, browser, desktop, github, google, hostshell, inbox, intents, mail, n8n, notion,
+                   obsidian,
                    screen,
                    search, senses, sources, vercel, watches, web, workers, workshop)
 from ahab.memory import Memory
@@ -229,7 +232,8 @@ def read_conversation(memory: Memory, date: str = "", around: int | None = None,
 # --- the workspace fence -------------------------------------------------
 
 def workspace_root(memory: Memory) -> Path:
-    root = (memory.home / "workspace").resolve()
+    # A crew agent's memory (agents.py) has a workspace of its own; Ahab's is <home>/workspace.
+    root = Path(getattr(memory, "workspace", None) or memory.home / "workspace").resolve()
     root.mkdir(parents=True, exist_ok=True)
     return root
 
@@ -450,6 +454,17 @@ def cancel_worker(memory: Memory, id: int) -> str:
         raise ToolError(str(e)) from None
 
 
+# --- agents (the logic lives in agents.py) ------------------------------
+
+def _agent_tool(function):
+    def tool(memory: Memory, **args) -> str:
+        try:
+            return function(memory, **args)
+        except agents.AgentError as e:
+            raise ToolError(str(e)) from None
+    return tool
+
+
 # --- writing to the owner (the logic lives in inbox.py) ------------------
 
 ATTACH_LIMIT = 5
@@ -611,10 +626,11 @@ DELETE_LIMIT = 25
 
 
 def deleted_today(memory: Memory) -> int:
-    """Deletes since midnight, local time."""
+    """Deletes since midnight, local time. A crew agent's count is Ahab's (its deletes are
+    logged there too), so the brake covers the whole crew."""
     midnight = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0)
     since = midnight.astimezone(timezone.utc).isoformat(timespec="seconds")
-    return memory.db.execute("SELECT COUNT(*) FROM events WHERE kind = 'deleted' AND time >= ?",
+    return getattr(memory, "head", memory).db.execute("SELECT COUNT(*) FROM events WHERE kind = 'deleted' AND time >= ?",
                              (since,)).fetchone()[0]
 
 
@@ -898,6 +914,36 @@ TOOLS = {
         cancel_worker,
         'Stop a running worker; it stops after its current step and writes no report. '
         'Args: {"id": <worker number>}',
+    ),
+    "agents": (
+        _agent_tool(agents.listing),
+        'Your agents (the ones your owner put on your roster): what each is for, its model and '
+        'tools, whether its tasks need your owner\'s approval, and your recent tasks. Args: {}',
+    ),
+    "ask_agent": (
+        _agent_tool(lambda memory, agent, task, follow_up=None, wake=None:
+                    agents.ask(memory, agent, task, follow_up, wake)),
+        'Hand a task to one of your agents. Unlike a worker, an agent has a lane of its own, keeps '
+        'notes and files between tasks, and may have tools you\'d rather not spend your own calls '
+        'on; pick a worker for a one-off read, an agent for work in its lane. It knows only its '
+        'lane, its notes and what you put in "task", so say what you want, why, what you know '
+        'and what the report should hold. It reports to you, never your owner, and you\'re woken '
+        'with the report (wake false: it can wait for your next wake-up). "follow_up": an earlier '
+        f'task of the same agent\'s to continue (up to {agents.THREAD_LIMIT} in a thread). An agent '
+        'with outward powers gets the task only once your owner approves it, word for word, so '
+        f'keep those under {agents.OUTWARD_TASK_CHAR_LIMIT} chars. One task at a time per agent, '
+        f'{agents.MAX_RUNNING} at once, {agents.DAILY_LIMIT} a day. Args: {{"agent": "<name>", '
+        '"task": "<the task>", "follow_up": <task number>, "wake": true} (follow_up and wake optional)',
+    ),
+    "check_agent_task": (
+        _agent_tool(lambda memory, id: agents.check(memory, id)),
+        'How an agent\'s task is going or how it went: its last steps and where the report is. '
+        'Args: {"id": <task number>}',
+    ),
+    "cancel_agent_task": (
+        _agent_tool(lambda memory, id: agents.cancel(memory, id)),
+        'Stop an agent\'s running task; it stops after its current step and writes no report. '
+        'Args: {"id": <task number>}',
     ),
     "message_owner": (
         message_owner,
@@ -1384,6 +1430,10 @@ def _always(memory: Memory) -> bool:
     return True
 
 
+def _agents(memory: Memory) -> bool:
+    return any(agents.roster(memory.home))
+
+
 # The tools shown by name only, one line a group, unless the group was used lately. Each
 # group: what it's for, its tools, and whether this machine can run it, checked every
 # wake-up, so a group appears as soon as its setup does. Tools in no group are the core,
@@ -1395,6 +1445,8 @@ GROUPS = {
     "watches": ("watching a web page for a change", ("watch_page", "cancel_watch"), _always),
     "workers": ("helpers that research or read in the background and report to you",
                 ("start_worker", "check_worker", "cancel_worker"), _always),
+    "agents": ("your crew: named agents with lanes of their own, which report to you",
+               ("agents", "ask_agent", "check_agent_task", "cancel_agent_task"), _agents),
     "browser": ("a real browser, for pages that need JavaScript or clicking",
                 ("browse", "browse_look", "browse_click", "browse_type", "browse_scroll", "browse_back",
                  "browse_screenshot"), _docker),

@@ -226,5 +226,5 @@ n = len(calls)
 assert "daily limit" in tools.run(m2, "rewrite_notion", {"id": PAGE, "text": "x"}) and len(calls) == n
 assert tools.run(m2, "move_notion", {"id": PAGE, "parent": PLACE}).startswith("Moved")
 
-assert len(tools.TOOLS) == 87, len(tools.TOOLS)
+assert len(tools.TOOLS) == 91, len(tools.TOOLS)
 print("notion tests passed")
