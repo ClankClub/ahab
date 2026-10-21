@@ -60,7 +60,7 @@ Tools so far:
   preview_site, list_websites, request_publish       put sites online on Vercel: protected
                                                      previews, public by approval (vercel.py)
   supabase_tables, supabase_query, supabase_insert,
-  supabase_update, supabase_delete                   rows in its own Supabase project (supabase.py)
+  supabase_update, supabase_delete, supabase_sql      rows in its own Supabase project (supabase.py)
 
 The workspace is the first time Ahab can touch the disk, so every path it
 gives goes through _resolve() below, which is the whole sandbox. Its job:
@@ -1508,6 +1508,13 @@ TOOLS = {
         f'{supabase.DELETE_ROWS} rows go at once, and each call is one of your {DELETE_LIMIT} deletes a day. '
         'Args: {"table": "<name>", "filter": {"id": "eq.5"}}',
     ),
+    "supabase_sql": (
+        _supabase_tool(supabase.sql),
+        'Run SQL in your Supabase project: make or change tables, columns and indexes, or a query the row '
+        'tools cannot express. A select returns its rows; anything else returns ok. Deletes here are not '
+        'counted by the row tools, so take care. Needs your owner to have run the one-time setup SQL. '
+        'Args: {"query": "<SQL>"}',
+    ),
 }
 
 
@@ -1616,7 +1623,7 @@ GROUPS = {
     "workshop": ("building code and sites with a builder in a box",
                  ("start_build", "check_build", "read_build_file"), _docker),
     "supabase": ("your Supabase project's tables", ("supabase_tables", "supabase_query", "supabase_insert",
-                                                    "supabase_update", "supabase_delete"), _supabase),
+                                                    "supabase_update", "supabase_delete", "supabase_sql"), _supabase),
     "publishing": ("your GitHub repositories and Vercel websites",
                    ("list_repos", "push_site", "request_make_public", "list_websites", "preview_site",
                     "request_publish"), _n8n),

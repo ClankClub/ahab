@@ -86,3 +86,15 @@ os.environ[supabase.KEY_ENV] = KEY
 os.environ[supabase.URL_ENV] = "http://example.com"
 assert "https://" in tools.run(m, "supabase_tables", {})
 print("supabase ok")
+
+# supabase_sql: goes to the exec_sql function, drops a trailing semicolon, and says how to set it up when it's missing.
+os.environ[supabase.URL_ENV] = "https://abc.supabase.co/"
+sent = []
+supabase._request = lambda method, url, body=None, headers=None: (sent.append((method, url, body)) or (200, {}, b'[{"n": 1}]'))
+assert "SQL ran" in tools.run(m, "supabase_sql", {"query": "select 1 as n;"})
+assert sent[-1] == ("POST", "https://abc.supabase.co/rest/v1/rpc/exec_sql", {"query": "select 1 as n"}), sent[-1]
+supabase._request = lambda *a, **k: (404, {}, json.dumps({"code": "PGRST202", "message": "Could not find the function public.exec_sql(query) in the schema cache"}).encode())
+assert "setup SQL" in tools.run(m, "supabase_sql", {"query": "create table x (id int)"})
+assert "Give the SQL" in tools.run(m, "supabase_sql", {"query": "  ; "})
+assert "create or replace function exec_sql" in supabase.SETUP_SQL and "service_role" in supabase.SETUP_SQL
+print("supabase sql ok")
