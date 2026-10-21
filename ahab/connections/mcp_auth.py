@@ -176,7 +176,15 @@ def discover(url: str, challenge: str = "") -> dict:
     if "S256" not in meta.get("code_challenge_methods_supported", ["S256"]):
         raise AuthError("That server's login doesn't support PKCE, which Ahab needs for a safe login.")
     supported = resource.get("scopes_supported")
-    return {"authorization_endpoint": _secure(meta["authorization_endpoint"]),
+    # The token is named for the server as it names itself, which leaves off any query in the owner's
+    # url (?project_ref=...). Only a name covering this same address counts, so a stray metadata file
+    # can't point the token at somewhere else.
+    plain = urllib.parse.urlunparse(parts._replace(query="", fragment=""))
+    named = resource.get("resource")
+    if not (isinstance(named, str) and urllib.parse.urlparse(named).netloc == parts.netloc
+            and plain.startswith(named.rstrip("/"))):
+        named = plain
+    return {"resource": named, "authorization_endpoint": _secure(meta["authorization_endpoint"]),
             "token_endpoint": _secure(meta["token_endpoint"]),
             "registration_endpoint": meta.get("registration_endpoint"),
             "scope": scope or (" ".join(supported) if isinstance(supported, list) and supported else None)}
@@ -201,7 +209,7 @@ def _register(found: dict, redirect: str, oauth: dict) -> dict:
 
 
 def _token_request(record: dict, form: dict) -> dict:
-    form = {**form, "client_id": record["client_id"], "resource": record["url"]}
+    form = {**form, "client_id": record["client_id"], "resource": record.get("resource") or record["url"]}
     headers = {}
     if record.get("client_secret"):
         if record.get("auth_method") == "client_secret_basic":
@@ -275,11 +283,12 @@ def start_login(memory, name: str, url: str, challenge: str, oauth: dict | None 
     oauth = oauth or {}
     if not record.get("client_id") or record.get("redirect") != redirect:
         record = {"url": url, "redirect": redirect, **_register(found, redirect, oauth)}
-    record.update(token_endpoint=found["token_endpoint"])
+    record.update(token_endpoint=found["token_endpoint"], resource=found["resource"])
     verifier, state = secrets.token_urlsafe(48), secrets.token_urlsafe(24)
     challenge_hash = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
     params = {"response_type": "code", "client_id": record["client_id"], "redirect_uri": redirect,
-              "code_challenge": challenge_hash, "code_challenge_method": "S256", "state": state, "resource": url}
+              "code_challenge": challenge_hash, "code_challenge_method": "S256", "state": state,
+              "resource": found["resource"]}
     scope = oauth.get("scope") or found.get("scope")
     if scope:
         params["scope"] = scope

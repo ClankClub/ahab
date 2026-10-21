@@ -41,7 +41,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
         base = f"http://127.0.0.1:{self.server.server_port}"
-        if self.path == "/mcp":
+        if self.path.split("?")[0] == "/mcp":
             got = self.headers.get("Authorization")
             state["seen_tokens"].append(got)
             if not state["access"] or got != f"Bearer {state['access']}":
@@ -98,7 +98,9 @@ os.environ[mcp_auth.DIR_ENV] = str(auth_folder)
 os.environ[mcp_auth.CALLBACK_ENV] = "https://cb.test/functions/v1/ahab-oauth"
 home = Path(tempfile.mkdtemp())
 (home / "workspace").mkdir()
-(home / "home.json").write_text(json.dumps({"mcp": {"shop": {"url": URL, "approve": "none"}}}), encoding="utf-8")
+# The owner's url carries a query; the token is still named for the server as it names itself.
+(home / "home.json").write_text(json.dumps({"mcp": {"shop": {"url": URL + "?project=demo", "approve": "none"}}}),
+                                encoding="utf-8")
 m = Memory(home)
 
 
