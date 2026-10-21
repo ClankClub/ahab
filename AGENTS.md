@@ -19,7 +19,7 @@ The fences exist because Ahab reads strangers' text all day, not because of the 
 - Secrets live in environment variables, not in the repo. Ahab's file tools reach only `<home>/workspace/` through `_resolve()` in `ahab/tools.py`; web reading goes through `ahab/web.py`; outside services go through the n8n relays or a key in the environment, so the model never sees a token.
 - Keep the daily `DELETE_LIMIT` brake on any new delete tool.
 - After changing the browser box or the desktop box, run `py -m ahab.boxes.browser --check` or `py -m ahab.boxes.desktop --check`. Ask the owner before adding Docker sockets, host networking, extra mounts or proxy hosts.
-- The model backend stays swappable (`ahab/model.py`, `ahab/cli_model.py`). Tokens cost the owner money: a new tool goes into a group in `tools.GROUPS`, not the core.
+- The model backend stays swappable (`ahab/model.py`, `ahab/cli_model.py`). Tokens cost the owner money: a new tool goes into a group (its file's `GROUPS`, gathered by `tools.py`), not the core.
 - The details behind each of these are in [docs/FENCES.md](docs/FENCES.md).
 
 ## Working here

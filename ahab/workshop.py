@@ -120,6 +120,15 @@ def _docker_exe() -> str:
     raise WorkshopError("Docker isn't installed (or set AHAB_DOCKER_BIN).")
 
 
+def docker_ready(memory=None) -> bool:
+    """Whether this machine has Docker: the check for the workshop, browser and desktop groups."""
+    try:
+        _docker_exe()
+        return True
+    except WorkshopError:
+        return False
+
+
 def docker(*args: str, timeout: float = 120, check: bool = True,
            stdout=subprocess.PIPE, input: str | None = None) -> subprocess.CompletedProcess:
     exe = _docker_exe()

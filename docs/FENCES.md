@@ -12,7 +12,7 @@ Outside services go through the owner's local n8n: `ahab/connections/n8n.py` cal
 
 Drive, Docs, Sheets, Tasks and Contacts share one relay workflow; `ahab/connections/google.py` builds the requests, and both it and the relay refuse sharing and trashing, and deleting anything but Ahab's own tasks, task lists and contacts.
 
-Notion has its own relay workflow the same way (`ahab/connections/notion.py`): Ahab organizes its own workspace as it likes, and deletes only Notion's recoverable way (pages and databases to the trash, blocks one at a time). Those deletes are Ahab's own business (the owner's call, 2026-10-18), held to `DELETE_LIMIT` a day in `ahab/tools.py` so a planted instruction or a loop can't empty the place; keep that brake on any new delete tool.
+Notion has its own relay workflow the same way (`ahab/connections/notion.py`): Ahab organizes its own workspace as it likes, and deletes only Notion's recoverable way (pages and databases to the trash, blocks one at a time). Those deletes are Ahab's own business (the owner's call, 2026-10-18), held to `DELETE_LIMIT` a day (`ahab/toolkit.py`) so a planted instruction or a loop can't empty the place; keep that brake on any new delete tool.
 
 GitHub's relay (`ahab/connections/github.py`) is an allowlist inside Pip's own account: private repositories and unforced commits, public only through the `github_public` approval, and nothing under `.github/`. Don't add Ahab's GitHub account to the code repos: its token would let it push to its own code.
 

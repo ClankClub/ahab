@@ -20,6 +20,7 @@ import sys
 import zlib
 from datetime import datetime
 from pathlib import Path
+from ahab import toolkit
 
 MAX_WIDTH = 1600            # wider captures are halved until they fit; the model downsizes anyway
 
@@ -183,3 +184,26 @@ def screenshot_window(memory, app: str) -> str:
         return f"{head}. The model you're running on can't see images, so it isn't shown to you."
     senses.show(memory, tools.workspace_root(memory) / rel, rel)
     return f"{head}, and attached to this result. {senses.NOT_ORDERS}"
+
+
+# --- tools (tools.py gathers these; see toolkit.py) ----------------------------------
+
+def available(memory) -> bool:
+    try:
+        return bool(json.loads((memory.home / "home.json").read_text(encoding="utf-8")).get("screen_apps"))
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+TOOLS = {
+    "screenshot_window": (
+        toolkit.wrap(screenshot_window, ScreenError),
+        "A picture of one app's window on your owner's screen, for the apps they allow you to look "
+        "at (none unless they've said); it's attached to the result. Never the whole screen, and you "
+        'can only look, not click. Args: {"app": "<program name, like Obsidian>"}',
+    ),
+}
+
+GROUPS = {
+    "screen": ("screenshots of your owner's app windows", ("screenshot_window",), available),
+}

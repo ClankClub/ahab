@@ -50,6 +50,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 
 from ahab.workshop import WorkshopError, _docker_exe, _hash, docker, ensure_proxy
+from ahab import toolkit, workshop
 
 REPO = Path(__file__).resolve().parents[2]
 FILES = REPO / "desktop"
@@ -508,8 +509,8 @@ def desktop_files(memory, do: str, path: str = "") -> str:
         listed = ", ".join(written[:10]) + (f" and {len(written) - 10} more" if len(written) > 10 else "")
         return f"Brought {len(written)} file(s) back into your workspace: {listed}."
     if do == "reset":
-        if tools.deleted_today(memory) >= tools.DELETE_LIMIT:
-            raise DesktopError(f"You've deleted {tools.DELETE_LIMIT} things today, the daily limit.")
+        if toolkit.deleted_today(memory) >= toolkit.DELETE_LIMIT:
+            raise DesktopError(f"You've deleted {toolkit.DELETE_LIMIT} things today, the daily limit.")
         docker("rm", "-f", CONTAINER, check=False)
         docker("volume", "rm", "-f", VOLUME, check=False)
         result = "Wiped the desktop: its home and everything in it are gone; it starts fresh next time."
@@ -665,6 +666,57 @@ def main() -> None:
         path.write_bytes(base64.b64decode(answer.pop("image")))
         answer["saved"] = str(path)
     print(json.dumps(answer, indent=1))
+
+
+# --- tools (tools.py gathers these; see toolkit.py) ----------------------------------
+
+TOOLS = {
+    "desktop_look": (
+        toolkit.wrap(desktop_look, (DesktopError, WorkshopError)),
+        'A picture of your desktop: a Linux computer of your own in a locked box (XFCE, with '
+        'Firefox, LibreOffice, a text editor, files, a terminal and Obsidian), offline unless your '
+        'owner lists sites. The screen is 1024x768 and the picture is the same size, so x,y in it '
+        'are x,y for desktop_act. Also lists the open windows. "zoom": [x0, y0, x1, y1] enlarges a '
+        'region (its own coordinates, explained in the result); "grid": true draws a labeled grid '
+        'every 100 px; "save": true also saves it in media/ (to send it on). '
+        'Args: {"zoom": [..], "grid": false, "save": false} (all optional)',
+    ),
+    "desktop_act": (
+        toolkit.wrap(desktop_act, (DesktopError, WorkshopError)),
+        'Use your desktop like a person at it; answers with what happened, the windows and a fresh '
+        'screenshot. Actions: "click" {x, y, button: left|right|middle, count: 1-3}, "move" {x, y}, '
+        '"drag" {x, y, to_x, to_y}, "scroll" {x, y, direction: up|down|left|right, amount: 1-10}, '
+        '"type" {text}, "key" {keys: like "ctrl+s", "Return", "alt+F4"}, "launch" {app: files, '
+        'editor, writer, calc, firefox, terminal, images, calculator, obsidian}, "focus" {window: '
+        'part of a title}, "copy" (reads the clipboard as text: select, ctrl+c, then copy, for '
+        'exact text), "wait" {seconds: up to 5}. Nothing in the box reaches anyone, so act freely. '
+        'Args: {"action": "<action>", ...its args}',
+    ),
+    "desktop_shell": (
+        toolkit.wrap(desktop_shell, (DesktopError, WorkshopError)),
+        'Run a shell command (bash) inside your desktop box, as its user, in its home folder; the '
+        "output comes back as text. It's the box's own Linux, offline unless your owner lists "
+        "sites: Python 3 and the usual tools, nothing of your owner's PC. Files you make there stay "
+        'in the box until desktop_files "get" brings them back. '
+        f'Args: {{"command": "<command>", "timeout": <seconds, up to {SHELL_MAX_TIMEOUT}>}} '
+        f'(timeout optional, default {SHELL_TIMEOUT})',
+    ),
+    "desktop_files": (
+        toolkit.wrap(desktop_files, (DesktopError, WorkshopError)),
+        "Move files between your workspace and your desktop's home folder. \"list\" shows what's "
+        'there (path optional); "put" copies a workspace file or folder in, under ~/from-workspace/; '
+        '"get" copies a file or folder from the desktop into your workspace, under desktop/; "reset" '
+        "wipes the desktop's home and starts it fresh (counts as a deletion). "
+        'Args: {"do": "list|put|get|reset", "path": "<path>"}',
+    ),
+}
+
+GROUPS = {
+    "desktop": ("your own Linux desktop in a box: screen, mouse, keyboard, its shell and files",
+        ("desktop_look", "desktop_act", "desktop_shell", "desktop_files"), workshop.docker_ready),
+}
+
+
 
 
 if __name__ == "__main__":

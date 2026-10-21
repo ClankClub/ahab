@@ -71,7 +71,7 @@ CREW_REFUSED = ("message_owner", "set_alarm", "cancel_alarm", "set_intent", "can
                 "read_conversation", "about_yourself", "tool_help")
 # Groups a crew agent may be given, and the tools in each it may not have. Left out:
 # watches (they wake Ahab), workers and agents (no delegating), browser, desktop and
-# workshop (one shared box each), shell and screen (Ahab's alone), publishing (outward).
+# workshop (one shared box each), shell and screen (Ahab's alone), github and vercel (outward).
 AGENT_GROUPS = {"sources": (), "vault": (), "email": ("send_email",), "calendar": (),
                 "google_files": (), "tasks_and_contacts": (), "notion": ()}
 

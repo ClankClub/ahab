@@ -32,7 +32,7 @@ import hashlib
 import re
 from datetime import datetime
 
-from ahab import approvals, workshop
+from ahab import approvals, toolkit, workshop
 from ahab.connections import n8n
 from ahab.memory import Memory
 
@@ -243,3 +243,31 @@ def _make_public(memory: Memory, payload: dict) -> str:
 
 
 approvals.register("github_public", _public_card, _make_public)
+
+
+# --- tools (tools.py gathers these; see toolkit.py) ----------------------------------
+
+TOOLS = {
+    "list_repos": (
+        toolkit.wrap(list_repos, (GitHubError, n8n.N8nError)),
+        'List the repositories in your GitHub account, private or public. No args.',
+    ),
+    "push_site": (
+        toolkit.wrap(push_site, (GitHubError, n8n.N8nError)),
+        "Save a workshop site's source to a private GitHub repository of the same name in "
+        'your own account, made on the first push. Each push is one commit of the '
+        'whole site; briefs and build output stay out. '
+        'Args: {"name": "<site>", "message": "<what changed>"} (message optional)',
+    ),
+    "request_make_public": (
+        toolkit.wrap(request_make_public, (GitHubError, n8n.N8nError)),
+        'Ask your owner to make a repository public, so anyone can see its files and history. '
+        'They get a card with Approve and Deny buttons; it happens only if they approve, and '
+        'only for the commit it is at now. Args: {"name": "<repo>", "note": "<why, for them>"} '
+        '(note optional)',
+    ),
+}
+
+GROUPS = {
+    "github": ("your GitHub repositories", ("list_repos", "push_site", "request_make_public"), n8n.available),
+}

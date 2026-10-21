@@ -28,6 +28,7 @@ import re
 import secrets
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from ahab import toolkit
 
 NOTE_LIMIT = 20_000                 # notes looked at in one search or link scan
 NOTE_BYTE_LIMIT = 1024 * 1024       # bigger notes are skipped by search, refused by read
@@ -446,3 +447,45 @@ def delete(memory, note: str) -> str:
     rel = rel_of(root, path)
     where = _trash(root, path)
     return f"Moved {rel} to the vault's trash ({where}), where it can be brought back."
+
+
+# --- tools (tools.py gathers these; see toolkit.py) ----------------------------------
+
+TOOLS = {
+    "vault_search": (
+        toolkit.wrap(search, ObsidianError),
+        'Search the Obsidian vault (notes that link to each other, as Markdown files) by words '
+        '(best match first, with a snippet) and/or a tag. With neither, lists the notes changed '
+        'most recently. Args: {"query": "<words>", "tag": "<tag>"} (both optional)',
+    ),
+    "vault_read": (
+        toolkit.wrap(read, ObsidianError),
+        'Read a note in the vault by its name or path, the way a [[link]] names it, with the notes '
+        'it links to and the notes that link to it. "today", "yesterday" and "tomorrow" mean those '
+        'daily notes. Args: {"note": "<name>", "start": <char offset>} (start optional)',
+    ),
+    "vault_write": (
+        toolkit.wrap(write, ObsidianError),
+        'Write a note in the vault; link others with [[Note name]] and tag with #tag. mode: '
+        '"create" (the default; a new note, folders made as needed), "append" (the default for '
+        'a daily note; starts the note if it is new), "replace" (the old version goes to the '
+        "vault's trash), or give old, an exact passage to swap for content. \"today\" is today's "
+        f'daily note. Max {toolkit.WRITE_CHAR_LIMIT} chars. Args: {{"note": "<name or folder/name>", '
+        '"content": "<Markdown>", "mode": "<mode>", "old": "<passage>"} (mode and old optional)',
+    ),
+    "vault_move": (
+        toolkit.wrap(move, ObsidianError),
+        'Rename a note or move it to another folder of the vault; every [[link]] to it is updated. '
+        'Args: {"note": "<name>", "to": "<new name, folder/new name, or an existing folder>"}',
+    ),
+    "vault_delete": (
+        toolkit.wrap(delete, ObsidianError, deleting=True),
+        "Move a note to the vault's trash, where it can be brought back. One of your "
+        f'{toolkit.DELETE_LIMIT} deletes a day. Args: {{"note": "<name>"}}',
+    ),
+}
+
+GROUPS = {
+    "vault": ("the Obsidian vault of notes",
+        ("vault_search", "vault_read", "vault_write", "vault_move", "vault_delete"), lambda memory: True),
+}

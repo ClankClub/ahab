@@ -42,7 +42,7 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 
-from ahab import approvals, workshop
+from ahab import approvals, toolkit, workshop
 from ahab.connections import n8n
 from ahab.memory import Memory
 
@@ -368,3 +368,34 @@ def _publish(memory: Memory, payload: dict) -> str:
 
 
 approvals.register("vercel_publish", _publish_card, _publish)
+
+
+# --- tools (tools.py gathers these; see toolkit.py) ----------------------------------
+
+TOOLS = {
+    "list_websites": (
+        toolkit.wrap(list_websites, (VercelError, n8n.N8nError)),
+        "Your websites on Vercel and their public addresses; with a name, that site's recent "
+        'deployments and their ids. Args: {"name": "<site>"} (optional)',
+    ),
+    "preview_site": (
+        toolkit.wrap(preview_site, (VercelError, n8n.N8nError)),
+        "Put a workshop site's latest finished build online as a preview on Vercel, in your own "
+        "account (a project of the same name, made the first time). Previews are behind Vercel's "
+        'sign-in: only someone signed in to your Vercel account can open them. The first preview '
+        "also gives the site its public address, showing a placeholder page until your owner approves "
+        'publishing, so the name itself is public from then on. '
+        f'{DAILY_LIMIT} deployments a day. Args: {{"name": "<site>"}}',
+    ),
+    "request_publish": (
+        toolkit.wrap(request_publish, (VercelError, n8n.N8nError)),
+        'Ask your owner to make a site public on Vercel. They get a card with Approve and Deny buttons '
+        'and the preview to look at; if they approve, exactly that deployment becomes the public site. '
+        'Without a deployment id, the latest ready preview. Args: {"name": "<site>", '
+        '"deployment": "<dpl_...>", "note": "<why, for them>"} (deployment, note optional)',
+    ),
+}
+
+GROUPS = {
+    "vercel": ("your Vercel websites", ("list_websites", "preview_site", "request_publish"), n8n.available),
+}

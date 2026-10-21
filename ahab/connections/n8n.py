@@ -56,6 +56,11 @@ INVISIBLE = re.compile(r"[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180e"
                        r"\u200b-\u200f\u2060-\u2064\ufeff]")
 
 
+def available(memory=None) -> bool:
+    """Whether this install uses n8n (its key is set): the check for the groups that go through it."""
+    return bool(os.environ.get(KEY_ENV, "").strip())
+
+
 class N8nError(Exception):
     """n8n couldn't be reached or the workflow failed. Readable by Ahab."""
 
