@@ -16,8 +16,9 @@ Two ways to reach a server:
          log. It runs as Ahab's user, with that user's reach on this machine.
   http   the server is a web address ("Streamable HTTP"). Each message is a POST; the
          answer comes back as plain JSON or as a short event stream (text/event-stream).
-         The older HTTP+SSE transport and OAuth sign-in aren't supported: a server that
-         needs a login takes a key in a header instead.
+         A server that wants the owner to sign in gets an OAuth login (mcp_auth.py): a link
+         on Telegram, a tap, and code keeps the token. A server that takes a key instead
+         gets it in a header. The older HTTP+SSE transport isn't supported.
 
 The owner lists servers in home.json, which Ahab's file tools can't reach, so Ahab can't add
 one itself (a stdio server is a program it would be running):
@@ -37,6 +38,8 @@ Per server, optionally:
              the server doesn't mark read-only), "all", "none", or a list of tool names.
   "tools"    the only tool names Ahab is offered (a big server costs fewer tokens).
   "timeout"  seconds to wait for an answer (default TIMEOUT; a first `npx` run downloads).
+  "oauth"    for a login service that doesn't let apps register themselves: {"client_id",
+             "client_secret" (as $NAME), "scope"}. Most servers need nothing here.
 
 Ahab's side is two tools in the "mcp" group: mcp_tools says what's there (names first, one
 tool's full description and arguments on request), mcp_call runs one. That's how Claude Code
@@ -71,6 +74,7 @@ import urllib.request
 from pathlib import Path
 
 from ahab import approvals, toolkit
+from ahab.connections import mcp_auth
 
 PROTOCOL = "2025-06-18"
 KNOWN_PROTOCOLS = ("2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25")
@@ -217,8 +221,9 @@ class _Session:
 
 
 class _Stdio(_Session):
-    def __init__(self, name: str, config: dict, home: Path):
+    def __init__(self, name: str, config: dict, memory):
         super().__init__(name, config)
+        home = memory.home
         command = config["command"]
         parts = shlex.split(command, posix=os.name != "nt") if isinstance(command, str) else list(command)
         if not parts:
@@ -310,8 +315,9 @@ class _Stdio(_Session):
 
 
 class _Http(_Session):
-    def __init__(self, name: str, config: dict, home: Path):
+    def __init__(self, name: str, config: dict, memory):
         super().__init__(name, config)
+        self.memory = memory
         self.url = _fill(config["url"], f"{name}'s url").strip()
         host = urllib.parse.urlparse(self.url).hostname or ""
         if not (self.url.startswith("https://")
@@ -322,10 +328,17 @@ class _Http(_Session):
             raise MCPError(f"{name}'s headers have to be an object of Name: value.")
         self.headers = {str(k): _fill(v, f"{name}'s headers") for k, v in given.items()}
         self.session_id: str | None = None
+        # With no key of the owner's in the headers, a login (if the server wants one) does it.
+        self.login = not any(k.lower() == "authorization" for k in self.headers)
+        oauth = config.get("oauth")
+        self.oauth = oauth if isinstance(oauth, dict) else {}
 
-    def _post(self, message: dict):
+    def _post(self, message: dict, retried: bool = False):
         headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream",
                    **self.headers}
+        token = mcp_auth.token(self.memory, self.name, self.url) if self.login else None
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
         if self.session_id:
             headers["Mcp-Session-Id"] = self.session_id
         if self.protocol:
@@ -337,6 +350,15 @@ class _Http(_Session):
         except urllib.error.HTTPError as e:
             if e.code == 404 and self.session_id:
                 raise _Expired(f"{self.name} forgot the session.") from None
+            if e.code == 401 and self.login:
+                if token and not retried and mcp_auth.refresh(self.memory, self.name, self.url):
+                    return self._post(message, retried=True)
+                try:
+                    said = mcp_auth.start_login(self.memory, self.name, self.url,
+                                                e.headers.get("WWW-Authenticate", ""), self.oauth)
+                except mcp_auth.AuthError as why:
+                    raise MCPError(str(why)) from None
+                raise MCPError(said) from None
             if e.code in (401, 403):
                 raise MCPError(f"{self.name} turned Ahab away ({e.code}). Its key may be missing or "
                                "wrong; that's for your owner to fix.") from None
@@ -414,7 +436,7 @@ def _session(memory, name: str) -> _Session:
             session.close()
             session = None
         if session is None:
-            session = (_Http if "url" in config else _Stdio)(name, config, memory.home)
+            session = (_Http if "url" in config else _Stdio)(name, config, memory)
             session.fingerprint = fingerprint
             try:
                 session.open()

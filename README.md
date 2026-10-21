@@ -116,7 +116,7 @@ Any MCP server can lend Ahab its tools. List them in `home/home.json`:
 }
 ```
 
-A `command` is a program Ahab starts (stdio); a `url` is a server on the web (Streamable HTTP, https only). `$NAME` is read from the environment, so keys stay out of `home.json`; a started server sees only a basic environment plus what its `"env"` names. A call waits for your Approve tap unless the server marks that tool read-only; `"approve": "none"` (or `"all"`, or a list of tool names) changes that per server, and `"tools"` limits which tools Ahab is offered. `py -m ahab.connections.mcp` starts each server and lists its tools.
+A `command` is a program Ahab starts (stdio); a `url` is a server on the web (Streamable HTTP, https only). `$NAME` is read from the environment, so keys stay out of `home.json`; a started server sees only a basic environment plus what its `"env"` names. A call waits for your Approve tap unless the server marks that tool read-only; `"approve": "none"` (or `"all"`, or a list of tool names) changes that per server, and `"tools"` limits which tools Ahab is offered. A server that wants you to sign in (OAuth) gets a login link sent to you on Telegram; tap it, allow, and Ahab keeps the token outside the repo. That needs the `ahab-oauth` function (`supabase/functions/`) deployed with JWT verification off in the Supabase project `AHAB_SUPABASE_URL` names, and its table (`mcp_auth.SETUP_SQL`), or another callback in `AHAB_MCP_CALLBACK`. `py -m ahab.connections.mcp` starts each server and lists its tools.
 
 ### Sources (what you did with other agents)
 

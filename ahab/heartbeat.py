@@ -31,7 +31,7 @@ from pathlib import Path
 from ahab import (agents, alarms, approvals, digest, dream, goals, identity, inbox, intents, senses, session, skills,
                   tools, watchdog, watches, workers, workshop)
 from ahab.boxes import desktop
-from ahab.connections import mail, n8n
+from ahab.connections import mail, mcp_auth, n8n
 from ahab.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from ahab.model import ModelClient, ModelError, with_fallback
 
@@ -923,7 +923,8 @@ def main() -> None:
                 if sleep_until(wake_at, interrupt=lambda: inbox.knocked(memory)
                                or approvals.waiting(memory) or workshop.waiting(memory)
                                or workers.waiting(memory) or agents.waiting(memory)
-                               or mail.waiting(memory) or goals.due_now(memory)):
+                               or mail.waiting(memory) or goals.due_now(memory)
+                               or mcp_auth.collect(memory)):
                     print("--- knock: a message, an approval, a finished build, worker or agent"
                           " task, or an email; waking early. ---\n")
                     break

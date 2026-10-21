@@ -1,0 +1,5 @@
+# Only what the Supabase CLI needs to deploy Ahab's one function, if it's deployed that way
+# (`supabase functions deploy ahab-oauth`). Pasting it into the dashboard works too: turn
+# "Verify JWT" off there.
+[functions.ahab-oauth]
+verify_jwt = false
