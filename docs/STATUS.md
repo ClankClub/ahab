@@ -31,14 +31,15 @@ Moving to a Linux laptop (2026-10-20): the code is now Ahab throughout (`ahab` p
 
 ## Next, roughly in order
 
-1. **Tool grouping (next, the owner's priority):** the tool list is about 20,000 characters, re-sent on every call of every wake; show some groups (browser, desktop, Notion, GitHub) only once asked for.
-2. **Desktop phase 2:** desktop jobs (a worker that holds the desktop for a long errand), `--replay` and `--calibrate`; see [DESIGN_DESKTOP.md](DESIGN_DESKTOP.md).
-3. **Goals:** the next genre in the agent comparison: something longer-lived than an alarm or intent that Pip works toward across wakes and reports on.
-4. **Model fallback:** when the running backend fails (a lapsed login, an outage), a wake falls back to a second one instead of not happening.
-5. **Skill upkeep:** the dream reviews skills it wrote for ones that went stale or never get used.
-6. **More search providers:** `brave` and `searxng` in `ahab/search.py`, for homes on an API.
-7. **Backend bake-off:** replay real owner messages through copies of the home on `codex-luna`, `claude-haiku` and DeepSeek, scoring JSON slips, tool choices, finishing the job, voice, time and tokens.
-8. **Small gaps:** find-and-replace in Docs; Notion restore from trash and moving into a database (both want a newer Notion API version).
-9. **Mail off the list,** if wanted, through the approval step.
-10. **A reply form for API backends** (`response_format: json_schema`), if an OpenAI or OpenRouter backend is used.
-11. **Later:** a Windows `install.ps1`; browser sign-in to Pip's own accounts through approvals; a model ladder and a spend cap.
+1. **Sources (next, agreed 2026-10-20):** one memory across everything the owner uses. Copies of other agents' and apps' records (Hermes first, delivered nightly; then uploaded exports like ChatGPT's), searchable by Pip and digested into his memory under a write fence; see [DESIGN_SOURCES.md](DESIGN_SOURCES.md).
+2. **Tool grouping (the owner's earlier priority):** the tool list is about 20,000 characters, re-sent on every call of every wake; show some groups (browser, desktop, Notion, GitHub) only once asked for.
+3. **Desktop phase 2:** desktop jobs (a worker that holds the desktop for a long errand), `--replay` and `--calibrate`; see [DESIGN_DESKTOP.md](DESIGN_DESKTOP.md).
+4. **Goals:** the next genre in the agent comparison: something longer-lived than an alarm or intent that Pip works toward across wakes and reports on.
+5. **Model fallback:** when the running backend fails (a lapsed login, an outage), a wake falls back to a second one instead of not happening.
+6. **Skill upkeep:** the dream reviews skills it wrote for ones that went stale or never get used.
+7. **More search providers:** `brave` and `searxng` in `ahab/search.py`, for homes on an API.
+8. **Backend bake-off:** replay real owner messages through copies of the home on `codex-luna`, `claude-haiku` and DeepSeek, scoring JSON slips, tool choices, finishing the job, voice, time and tokens.
+9. **Small gaps:** find-and-replace in Docs; Notion restore from trash and moving into a database (both want a newer Notion API version).
+10. **Mail off the list,** if wanted, through the approval step.
+11. **A reply form for API backends** (`response_format: json_schema`), if an OpenAI or OpenRouter backend is used.
+12. **Later:** a Windows `install.ps1`; browser sign-in to Pip's own accounts through approvals; a model ladder and a spend cap.
