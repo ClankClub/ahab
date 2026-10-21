@@ -52,6 +52,8 @@ MAX_TOOL_CALLS = 20
 # (The full result is still in the log.)
 TRIM_RESULTS_OVER = 1500
 TRIMMED_KEEP = 600
+# Where the tool list goes in the prompt; beat() fills it in for each home and wake-up.
+TOOL_LIST = "<<the tool list>>"
 # --restart leaves this note in the home so the new heartbeat can say who
 # restarted it. Only a fresh note counts, in case a restart never happened.
 RESTART_NOTE = "restart.note"
@@ -133,7 +135,7 @@ Each wake-up you can:
    result stays whole: once you call another tool, a long earlier result is
    cut to its first {TRIMMED_KEEP} characters. So when a result matters, put
    what you need from it in your next "thought" before moving on. Available tools:
-{tools.describe()}
+{TOOL_LIST}
 3. Message your owner, in the "message" field of your final reply. That's
    the usual way to answer them: it's sent as you finish, with no extra
    step. Use the message_owner tool only to say something before you carry
@@ -280,6 +282,8 @@ def trim_last_result(messages: list[dict]) -> None:
     if last["role"] != "user" or not last["content"].startswith(prefix):
         return
     result = last["content"][len(prefix):]
+    if result.startswith(tools.HELP_MARK):   # tool_help: instructions to keep for the whole wake
+        return
     if len(result) > TRIM_RESULTS_OVER:
         last["content"] = (f"{prefix}{result[:TRIMMED_KEEP]}\n[trimmed: {len(result) - TRIMMED_KEEP}"
                            " more chars, cut once a newer result arrived. Run the tool again"
@@ -461,8 +465,10 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
                                     workshop.describe_running(memory),
                                     workers.describe_running(memory),
                                     mail.describe_waiting(memory)) if s)
+    # The tool list is filled in per wake-up: which groups this machine can run, and which
+    # were used lately (tools.describe). It stays the same for every call of the wake.
     messages = [
-        {"role": "system", "content": prompt},
+        {"role": "system", "content": prompt.replace(TOOL_LIST, tools.describe(memory))},
         {"role": "user", "content": f"Current time: {now} (your owner's local time: "
                                     f"{datetime.now().astimezone():%A %d %B %Y, %H:%M %Z})\n"
                                     f"{coming_days(datetime.now().astimezone())}\n"

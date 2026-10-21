@@ -1324,9 +1324,145 @@ TOOLS = {
 }
 
 
-def describe() -> str:
-    """Tool list, formatted for the system prompt."""
-    return "\n".join(f"- {name}: {desc}" for name, (_, desc) in TOOLS.items())
+def tool_help(memory: Memory, group: str = "", tool: str = "") -> str:
+    """The full instructions for one group of tools, or one tool."""
+    if tool:
+        if tool not in TOOLS:
+            raise ToolError(f"No tool {tool!r}. Groups: {', '.join(GROUPS)}.")
+        return f"{HELP_MARK} {tool}:\n- {tool}: {TOOLS[tool][1]}"
+    key = str(group or "").strip().lower().replace(" ", "_")
+    if key not in GROUPS:
+        raise ToolError(f"No group {group!r}. Groups: {', '.join(GROUPS)}.")
+    about, names, _ = GROUPS[key]
+    note = "" if _available(memory, key) else "\n(Not set up on this machine yet, so these will refuse.)"
+    return (f"{HELP_MARK} {key} ({about}). These stay in front of you for the rest of this wake-up:{note}\n"
+            + "\n".join(f"- {n}: {TOOLS[n][1]}" for n in names))
+
+
+TOOLS["tool_help"] = (
+    tool_help,
+    'Show the full instructions for a group of tools listed below by name only, or for one tool. '
+    'You can call a listed tool without this when you know its args. '
+    'Args: {"group": "<group>"} or {"tool": "<tool name>"}',
+)
+
+HELP_MARK = "How to use"   # a tool_help result starts with this; the heartbeat never trims it
+
+
+def _n8n(memory: Memory) -> bool:
+    return bool(os.environ.get(n8n.KEY_ENV, "").strip())
+
+
+def _docker(memory: Memory) -> bool:
+    try:
+        workshop._docker_exe()
+        return True
+    except workshop.WorkshopError:
+        return False
+
+
+def _shell(memory: Memory) -> bool:
+    try:
+        hostshell.user(memory)
+        return True
+    except hostshell.ShellError:
+        return False
+
+
+def _screen(memory: Memory) -> bool:
+    try:
+        return bool(json.loads((memory.home / "home.json").read_text(encoding="utf-8")).get("screen_apps"))
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def _sources(memory: Memory) -> bool:
+    return bool(sources.configured(memory.home))
+
+
+def _always(memory: Memory) -> bool:
+    return True
+
+
+# The tools shown by name only, one line a group, unless the group was used lately. Each
+# group: what it's for, its tools, and whether this machine can run it, checked every
+# wake-up, so a group appears as soon as its setup does. Tools in no group are the core,
+# always described in full. Every tool stays callable either way.
+GROUPS = {
+    "sources": ("copies of what the owner did with other agents and apps", ("sources",), _sources),
+    "vault": ("the Obsidian vault of notes", ("vault_search", "vault_read", "vault_write", "vault_move",
+                                              "vault_delete"), _always),
+    "watches": ("watching a web page for a change", ("watch_page", "cancel_watch"), _always),
+    "workers": ("helpers that research or read in the background and report to you",
+                ("start_worker", "check_worker", "cancel_worker"), _always),
+    "browser": ("a real browser, for pages that need JavaScript or clicking",
+                ("browse", "browse_look", "browse_click", "browse_type", "browse_scroll", "browse_back",
+                 "browse_screenshot"), _docker),
+    "desktop": ("your own Linux desktop in a box: screen, mouse, keyboard, its shell and files",
+                ("desktop_look", "desktop_act", "desktop_shell", "desktop_files"), _docker),
+    "shell": ("a shell on this machine, as your own user", ("shell", "shell_files"), _shell),
+    "screen": ("screenshots of your owner's app windows", ("screenshot_window",), _screen),
+    "email": ("your email", ("search_email", "read_email", "save_attachment", "send_email"), _n8n),
+    "calendar": ("the calendar", ("check_calendar", "add_event", "update_event"), _n8n),
+    "google_files": ("Google Drive, Docs and Sheets",
+                     ("drive_search", "read_drive_file", "save_drive_file", "create_doc", "append_to_doc",
+                      "read_sheet", "create_sheet", "add_rows", "update_cells"), _n8n),
+    "tasks_and_contacts": ("Google Tasks and Contacts",
+                           ("list_tasks", "add_task", "update_task", "delete_task", "create_task_list",
+                            "delete_task_list", "search_contacts", "add_contact", "update_contact",
+                            "delete_contact"), _n8n),
+    "notion": ("Notion", ("search_notion", "read_notion", "create_notion_page", "append_to_notion",
+                          "update_notion", "rewrite_notion", "move_notion", "create_notion_database",
+                          "delete_notion"), _n8n),
+    "workshop": ("building code and sites with a builder in a box",
+                 ("start_build", "check_build", "read_build_file"), _docker),
+    "publishing": ("your GitHub repositories and Vercel websites",
+                   ("list_repos", "push_site", "request_make_public", "list_websites", "preview_site",
+                    "request_publish"), _n8n),
+}
+RECENT_DAYS = 7   # a group used this recently is shown in full
+
+
+def _available(memory: Memory, group: str) -> bool:
+    try:
+        return bool(GROUPS[group][2](memory))
+    except Exception:   # a broken check hides nothing: the tool itself says what's wrong
+        return True
+
+
+def recently_used(memory: Memory, days: int = RECENT_DAYS) -> set[str]:
+    """Tool names used in the last few days, from the log."""
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+    try:
+        rows = memory.db.execute("SELECT content FROM events WHERE kind = 'tool' AND time >= ?",
+                                 (since,)).fetchall()
+    except Exception:
+        return set()
+    return {str(r[0]).split(" ", 1)[0] for r in rows}
+
+
+def describe(memory: Memory | None = None) -> str:
+    """Tool list, formatted for the system prompt. Without a home, every tool in full."""
+    if memory is None:
+        return "\n".join(f"- {name}: {desc}" for name, (_, desc) in TOOLS.items())
+    grouped = {n for _, names, _ in GROUPS.values() for n in names}
+    lines = [f"- {name}: {desc}" for name, (_, desc) in TOOLS.items() if name not in grouped]
+    used, short, missing = recently_used(memory), [], []
+    for key, (about, names, _) in GROUPS.items():
+        if not _available(memory, key):
+            missing.append(key)
+        elif used.intersection(names):
+            lines += [f"- {n}: {TOOLS[n][1]}" for n in names]
+        else:
+            short.append(f"- {key}, {about}: {', '.join(names)}")
+    if short:
+        lines.append("More tools, by group. tool_help {\"group\": \"<group>\"} shows how to use one "
+                     "(a group you've used this week is described in full above):")
+        lines += short
+    if missing:
+        lines.append("Not set up on this machine yet, so they'd refuse (your owner can set them up): "
+                     f"{', '.join(missing)}.")
+    return "\n".join(lines)
 
 
 def run(memory: Memory, name: str, args: dict) -> str:
@@ -1343,6 +1479,7 @@ def run(memory: Memory, name: str, args: dict) -> str:
             desktop.DesktopError, sources.SourceError) as e:
         return f"{name} refused: {e}"
     except (TypeError, ValueError) as e:
-        return f"Bad args for {name}: {e}"
+        # Its instructions come along, since a grouped tool may not have been shown in full.
+        return f"Bad args for {name}: {e}\n{HELP_MARK} {name}: {TOOLS[name][1]}"
     except OSError as e:
         return f"{name} failed: {e.strerror or e}"

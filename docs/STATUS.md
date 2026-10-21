@@ -23,7 +23,6 @@ Moving to a Linux laptop (2026-10-20): the code is now Ahab throughout (`ahab` p
 - The Obsidian vault (new): whether Pip uses it as a real notebook (links, daily notes) or ignores it next to its own memory folder. Obsidian is installed on the PC, with Pip's vault at `home/workspace/vault`.
 - The desktop (new): whether Pip reaches for it, how well Luna clicks from screenshots (no number yet; calibration is phase 2), what a desktop wake costs with a picture on every call, and whether the home volume grows.
 - The sanity canary (new): one live probe came back clean; watch its first days on the real home. A "model_tools" event in the log means Codex's own tools are back.
-- The tool list is about 20,000 characters on every wake and growing (a third of the page). At some point tools want grouping (browser tools appearing only once asked for, say).
 - Codex's audit (2026-10-19, in its scratch fork's `docs/audit/`): three fixes are in; 23 findings remain, the worst being EX-02 (desktop and workshop output buffered whole on the PC before any limit), then interrupted approvals left `running`, the mail watch missing a burst past 25, and worker cancel and usage accounting.
 - Sources (new): whether Pip looks in the Hermes copy when the owner mentions it, and how fast the archive grows.
 - A real email waking Pip through the mail watch hasn't been seen yet.
@@ -32,16 +31,15 @@ Moving to a Linux laptop (2026-10-20): the code is now Ahab throughout (`ahab` p
 
 ## Next, roughly in order
 
-1. **Tool grouping (the owner's earlier priority):** the tool list is about 20,000 characters, re-sent on every call of every wake; show some groups (browser, desktop, Notion, GitHub) only once asked for.
-2. **A terse background voice (agreed 2026-10-20):** the caveman idea, for what Pip writes that nobody reads for pleasure: thoughts between tool calls, worker reports, the digest's pages and index. Never his messages to the owner unless the owner asks, and never what he reads (his rules, the owner's words), since compressing a prompt makes answers worse. Matters most on a per-token backend like Sonnet.
-3. **Desktop phase 2:** desktop jobs (a worker that holds the desktop for a long errand), `--replay` and `--calibrate`; see [DESIGN_DESKTOP.md](DESIGN_DESKTOP.md).
-4. **Goals:** the next genre in the agent comparison: something longer-lived than an alarm or intent that Pip works toward across wakes and reports on.
-5. **Model fallback:** when the running backend fails (a lapsed login, an outage), a wake falls back to a second one instead of not happening.
-6. **Skill upkeep:** the dream reviews skills it wrote for ones that went stale or never get used.
-7. **Sources phase 3 (parked 2026-10-20, the owner's call):** uploaded exports like ChatGPT's, built against a real export, with the monthly nudge and re-read; see [DESIGN_SOURCES.md](DESIGN_SOURCES.md). Phases 1 and 2 are built: Hermes's record delivered daily, searchable by Pip, and distilled each morning by the digest into pages under `memory/sources/hermes/`. The digest's first live run read and wrote nothing (fixed in `ddc7030`); check the next morning runs actually write pages.
-8. **More search providers:** `brave` and `searxng` in `ahab/search.py`, for homes on an API.
-9. **Backend bake-off:** replay real owner messages through copies of the home on `codex-luna`, `claude-haiku` and DeepSeek, scoring JSON slips, tool choices, finishing the job, voice, time and tokens.
-10. **Small gaps:** find-and-replace in Docs; Notion restore from trash and moving into a database (both want a newer Notion API version).
-11. **Mail off the list,** if wanted, through the approval step.
-12. **A reply form for API backends** (`response_format: json_schema`), if an OpenAI or OpenRouter backend is used.
-13. **Later:** a Windows `install.ps1`; browser sign-in to Pip's own accounts through approvals; a model ladder and a spend cap.
+1. **A terse background voice (agreed 2026-10-20):** the caveman idea, for what Pip writes that nobody reads for pleasure: thoughts between tool calls, worker reports, the digest's pages and index. Never his messages to the owner unless the owner asks, and never what he reads (his rules, the owner's words), since compressing a prompt makes answers worse. Matters most on a per-token backend like Sonnet.
+2. **Desktop phase 2:** desktop jobs (a worker that holds the desktop for a long errand), `--replay` and `--calibrate`; see [DESIGN_DESKTOP.md](DESIGN_DESKTOP.md).
+3. **Goals:** the next genre in the agent comparison: something longer-lived than an alarm or intent that Pip works toward across wakes and reports on.
+4. **Model fallback:** when the running backend fails (a lapsed login, an outage), a wake falls back to a second one instead of not happening.
+5. **Skill upkeep:** the dream reviews skills it wrote for ones that went stale or never get used.
+6. **Sources phase 3 (parked 2026-10-20, the owner's call):** uploaded exports like ChatGPT's, built against a real export, with the monthly nudge and re-read; see [DESIGN_SOURCES.md](DESIGN_SOURCES.md). Phases 1 and 2 are built: Hermes's record delivered daily, searchable by Pip, and distilled each morning by the digest into pages under `memory/sources/hermes/`. The digest's first live run read and wrote nothing (fixed in `ddc7030`); check the next morning runs actually write pages.
+7. **More search providers:** `brave` and `searxng` in `ahab/search.py`, for homes on an API.
+8. **Backend bake-off:** replay real owner messages through copies of the home on `codex-luna`, `claude-haiku` and DeepSeek, scoring JSON slips, tool choices, finishing the job, voice, time and tokens.
+9. **Small gaps:** find-and-replace in Docs; Notion restore from trash and moving into a database (both want a newer Notion API version).
+10. **Mail off the list,** if wanted, through the approval step.
+11. **A reply form for API backends** (`response_format: json_schema`), if an OpenAI or OpenRouter backend is used.
+12. **Later:** a Windows `install.ps1`; browser sign-in to Pip's own accounts through approvals; a model ladder and a spend cap.
