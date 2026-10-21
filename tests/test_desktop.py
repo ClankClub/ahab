@@ -153,5 +153,5 @@ assert desktop.idle_at() is None
 
 # Workers don't get the desktop (one shared box), and the tools are counted.
 assert not {"desktop_look", "desktop_act", "desktop_shell", "desktop_files"} & set(workers.WORKER_TOOLS)
-assert len(tools.TOOLS) == 103
+assert len(tools.TOOLS) == 105
 print("desktop ok")

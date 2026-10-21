@@ -37,7 +37,7 @@ Tools so far:
                get a website built by Codex, in a locked box (see workshop.py)
 
   The rest live with what they reach: connections/ (email, Google, Notion, GitHub, Vercel,
-  Supabase, the Obsidian vault) and boxes/ (the browser, the desktop, its own shell, window
+  Supabase, the Obsidian vault, MCP servers) and boxes/ (the browser, the desktop, its own shell, window
   screenshots). Each of those files ends with its own TOOLS and GROUPS, gathered into the
   tables below through CONNECTED; toolkit.py has what they share.
 
@@ -58,13 +58,14 @@ from pathlib import Path
 
 from ahab import agents, alarms, goals, inbox, intents, search, senses, sources, watches, web, workers, workshop
 from ahab.boxes import browser, desktop, hostshell, screen
-from ahab.connections import github, google, mail, notion, obsidian, supabase, vercel
+from ahab.connections import github, google, mail, mcp, notion, obsidian, supabase, vercel
 from ahab.memory import Memory
 from ahab.toolkit import DELETE_LIMIT, WRITE_CHAR_LIMIT, ToolError, deleted_today  # noqa: F401  (tools.X for older callers)
 
 # The files whose own TOOLS and GROUPS join the core below. A new connection or box is a
 # file in connections/ or boxes/ plus a line here.
-CONNECTED = (browser, desktop, hostshell, screen, obsidian, mail, google, notion, supabase, github, vercel)
+CONNECTED = (browser, desktop, hostshell, screen, obsidian, mail, google, notion, supabase, github, vercel,
+             mcp)
 
 # What Ahab can and can't do, kept in the code repo so Ahab can read it but
 # never edit it. Read a section at a time, so it costs nothing until needed.

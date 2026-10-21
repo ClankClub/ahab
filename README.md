@@ -40,6 +40,7 @@ Your PC: Ahab runtime (Python)
   ├─ github         → keeps those sites in private repos on its own GitHub, through n8n; public only by approval
   ├─ vercel         → puts them online on its own Vercel: previews behind Vercel's sign-in, public only by approval
   ├─ supabase       → rows in its own Supabase project, directly over its REST API
+  ├─ mcp            → tools from any MCP server you list in home.json (stdio or http); writes wait for your tap
   ├─ approvals      → outward actions wait for your Approve/Deny tap on Telegram, then run in code
   ├─ skills         → know-how files it keeps in workspace/skills/
   ├─ dream          → once a day at 7:00, a quiet wake that tidies notes and memory, writes a day note and workspace/dreams/
@@ -102,6 +103,20 @@ Or skip faster-whisper and set `GROQ_API_KEY` (or `OPENAI_API_KEY`) to transcrib
 ### Obsidian (optional)
 
 Pip keeps its own vault in `home/workspace/vault/`; open that folder as a vault in Obsidian to read along. To have it work in a vault of yours instead, put `"obsidian_vault": "C:\path\to\vault"` in `home/home.json`. Nothing else is needed: a vault is plain Markdown files. Pip never touches `.obsidian/` (the app's settings and plugins), and what it deletes goes to the vault's `.trash/`.
+
+### MCP servers (optional)
+
+Any MCP server can lend Ahab its tools. List them in `home/home.json`:
+
+```json
+"mcp": {
+  "fetch":  {"command": ["uvx", "mcp-server-fetch"]},
+  "github": {"url": "https://api.githubcopilot.com/mcp/",
+             "headers": {"Authorization": "Bearer $AHAB_MCP_GITHUB_TOKEN"}}
+}
+```
+
+A `command` is a program Ahab starts (stdio); a `url` is a server on the web (Streamable HTTP, https only). `$NAME` is read from the environment, so keys stay out of `home.json`; a started server sees only a basic environment plus what its `"env"` names. A call waits for your Approve tap unless the server marks that tool read-only; `"approve": "none"` (or `"all"`, or a list of tool names) changes that per server, and `"tools"` limits which tools Ahab is offered. `py -m ahab.connections.mcp` starts each server and lists its tools.
 
 ### Sources (what you did with other agents)
 
