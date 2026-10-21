@@ -130,7 +130,7 @@ $env:CODEX_HOME = "$env:LOCALAPPDATA\Ahab\codex"; codex login
 $env:CLAUDE_CONFIG_DIR = "$env:LOCALAPPDATA\Ahab\claude"; claude auth login
 ```
 
-If `codex` isn't on your PATH, the desktop app's copy is under `~\.codex\packages\standalone\releases\<version>\bin\codex.exe` (Ahab finds it there on its own, or set `AHAB_CODEX_BIN`). Then put `{"backend": "codex-luna"}` in `home/home.json` and restart the heartbeat.
+If `codex` isn't on your PATH, the desktop app's copy is under `~\.codex\packages\standalone\releases\<version>\bin\codex.exe` (Ahab finds it there on its own, or set `AHAB_CODEX_BIN`). Then put `{"backend": "codex-luna"}` in `home/home.json` and restart the heartbeat. To give it a spare for when that model fails (a lapsed login, an outage, a rate limit), add `"fallback": "claude-sonnet"` (any backend name): a failed call goes to the spare, the usual model is tried again ten minutes later, and Pip sees a note on his page while the spare is answering. When a CLI login has expired the error says which `login` command to run.
 
 ### Google and Notion (through n8n)
 

@@ -26,6 +26,7 @@ Moving to a Linux laptop (2026-10-20): the code is now Ahab throughout (`ahab` p
 - The sanity canary (new): one live probe came back clean; watch its first days on the real home. A "model_tools" event in the log means Codex's own tools are back.
 - Codex's audit (2026-10-19, in its scratch fork's `docs/audit/`): three fixes are in; 23 findings remain, the worst being EX-02 (desktop and workshop output buffered whole on the PC before any limit), then interrupted approvals left `running`, the mail watch missing a burst past 25, and worker cancel and usage accounting.
 - Sources (new): whether Pip looks in the Hermes copy when the owner mentions it, and how fast the archive grows.
+- Model fallback (new, 2026-10-21): built and tested, but `"fallback"` isn't set in the laptop's `home.json` yet; once it is, watch for `model_fallback` lines in the log.
 - A real email waking Pip through the mail watch hasn't been seen yet.
 - Which sites the browser's no-sending rule breaks (Google Maps half-loads).
 - Making a GitHub repository public through the approval hasn't been tried live.
@@ -37,12 +38,11 @@ Moving to a Linux laptop (2026-10-20): the code is now Ahab throughout (`ahab` p
 3. **A terse background voice (agreed 2026-10-20):** the caveman idea, for what Pip writes that nobody reads for pleasure: thoughts between tool calls, worker reports, the digest's pages and index. Never his messages to the owner unless the owner asks, and never what he reads (his rules, the owner's words), since compressing a prompt makes answers worse. Matters most on a per-token backend like Sonnet. Most of a wake's spend is input (about 96% on the laptop's screen, 2026-10-21), so check the page size and whether prompt caching works before compressing what Pip writes.
 4. **Agents, the rest (parked 2026-10-21, the owner's call: first see how a live crew agent does):** phase 2 is remote agents over A2A, Hermes first (the client and courier, tested against a fake peer, then the owner sets up Hermes's side and a live run checks what comes back); phase 3 is standing orders (an agent on a schedule the owner approved), Pip proposing agents and lane changes through approvals, files handed to an agent's workspace, per-box locks so agents can use the browser, desktop or workshop, and the Telegram `/to` switch. Phase 1 (crew agents) is built and one agent, `scout` (a research desk on Pip's own model), is on the laptop; see [DESIGN_AGENTS.md](DESIGN_AGENTS.md).
 5. **Desktop phase 2:** desktop jobs (a worker that holds the desktop for a long errand), `--replay` and `--calibrate`; see [DESIGN_DESKTOP.md](DESIGN_DESKTOP.md).
-6. **Model fallback:** when the running backend fails (a lapsed login, an outage), a wake falls back to a second one instead of not happening.
-7. **Skill upkeep:** the dream reviews skills it wrote for ones that went stale or never get used.
-8. **Sources phase 3 (parked 2026-10-20, the owner's call):** uploaded exports like ChatGPT's, built against a real export, with the monthly nudge and re-read; see [DESIGN_SOURCES.md](DESIGN_SOURCES.md). Phases 1 and 2 are built: Hermes's record delivered daily, searchable by Pip, and distilled each morning by the digest into pages under `memory/sources/hermes/`. The digest's first live run read and wrote nothing (fixed in `ddc7030`); check the next morning runs actually write pages.
-9. **More search providers:** `brave` and `searxng` in `ahab/search.py`, for homes on an API.
-10. **Backend bake-off:** replay real owner messages through copies of the home on `codex-luna`, `claude-haiku` and DeepSeek, scoring JSON slips, tool choices, finishing the job, voice, time and tokens.
-11. **Small gaps:** find-and-replace in Docs; Notion restore from trash and moving into a database (both want a newer Notion API version).
-12. **Mail off the list,** if wanted, through the approval step.
-13. **A reply form for API backends** (`response_format: json_schema`), if an OpenAI or OpenRouter backend is used.
-14. **Later:** a Windows `install.ps1`; browser sign-in to Pip's own accounts through approvals; a model ladder and a spend cap.
+6. **Skill upkeep:** the dream reviews skills it wrote for ones that went stale or never get used.
+7. **Sources phase 3 (parked 2026-10-20, the owner's call):** uploaded exports like ChatGPT's, built against a real export, with the monthly nudge and re-read; see [DESIGN_SOURCES.md](DESIGN_SOURCES.md). Phases 1 and 2 are built: Hermes's record delivered daily, searchable by Pip, and distilled each morning by the digest into pages under `memory/sources/hermes/`. The digest's first live run read and wrote nothing (fixed in `ddc7030`); check the next morning runs actually write pages.
+8. **More search providers:** `brave` and `searxng` in `ahab/search.py`, for homes on an API.
+9. **Backend bake-off:** replay real owner messages through copies of the home on `codex-luna`, `claude-haiku` and DeepSeek, scoring JSON slips, tool choices, finishing the job, voice, time and tokens.
+10. **Small gaps:** find-and-replace in Docs; Notion restore from trash and moving into a database (both want a newer Notion API version).
+11. **Mail off the list,** if wanted, through the approval step.
+12. **A reply form for API backends** (`response_format: json_schema`), if an OpenAI or OpenRouter backend is used.
+13. **Later:** a Windows `install.ps1`; browser sign-in to Pip's own accounts through approvals; a model ladder and a spend cap.

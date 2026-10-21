@@ -73,6 +73,11 @@ class ModelError(Exception):
     """The model call failed in a way the caller should hear about."""
 
 
+class AuthError(ModelError):
+    """The model's sign-in is missing, expired or refused. Asking again won't
+    help; someone has to sign in, and the message says how."""
+
+
 @dataclass
 class Reply:
     text: str
@@ -218,6 +223,8 @@ class ModelClient:
             except urllib.error.HTTPError as e:
                 detail = e.read().decode("utf-8", errors="replace")[:300]
                 last_error = f"HTTP {e.code}: {detail}"
+                if e.code in (401, 403):
+                    raise AuthError(f"{last_error} (the API refused this backend's key; check it)")
                 if e.code not in RETRYABLE_STATUS:
                     raise ModelError(last_error)
             except (urllib.error.URLError, http.client.IncompleteRead, TimeoutError,
@@ -230,6 +237,79 @@ class ModelClient:
             if attempt < self.max_attempts:
                 time.sleep(attempt)
         raise ModelError(f"Gave up after {self.max_attempts} attempts. Last error: {last_error}")
+
+
+# After the usual model fails, how long to leave it alone before trying it again.
+# Without this every call of a 20-call wake-up would wait on a dead login first.
+PRIMARY_RETRY_SECONDS = 10 * 60
+
+
+class FallbackClient:
+    """The home's usual model, with a second one behind it for when it fails.
+
+    Any ModelError from the usual one (a lapsed login, an outage, a timeout, a
+    rate limit) sends that call to the fallback, and the usual one is left
+    alone for PRIMARY_RETRY_SECONDS before the next try, so recovery is
+    automatic. A reply that came back but was badly formed isn't a failure of
+    the backend and doesn't count. Everything else (backend, can_see, foreign,
+    searches...) is read from whichever model answered last, so the rest of
+    Ahab doesn't need to know there are two.
+    """
+
+    def __init__(self, primary, fallback, retry_seconds: float = PRIMARY_RETRY_SECONDS,
+                 clock=time.monotonic):
+        self.primary, self.fallback = primary, fallback
+        self.retry_seconds, self._clock = retry_seconds, clock
+        self.active = primary
+        self._down_until = 0.0
+        self._primary_error = ""
+        self.failovers: list[str] = []   # taken by the heartbeat, which logs them
+
+    def __getattr__(self, name):
+        if name in ("active", "primary", "fallback"):   # not set yet: don't recurse
+            raise AttributeError(name)
+        return getattr(self.active, name)
+
+    @property
+    def failover_note(self) -> str | None:
+        """For Ahab's page while the fallback is the one answering."""
+        if self.active is not self.fallback:
+            return None
+        return (f"Your usual model ({self.primary.backend}) isn't answering, so you're running on "
+                f"{self.fallback.backend} for now. Mention it to your owner if it keeps happening.")
+
+    def complete(self, messages, temperature: float = 0.7, json_mode=False) -> Reply:
+        if self._clock() >= self._down_until:
+            try:
+                reply = self.primary.complete(messages, temperature, json_mode)
+                self.active = self.primary
+                return reply
+            except ModelError as e:
+                self._down_until = self._clock() + self.retry_seconds
+                self._primary_error = str(e)[:300]
+                self.failovers.append(
+                    f"Your usual model ({self.primary.backend}) failed: {self._primary_error} "
+                    f"Using {self.fallback.backend} instead, and trying the usual one again in "
+                    f"{self.retry_seconds / 60:.0f} minutes.")
+        self.active = self.fallback
+        try:
+            return self.fallback.complete(messages, temperature, json_mode)
+        except ModelError as e:
+            raise ModelError(f"Both models failed. {self.primary.backend}: {self._primary_error} "
+                             f"{self.fallback.backend}: {str(e)[:300]}") from None
+
+
+def with_fallback(primary, name: str | None):
+    """primary, or primary with the backend called name behind it. A fallback
+    that can't be built (unknown name, missing key) is reported and skipped:
+    a bad spare shouldn't stop the real one from running."""
+    if not name or name == getattr(primary, "backend", None):
+        return primary
+    try:
+        return FallbackClient(primary, ModelClient.from_backend(name))
+    except ModelError as e:
+        print(f"[fallback] {e} Running without a fallback.")
+        return primary
 
 
 if __name__ == "__main__":

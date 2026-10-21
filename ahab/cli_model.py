@@ -37,7 +37,7 @@ import tempfile
 from pathlib import Path
 
 from ahab import senses
-from ahab.model import Message, ModelError, Reply
+from ahab.model import AuthError, Message, ModelError, Reply
 
 # Codex features that give its model reach beyond writing an answer. All off.
 CODEX_FEATURES_OFF = (
@@ -66,6 +66,18 @@ CODEX_MODEL_DROP = ("multi_agent_version",)
 CODEX_SETTINGS_OFF = ("tools.experimental_request_user_input.enabled=false",)
 CLI_TIMEOUT_SECONDS = 30 * 60   # Luna at max effort can think for many minutes; 5 killed real wakes (2026-10-21)
 EMPTY_REPLY_ATTEMPTS = 2
+
+
+# Wording the two CLIs use when the sign-in is missing, expired or refused. Only
+# read in an error (a failed run, an error result), never in a model's own answer.
+AUTH_MARKERS = ("not logged in", "401 unauthorized", "unauthorized", "oauth", "/login", "log in again",
+                "sign in again", "token has expired", "token expired", "session has expired",
+                "session expired", "refresh token", "authentication_error", "invalid api key")
+
+
+def is_auth_failure(text: str) -> bool:
+    low = text.lower()
+    return any(marker in low for marker in AUTH_MARKERS)
 
 
 def _json_or_none(line: str):
@@ -178,11 +190,19 @@ class CliClient:
         except OSError as e:
             raise ModelError(f"Couldn't run {self.cli}: {e}") from None
         if "not logged in" in (done.stdout + done.stderr).lower() or "401 unauthorized" in done.stderr.lower():
-            raise ModelError(f"Ahab's {self.cli} profile isn't logged in ({self.home / profile}). "
-                             "See README.md > Setup.")
+            raise self._signed_out(profile)
+        if done.returncode != 0 and is_auth_failure(done.stdout + done.stderr):
+            raise self._signed_out(profile)
         if done.returncode != 0 and not done.stdout.strip():
             raise ModelError(f"{self.cli} failed (exit {done.returncode}): {done.stderr.strip()[-400:]}")
         return done.stdout
+
+    def _signed_out(self, profile: str) -> AuthError:
+        """The sign-in is gone or expired: say which one and how to renew it."""
+        login = "codex login" if self.cli == "codex" else "claude auth login"
+        env = "CODEX_HOME" if self.cli == "codex" else "CLAUDE_CONFIG_DIR"
+        return AuthError(f"Ahab's {self.cli} sign-in has expired or is missing. Renew it by running "
+                         f"`{login}` with {env} set to {self.home / profile}.")
 
     def _plain_model(self) -> dict | None:
         """The model's catalog entry with its built-in tools taken away, or None
@@ -261,6 +281,8 @@ class CliClient:
             elif event.get("type") in ("error", "turn.failed"):
                 errors.append(str(event.get("message") or event.get("error") or event)[:300])
         if not text and errors:
+            if is_auth_failure(errors[-1]):
+                raise self._signed_out("codex")
             raise ModelError(f"codex: {errors[-1]}")
         return Reply(text, self.model, usage.get("input_tokens") or 0,
                      usage.get("output_tokens") or 0, "\n".join(reasoning),
@@ -302,6 +324,8 @@ class CliClient:
         except (json.JSONDecodeError, IndexError):
             raise ModelError(f"claude sent something that isn't JSON: {out[:300]}") from None
         if data.get("is_error"):
+            if is_auth_failure(str(data.get("result"))):
+                raise self._signed_out("claude")
             raise ModelError(f"claude: {str(data.get('result'))[:300]}")
         usage = data.get("usage") or {}
         self.searches = []

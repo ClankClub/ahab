@@ -31,7 +31,7 @@ from pathlib import Path
 from ahab import (agents, alarms, approvals, desktop, digest, dream, goals, identity, inbox, intents, mail, n8n, senses,
                    skills, tools, watchdog, watches, workers, workshop)
 from ahab.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
-from ahab.model import ModelClient, ModelError
+from ahab.model import ModelClient, ModelError, with_fallback
 
 try:
     import msvcrt  # Windows
@@ -269,6 +269,9 @@ def page_note(client) -> str | None:
     asked. Only the practical consequence is shown, and only while it applies."""
     from ahab.model import BACKENDS
     note = BACKENDS.get(getattr(client, "backend", None) or "", {}).get("page_note")
+    spare = getattr(client, "failover_note", None)   # the usual model is down (model.FallbackClient)
+    if spare:
+        note = f"{note}\n{spare}" if note else spare
     if not getattr(client, "can_see", False):
         blind = ("The model you're running on now can't see images: photos reach you as file "
                  "names only, and look_at won't work until your owner switches back.")
@@ -513,7 +516,14 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
         # and loops; a final answer breaks out. One extra pass past the tool
         # limit lets Ahab answer after being told it's out of calls.
         for _ in range(MAX_TOOL_CALLS + 2):
-            reply = client.complete(messages, json_mode=REPLY_FORM)
+            try:
+                reply = client.complete(messages, json_mode=REPLY_FORM)
+            finally:
+                # The usual model failing and the spare taking over is worth a line in the log,
+                # even when the spare failed too.
+                for note in getattr(client, "failovers", []):
+                    memory.record("model_fallback", note)
+                getattr(client, "failovers", []).clear()
             tokens_in += reply.prompt_tokens
             tokens_cached += reply.cached_tokens
             tokens_out += reply.completion_tokens
@@ -810,6 +820,8 @@ def main() -> None:
     prompt = system_prompt(config["name"])
     memory = Memory(args.home)
     client = ModelClient.from_backend(args.backend or config["backend"])
+    if not args.backend:   # an explicit --backend is a test of that one backend
+        client = with_fallback(client, config.get("fallback"))
     # Starting the heartbeat wakes Ahab right away, whatever time it chose.
     # Say so in its log, as a plain fact.
     memory.record("start", start_message(args.home, args.once, args.scheduled))
