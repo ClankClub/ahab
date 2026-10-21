@@ -8,3 +8,9 @@ home/
 homes/
 *.sqlite3
 *.db
+
+# Raw data from scripts/simulate_sessions.py (kept locally; sizes and counts only)
+sim_results/
+
+# Scratch reports from scripts/simulate_sessions.py runs
+sim_*.txt
