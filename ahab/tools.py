@@ -1522,6 +1522,15 @@ def run(memory: Memory, name: str, args: dict) -> str:
     not as crashes: a bad tool call is something Ahab should learn from."""
     if name not in TOOLS:
         return f"Unknown tool {name!r}. Available: {', '.join(TOOLS)}."
+    if isinstance(args, str):
+        # Models now and then send the args object as a quoted string ("{\"path\": ...}"). It's
+        # plainly the object they meant, so read it instead of refusing (this cost Luna a wake).
+        try:
+            parsed = json.loads(args)
+        except ValueError:
+            parsed = None
+        if isinstance(parsed, dict):
+            args = parsed
     if not isinstance(args, dict):
         return f"args for {name} must be a JSON object."
     function, _ = TOOLS[name]

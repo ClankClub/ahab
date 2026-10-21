@@ -332,6 +332,12 @@ NOT_JSON = ("That reply wasn't the one JSON object your replies have to be, so n
             "or sent. Write it again as that JSON object.")
 
 
+EMPTY_REPLY = ("That reply did nothing: it had no tool, no message and no next_wake_minutes, and nothing "
+               "happens while you wait. If you still have work to do, request the tool now. If you're "
+               "finished, say so: put your answer to your owner in \"message\" if they're waiting for one, "
+               "and choose next_wake_minutes.")
+
+
 def parse_reply(text: str) -> tuple[dict, str]:
     """Read the model's reply as one JSON object. Returns (object, dropped text).
 
@@ -491,7 +497,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
 
     tokens_in = tokens_cached = tokens_out = 0
     tool_calls = 0
-    asked_again = False
+    asked_again = asked_empty = False
     try:
         # Each pass is one model call. A tool request sends the result back
         # and loops; a final answer breaks out. One extra pass past the tool
@@ -534,7 +540,17 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
             memory.record("thought", str(decision.get("thought", "")).strip() or "(empty)")
 
             if "tool" not in decision:
-                break
+                if "next_wake_minutes" in decision or decision.get("message") or asked_empty:
+                    break
+                # A reply that does nothing: no tool, no message, no wake time ("waiting for
+                # the output", after a tool slip). Taking it as a finished wake slept on an
+                # owner's unanswered request for 30 minutes (2026-10-21), so ask once more.
+                asked_empty = True
+                memory.record("error", "Reply had no tool, no message and no next_wake_minutes, so "
+                              f"nothing happened; asked again in the same wake-up. Reply was: {reply.text[:500]}")
+                messages.append({"role": "assistant", "content": reply.text})
+                messages.append({"role": "user", "content": EMPTY_REPLY})
+                continue
             name, args = str(decision["tool"]), decision.get("args", {})
             if tool_calls >= MAX_TOOL_CALLS:
                 result = (f"REFUSED: that call was NOT run (limit of {MAX_TOOL_CALLS} per wake-up). "
