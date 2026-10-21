@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = str(Path(__file__).resolve().parent.parent)
 sys.path.insert(0, ROOT)
 sys.path.insert(0, str(Path(ROOT) / "scripts"))
-from ahab import console, sources, tools, workers
+from ahab import backup, console, sources, tools, workers
 from ahab.memory import Memory
 import send_hermes
 
@@ -207,6 +207,12 @@ assert len(files) == 1 and files[0].endswith("/proj/notes.md"), files
 r = sources.receive(home, "hermes", io.BytesIO(packed.stdout), m)
 assert r.startswith("hermes: 5 files"), r
 assert "Cedar beds" in run(do="read", source="hermes", path="conversations/20260101_090000_abc.md")
+
+# A delivery while Pip sleeps doesn't make him look awake, to the screen or the backup.
+m.record("sleep", "Sleeping 30 min.")
+sources.receive(home, "notes", tar_of([("files/c.md", b"# C\nsea")]), m)
+assert console.state(home, datetime.now().timestamp()).startswith("asleep"), console.state(home, datetime.now().timestamp())
+assert backup.between_wakes(home) == (True, "last event is 'sleep'"), backup.between_wakes(home)
 
 m.close()
 print("sources ok")

@@ -33,7 +33,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ahab import sources
-from ahab.memory import DEFAULT_HOME
+from ahab.memory import BACKGROUND_KINDS, DEFAULT_HOME
 
 REFRESH = 5                      # seconds between frames
 STALE = 3 * 60                   # an .alive file older than this means not running
@@ -78,7 +78,9 @@ def state(home: Path, now: float) -> str:
     if db is None:
         return "no memory yet"
     try:
-        last = _rows(db, "SELECT time, kind, content FROM events ORDER BY id DESC LIMIT ?", 1)
+        skip = ", ".join("?" * len(BACKGROUND_KINDS))
+        last = list(db.execute(f"SELECT time, kind, content FROM events WHERE kind NOT IN ({skip}) "
+                               "ORDER BY id DESC LIMIT 1", BACKGROUND_KINDS).fetchall())
     finally:
         db.close()
     if not last:
@@ -191,7 +193,7 @@ def frame(home: Path, width: int = 80, height: int = 24, now: float | None = Non
                     wrapped = textwrap.wrap(" ".join(text.split()), max(10, width - len(label))) or [""]
                     chat_lines.append(c(BOLD if sender == "owner" else CYAN, label) + wrapped[0])
                     chat_lines += [" " * len(label) + w for w in wrapped[1:3]]
-            for t, kind, content in _rows(db, "SELECT time, kind, content FROM events ORDER BY id DESC LIMIT ?", 12):
+            for t, kind, content in _rows(db, "SELECT time, kind, content FROM events ORDER BY id DESC LIMIT ?", max(12, body_room)):
                 when = _when(t)
                 stamp = f"{when:%H:%M}" if when else "     "
                 tone = RED if kind == "error" else YELLOW if kind in ("watchdog", "approval") else DIM

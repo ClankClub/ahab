@@ -26,7 +26,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from ahab import days
-from ahab.memory import DEFAULT_HOME
+from ahab.memory import BACKGROUND_KINDS, DEFAULT_HOME
 
 # A beat that crashed never logs a `sleep` event. If nothing has been logged
 # for this long, Ahab isn't mid-wake either way.
@@ -43,8 +43,9 @@ def between_wakes(home: Path) -> tuple[bool, str]:
     try:
         con = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True, timeout=5)
         try:
-            row = con.execute(
-                "SELECT kind, time FROM events ORDER BY id DESC LIMIT 1").fetchone()
+            skip = ", ".join("?" * len(BACKGROUND_KINDS))
+            row = con.execute(f"SELECT kind, time FROM events WHERE kind NOT IN ({skip}) "
+                              "ORDER BY id DESC LIMIT 1", BACKGROUND_KINDS).fetchone()
         finally:
             con.close()
     except sqlite3.OperationalError as e:

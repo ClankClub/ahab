@@ -44,6 +44,8 @@ NOTES_CHAR_LIMIT = 8000
 # Event kinds whose full text is too long for the page; snapshot() shows only
 # their first line. Messages are shown in full in their own section instead
 # (inbox.describe_recent), so here they'd only be a second copy.
+# Logged by code with Ahab asleep (a source delivery), so they say nothing about whether it's awake.
+BACKGROUND_KINDS = ("source",)
 HEADER_ONLY_KINDS = ("notes", "tool", "reasoning", "message", "dream", "email_sent")
 
 # Tool results find() leaves out: these only repeat things it searches
