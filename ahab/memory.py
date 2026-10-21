@@ -46,6 +46,10 @@ NOTES_CHAR_LIMIT = 8000
 # (inbox.describe_recent), so here they'd only be a second copy.
 # Logged by code with Ahab asleep (a source delivery, a digest), so they say nothing about whether it's awake.
 BACKGROUND_KINDS = ("source", "digest")
+
+# The token counts a wake, dream, digest or search logs in its closing line:
+# "[3 tool calls, 1200 in (800 cached), 90 out]", "1200 in, 90 out", "1200 tokens in, 90 out".
+TOKEN_STATS = re.compile(r"(\d+) (?:tokens )?in(?: \(\d+ cached\))?, (\d+) out")
 HEADER_ONLY_KINDS = ("notes", "tool", "reasoning", "message", "dream", "email_sent")
 
 # Tool results find() leaves out: these only repeat things it searches

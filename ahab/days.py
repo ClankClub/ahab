@@ -15,16 +15,15 @@ results, notes rewrites) are folded into click-to-open sections.
 from __future__ import annotations
 
 import html
-import re
 import sqlite3
 import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-from ahab.memory import DEFAULT_HOME
+from ahab.memory import DEFAULT_HOME, TOKEN_STATS
 
-TOKENS = re.compile(r"(\d+) in, (\d+) out")
+TOKENS = TOKEN_STATS
 
 
 def load_events(home: Path) -> list[tuple[int, datetime, str, str]]:

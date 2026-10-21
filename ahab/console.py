@@ -6,7 +6,8 @@
 On Linux the installer runs it on the machine's own screen (tty1) in place
 of the login prompt, so a spare laptop shows what the agent is up to: asleep
 or awake and until when, the last messages with the owner, the recent log,
-whether the bridge, watchdog and backup are well, and the machine itself.
+whether the bridge, watchdog and backup are well, the model it runs on, the
+tokens spent so far, any workers and crew agents at work, and the machine itself.
 It only reads: the database is opened read-only, it spends no tokens, and it
 takes no input, so there's no shell behind it for whoever is at the keyboard.
 The owner can still log in on another console (Ctrl+Alt+F2).
@@ -33,9 +34,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ahab import sources
-from ahab.memory import BACKGROUND_KINDS, DEFAULT_HOME
+from ahab.memory import BACKGROUND_KINDS, DEFAULT_HOME, TOKEN_STATS
+from ahab.model import BACKENDS
 
 REFRESH = 5                      # seconds between frames
+MARGIN = 2                       # columns left empty at the right edge: a line that fills the last
+                                 # column gets its final character wiped by the clear-to-end-of-line
+USAGE_KINDS = ("sleep", "dream", "digest", "web_search")   # events whose first line says what they cost
+HELPER_LINES = 3                 # running helpers listed before "and N more"
+BAD_ENDS = ("failed", "timed_out", "interrupted")
 STALE = 3 * 60                   # an .alive file older than this means not running
 SLEEP = re.compile(r"Sleeping (\d+) min")
 PLAIN_KINDS = {"sleep", "wake", "start", "stopped", "watchdog", "dream"}   # shown even with the chat hidden
@@ -156,6 +163,98 @@ def _clip(text: str, width: int) -> str:
     return text if len(text) <= width else text[:max(0, width - 1)] + "…"
 
 
+def compact(n: int) -> str:
+    """14176736 -> '14.176 M': thousands, millions, billions with three decimals, cut not rounded."""
+    for unit, size in (("B", 10**9), ("M", 10**6), ("k", 10**3)):
+        if n >= size:
+            thousandths = n * 1000 // size
+            return f"{thousandths // 1000}.{thousandths % 1000:03d} {unit}"
+    return str(n)
+
+
+def backend_line(settings: dict) -> str:
+    """'Codex → gpt-6-luna → Max': the model home.json picks, as tools._this_mind reads it."""
+    name = settings.get("backend") or "deepseek"
+    config = BACKENDS.get(name)
+    if config is None:
+        return f"{name} (unknown backend)"
+    who = {"codex": "Codex", "claude": "Claude", "deepseek": "DeepSeek", "openrouter": "OpenRouter",
+           "local": "Local"}.get(config.get("cli") or name, name)
+    return " → ".join([who, config.get("model", "?")] + ([config["effort"].title()] if config.get("effort") else []))
+
+
+_seen: dict[str, tuple[int, int, int]] = {}      # home -> (last event counted, tokens in, tokens out)
+
+
+def spent(home: Path) -> tuple[int, int]:
+    """Tokens used so far, in and out: the cost lines wakes, dreams, digests and searches log, plus what
+    workers and crew agents report in their own tables. The log is read once and then only its new
+    rows (it grows for years and the screen redraws every few seconds)."""
+    db = _db(home)
+    if db is None:
+        return 0, 0
+    key = str(home)
+    last, t_in, t_out = _seen.get(key, (0, 0, 0))
+    marks = ", ".join("?" * len(USAGE_KINDS))
+    try:
+        for ident, line in db.execute(
+                f"SELECT id, substr(content, 1, instr(content || char(10), char(10))) FROM events "
+                f"WHERE id > ? AND kind IN ({marks}) ORDER BY id", (last, *USAGE_KINDS)):
+            last = ident
+            if m := TOKEN_STATS.search(line):
+                t_in, t_out = t_in + int(m[1]), t_out + int(m[2])
+        _seen[key] = (last, t_in, t_out)
+        for table in ("workers", "agent_tasks"):
+            try:
+                a, b = db.execute(f"SELECT COALESCE(SUM(tokens_in), 0), COALESCE(SUM(tokens_out), 0) "
+                                  f"FROM {table}").fetchone()
+                t_in, t_out = t_in + a, t_out + b
+            except sqlite3.Error:
+                pass                                  # the table appears with the first helper
+    except sqlite3.Error:
+        pass
+    finally:
+        db.close()
+    return t_in, t_out
+
+
+def helpers(home: Path, now: float, show_chat: bool, c, width: int) -> list[str]:
+    """Workers and crew-agent tasks: a line for each one running (what it was asked, unless the chat
+    is hidden), or, when none is, a count of those that finished in the last day."""
+    db = _db(home)
+    if db is None:
+        return []
+    cutoff = datetime.fromtimestamp(now - 24 * 3600, timezone.utc).isoformat(timespec="seconds")
+    running, finished, bad = [], 0, 0
+    try:
+        for table, kind, column in (("workers", "worker", "model"), ("agent_tasks", "agent", "agent")):
+            try:
+                running += [(created, f"{kind} {who}", task) for created, who, task in db.execute(
+                    f"SELECT created, {column}, task FROM {table} WHERE status IN ('running', 'cancelling')")]
+                for (status,) in db.execute(f"SELECT status FROM {table} WHERE finished > ? "
+                                            "AND status NOT IN ('running', 'cancelling', 'cancelled')", (cutoff,)):
+                    finished, bad = finished + 1, bad + (status in BAD_ENDS)
+            except sqlite3.Error:
+                continue                              # the table appears with the first helper
+    finally:
+        db.close()
+    running.sort()
+    lines = []
+    for created, label, task in running[:HELPER_LINES]:
+        began = _when(created)
+        mins = max(0, int((now - began.timestamp()) // 60)) if began else 0
+        age = f"{mins}m" if mins < 60 else f"{mins // 60}h{mins % 60:02d}"
+        prefix = f"helper {label:<14} {age:>5}  "
+        lines.append(c(YELLOW, "helper") + prefix[6:] +
+                     (_clip(" ".join(task.split()), width - len(prefix)) if show_chat else ""))
+    if len(running) > HELPER_LINES:
+        lines.append(c(DIM, f"…and {len(running) - HELPER_LINES} more running"))
+    if not running and finished:
+        text = f"helpers idle · {finished} finished in the last day" + (f", {bad} failed" if bad else "")
+        lines.append(c(RED if bad else DIM, _clip(text, width)))
+    return lines
+
+
 def frame(home: Path, width: int = 80, height: int = 24, now: float | None = None, color: bool = True) -> list[str]:
     """The screen as lines of text, at most `height` of them."""
     now = time.time() if now is None else now
@@ -172,15 +271,23 @@ def frame(home: Path, width: int = 80, height: int = 24, now: float | None = Non
     gap = " " * max(1, width - len(name) - 3 - len(status) - len(right))
     head = c(BOLD, name.upper()) + " · " + c(tone, status) + gap + right
 
+    t_in, t_out = spent(home)
+    total = f"{compact(t_in + t_out)} tokens"
+    mind = _clip(backend_line(settings), max(5, width - 3 - len(total)))
+    split = f" ({compact(t_in)} in, {compact(t_out)} out)"
+    fits = len(mind) + 3 + len(total) + len(split) <= width
+    info = c(CYAN, mind) + " · " + c(BOLD, total) + (c(DIM, split) if fits else "")
+
     def ok(flag: bool, label: str) -> str:
         return f"{label} " + (c(GREEN, "ok") if flag else c(RED, "down"))
 
     foot = [rule,
+            *helpers(home, now, show_chat, c, width),
             "  ".join([ok(alive(home, "heartbeat", now), "heartbeat"), ok(alive(home, "telegram", now), "bridge"),
                        f"backup {last_backup(home)}", *source_ages(home, c)]),
             c(DIM, _clip(machine(home), width))]
 
-    body_room = max(0, height - 2 - len(foot))
+    body_room = max(0, height - 3 - len(foot))
     chat_lines, log_lines = [], []
     db = _db(home)
     if db is not None:
@@ -199,8 +306,8 @@ def frame(home: Path, width: int = 80, height: int = 24, now: float | None = Non
                 tone = RED if kind == "error" else YELLOW if kind in ("watchdog", "approval") else DIM
                 if not show_chat and kind not in PLAIN_KINDS:
                     content = ""                     # messages, thoughts, mail and tool results stay private
-                log_lines.append(f"{stamp}  " + c(tone, f"{kind:<9}") + " " +
-                                 _clip(" ".join(content.split()), width - 17))
+                log_lines.append(f"{stamp}  " + c(tone, f"{kind[:10]:<10}") + " " +
+                                 _clip(" ".join(content.split()), width - 18))
         finally:
             db.close()
 
@@ -212,7 +319,7 @@ def frame(home: Path, width: int = 80, height: int = 24, now: float | None = Non
         body.append(rule)
     body += log_lines[max(0, len(log_lines) - log_room):]
     body += [""] * (body_room - len(body))
-    return [head, rule, *body, *foot][:height]
+    return [head, info, rule, *body, *foot][:height]
 
 
 def main() -> None:
@@ -229,7 +336,7 @@ def main() -> None:
     try:
         while True:
             size = shutil.get_terminal_size((80, 25))
-            lines = frame(args.home, size.columns, size.lines)
+            lines = frame(args.home, max(20, size.columns - MARGIN), size.lines)
             out.write("\033[H" + "\n".join(l + "\033[K" for l in lines) + "\033[J")
             out.flush()
             time.sleep(REFRESH)
