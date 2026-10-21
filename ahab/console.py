@@ -88,7 +88,9 @@ def state(home: Path, now: float) -> str:
     if m and when:
         wake = when.timestamp() + int(m.group(1)) * 60
         if wake > now:
-            return f"asleep, next wake {datetime.fromtimestamp(wake):%H:%M}"
+            at = datetime.fromtimestamp(wake)
+            day = "" if at.date() == datetime.fromtimestamp(now).date() else f"{at:%a} "
+            return f"asleep, next wake {day}{at:%H:%M}"
         return "asleep, waking soon"
     if kind == "error":
         return "last wake failed"
