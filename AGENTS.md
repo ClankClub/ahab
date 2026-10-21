@@ -25,7 +25,7 @@ The fences exist because Ahab reads strangers' text all day, not because of the 
 ## Working here
 
 - Build one piece at a time and explain it plainly when it lands; the owner is learning and likes talking design.
-- Layout: the core loop sits in `ahab/`, outside services in `ahab/connections/`, the machines Ahab drives in `ahab/boxes/`. The owner likes the idea that a service with more than one way in (direct, n8n, MCP) becomes a folder with a file per way, so each install can use whichever it has. A preference, not a rule.
+- Layout: the core loop sits in `ahab/`, outside services in `ahab/connections/`, the machines Ahab drives in `ahab/boxes/`. A service is one file named for it, saying near the top how it gets in; when it gets a second way in with code of its own, it becomes a folder with a file per way (`notion/n8n.py`, `notion/direct.py`), so each install can use whichever it has. MCP servers are config in `home.json`, so they don't count.
 - Standard library by default; check with the owner before adding a dependency.
 - Run `py tests/run.py` before committing and add a test with each new piece. Tests stay offline and generic, since the repo is public.
 - The code is `ClankClub/ahab` (public: no secrets or personal details). `home/` is its own private repo (`silascroe/pip`) that the backup task commits every 6 hours, so don't commit there by hand while Ahab is awake. Commit and push finished, tested code; ask first for history rewrites, force pushes or visibility changes.

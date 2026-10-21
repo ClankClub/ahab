@@ -31,7 +31,7 @@ Moving to a Linux laptop (2026-10-20): the code is now Ahab throughout (`ahab` p
 - A real email waking Pip through the mail watch hasn't been seen yet.
 - Which sites the browser's no-sending rule breaks (Google Maps half-loads).
 - Making a GitHub repository public through the approval hasn't been tried live.
-- MCP (new, 2026-10-21): tested only against fakes so far, logins included. Deploy `ahab-oauth` (JWT off) before the first login. Try a real one (stdio and http), and watch whether Pip finds the `mcp` group and what a big server's listing costs.
+- MCP (new, 2026-10-21): live with Supabase's hosted server (http, OAuth through the Telegram link, 20 tools). Its `execute_sql` is marked destructive, so even a SELECT asks and counts against `DELETE_LIMIT`; Pip's own `supabase_sql` is the cheaper path for queries. Still to try: a stdio server, and watch whether Pip finds the `mcp` group on its own and what a big server's listing costs.
 
 ## Next, roughly in order
 
