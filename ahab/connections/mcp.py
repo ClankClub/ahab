@@ -75,6 +75,7 @@ from pathlib import Path
 
 from ahab import approvals, toolkit
 from ahab.connections import mcp_auth
+from ahab.web import USER_AGENT
 
 PROTOCOL = "2025-06-18"
 KNOWN_PROTOCOLS = ("2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25")
@@ -335,7 +336,7 @@ class _Http(_Session):
 
     def _post(self, message: dict, retried: bool = False):
         headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream",
-                   **self.headers}
+                   "User-Agent": USER_AGENT, **self.headers}
         token = mcp_auth.token(self.memory, self.name, self.url) if self.login else None
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -396,7 +397,7 @@ class _Http(_Session):
     def close(self) -> None:
         if not self.session_id:
             return
-        headers = {**self.headers, "Mcp-Session-Id": self.session_id}
+        headers = {"User-Agent": USER_AGENT, **self.headers, "Mcp-Session-Id": self.session_id}
         try:
             urllib.request.urlopen(urllib.request.Request(self.url, headers=headers, method="DELETE"),
                                    timeout=5).close()

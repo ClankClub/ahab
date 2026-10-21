@@ -43,7 +43,7 @@ assert server_module.exists(), "tests/mcp_fake.py holds the fake server's answer
 
 
 # The http server: answers as JSON, except tools/call, which comes back as an event stream.
-seen = {"auth": [], "sessions": []}
+seen = {"auth": [], "sessions": [], "agents": []}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -52,6 +52,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         seen["auth"].append(self.headers.get("Authorization"))
         seen["sessions"].append(self.headers.get("Mcp-Session-Id"))
+        seen["agents"].append(self.headers.get("User-Agent"))
         msg = json.loads(self.rfile.read(int(self.headers["Content-Length"])))   # read first, always
         if self.headers.get("Authorization") != "Bearer http-token":
             self.send_response(401); self.send_header("Content-Length", "0"); self.end_headers(); return
@@ -157,6 +158,8 @@ assert "daily limit" in tools.run(m, "mcp_call", {"server": "web", "tool": "remo
 assert "echo: there" in tools.run(m, "mcp_call", {"server": "web", "tool": "echo", "args": {"text": "there"}})
 assert set(seen["auth"]) == {"Bearer http-token"} and seen["sessions"][0] is None
 assert set(seen["sessions"][1:]) == {"sess-1"}, seen["sessions"]
+# Its own name, not Python's default, which some hosts (Cloudflare) turn away.
+assert all(ua.startswith("Ahab/") for ua in seen["agents"]), seen["agents"]
 config["mcp"]["web"]["headers"]["Authorization"] = "Bearer wrong"
 (home / "home.json").write_text(json.dumps(config), encoding="utf-8")
 assert "turned Ahab away (401)" in tools.run(m, "mcp_tools", {"server": "web"})

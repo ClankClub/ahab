@@ -39,6 +39,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from ahab.web import USER_AGENT
+
 CALLBACK_ENV = "AHAB_MCP_CALLBACK"
 DIR_ENV = "AHAB_MCP_AUTH_DIR"
 TABLE = "ahab_oauth"
@@ -110,7 +112,7 @@ def callback() -> str | None:
 def _fetch(url: str, form: dict | None = None, body: dict | None = None, headers: dict | None = None):
     """(status, json or None). The seam the tests replace."""
     data = None
-    sent = {"Accept": "application/json", **(headers or {})}
+    sent = {"Accept": "application/json", "User-Agent": USER_AGENT, **(headers or {})}
     if form is not None:
         data = urllib.parse.urlencode(form).encode()
         sent["Content-Type"] = "application/x-www-form-urlencoded"
