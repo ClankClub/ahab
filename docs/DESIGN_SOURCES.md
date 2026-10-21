@@ -1,6 +1,6 @@
 # Design: sources (one memory across everything the owner uses)
 
-Drafted 2026-10-20 from the owner's brief. Phase 1 (Hermes delivery) is built; the rest is still a draft. When it's all built, the story goes into `BUILD_LOG.md`, the fences into `AGENTS.md` and the module docstrings, and this file is deleted. Background research: the owner's private notes on how Hermes and OpenClaw hand work around (`03-orchestration.md`), which aren't in this repo.
+Drafted 2026-10-20 from the owner's brief. Phases 1 and 2 (Hermes delivery, the digest) are built; the rest is still a draft. When it's all built, the story goes into `BUILD_LOG.md`, the fences into `AGENTS.md` and the module docstrings, and this file is deleted. Background research: the owner's private notes on how Hermes and OpenClaw hand work around (`03-orchestration.md`), which aren't in this repo.
 
 ## Why
 
@@ -95,7 +95,7 @@ Search alone isn't knowing. Knowing means Pip already has a page on "the project
 ## Phases
 
 1. **Hermes delivery (built 2026-10-20):** the sender script, `sources.py` (`receive`, the archive and manifest, a status command), the forced-command key, the `sources` tool, and the console line. Pip can look things up; there's no digest yet. Tested offline with a fake Hermes export and hostile tars.
-2. **The digest:** the sorting stage, the digest worker with its write fence, the dream's rule for carrying facts up, the staleness event. Tested with a fake archive containing a planted instruction.
+2. **The digest (built 2026-10-20):** the sorting stage, the digest run with its write fence, the dream's rule for carrying facts up, the staleness event. Tested with a fake archive containing a planted instruction. As built it runs in the heartbeat's dream slot just before the dream (not an hour earlier, so there's one quiet window to reason about), with a 40-minute and 30-call limit, and a batch that fails three times is set aside until something new arrives. The monthly re-read moved to phase 3, with the uploads it mostly serves.
 3. **Uploaded sources:** a ChatGPT unpacker built against a real export, `_incoming/`, the Telegram drop, the monthly nudge and the re-read. Muse and others follow the same way.
 4. **OpenClaw** as a delivered source, when it's installed: its memory is already Markdown, so its sender is the easy one.
 

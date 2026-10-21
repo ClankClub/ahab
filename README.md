@@ -181,6 +181,7 @@ The pairing lives in `home/telegram.json`. Delete that file and pair again to sw
 - `sudo python3 scripts/install_linux.py --owner YOU` — the Linux equivalent, for a machine of Ahab's own: systemd services running as an `ahab` user, and a separate user for the agent's shell (see "On Linux" above; `--dry-run`, `--remove`). As `ahab`, `python3 -m ahab.heartbeat --restart` reloads the heartbeat and `journalctl -u ahab-heartbeat` shows its log.
 - `python3 -m ahab.console` — a live status screen: asleep or awake, the last messages, the recent log, the services and the machine, redrawn every 5 seconds, read-only (`--once` prints one frame). The Linux installer puts it on the machine's own screen in place of the login prompt (`--no-console` to skip); `"console": {"show_chat": false}` in `home.json` hides the conversation for a screen in a shared room.
 - `py -m ahab.sources` — each source and when it last arrived; `receive <name>` takes one delivery as a tar on stdin (what the forced-command key runs).
+- `py -m ahab.digest [source] [--all]` — run the digest by hand: distills what's new in each source (or one) into pages under `workspace/memory/sources/<name>/`; `--all` re-reads everything. The heartbeat runs it each morning before the dream.
 - `py -m ahab.desktop --setup | --check | --watch | --stop` — the desktop box; `look`, `windows`, `click X Y`, `type TEXT`, `key KEYS`, `launch APP` and `shell CMD` drive it by hand.
 
 ## License

@@ -32,7 +32,7 @@ Moving to a Linux laptop (2026-10-20): the code is now Ahab throughout (`ahab` p
 
 ## Next, roughly in order
 
-1. **Sources (agreed 2026-10-20):** one memory across everything the owner uses. Phase 1 is built: Hermes's record delivered daily, searchable and readable by Pip. Next is phase 2, the digest (distilling an archive into his memory under a write fence), then uploaded exports like ChatGPT's; see [DESIGN_SOURCES.md](DESIGN_SOURCES.md).
+1. **Sources (agreed 2026-10-20):** one memory across everything the owner uses. Phases 1 and 2 are built: Hermes's record delivered daily, searchable by Pip, and distilled each morning by the digest into pages under `memory/sources/hermes/` with an index on his page. Next is phase 3, uploaded exports like ChatGPT's (against a real export), with the monthly nudge and re-read; see [DESIGN_SOURCES.md](DESIGN_SOURCES.md).
 2. **Tool grouping (the owner's earlier priority):** the tool list is about 20,000 characters, re-sent on every call of every wake; show some groups (browser, desktop, Notion, GitHub) only once asked for.
 3. **Desktop phase 2:** desktop jobs (a worker that holds the desktop for a long errand), `--replay` and `--calibrate`; see [DESIGN_DESKTOP.md](DESIGN_DESKTOP.md).
 4. **Goals:** the next genre in the agent comparison: something longer-lived than an alarm or intent that Pip works toward across wakes and reports on.
