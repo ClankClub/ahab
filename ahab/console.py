@@ -32,6 +32,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ahab import sources
 from ahab.memory import DEFAULT_HOME
 
 REFRESH = 5                      # seconds between frames
@@ -115,6 +116,15 @@ def last_backup(home: Path) -> str:
         return "?"
 
 
+def source_ages(home: Path, c) -> list[str]:
+    """One "hermes 3h ago" per listed source, red once a delivery is overdue."""
+    out = []
+    for name in sources.configured(home):
+        received = sources.manifest(home, name).get("received", "")
+        out.append(f"{name} " + c(RED if sources.stale(received) else GREEN, sources.age(received)))
+    return out
+
+
 def machine(home: Path) -> str:
     parts = []
     try:
@@ -165,7 +175,7 @@ def frame(home: Path, width: int = 80, height: int = 24, now: float | None = Non
 
     foot = [rule,
             "  ".join([ok(alive(home, "heartbeat", now), "heartbeat"), ok(alive(home, "telegram", now), "bridge"),
-                       f"backup {last_backup(home)}"]),
+                       f"backup {last_backup(home)}", *source_ages(home, c)]),
             c(DIM, _clip(machine(home), width))]
 
     body_room = max(0, height - 2 - len(foot))

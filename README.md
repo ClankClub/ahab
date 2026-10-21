@@ -101,6 +101,16 @@ Or skip faster-whisper and set `GROQ_API_KEY` (or `OPENAI_API_KEY`) to transcrib
 
 Pip keeps its own vault in `home/workspace/vault/`; open that folder as a vault in Obsidian to read along. To have it work in a vault of yours instead, put `"obsidian_vault": "C:\path\to\vault"` in `home/home.json`. Nothing else is needed: a vault is plain Markdown files. Pip never touches `.obsidian/` (the app's settings and plugins), and what it deletes goes to the vault's `.trash/`.
 
+### Sources (what you did with other agents)
+
+Ahab can keep a copy of what you do with another agent, so it knows about it later without asking. List each source in `home.json` (`"sources": {"hermes": {"kind": "hermes", "about": "Hermes on the desktop"}}`); nothing is accepted from a source that isn't listed. For Hermes in Docker, `scripts/send_hermes.py` (standard library only, run where Hermes runs) packs its conversations (exported with credentials scrubbed), memory, the skills it made and its workspaces' text files, and sends them over SSH. On the Ahab machine, give the sender a key of its own in the service user's `~/.ssh/authorized_keys` that can only deliver:
+
+```
+command="cd /path/to/ahab && python3 -X utf8 -m ahab.sources receive hermes",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAA...
+```
+
+Then schedule `python send_hermes.py --ssh ahab@<ahab machine> --key <that key>` daily (or `--local <ahab folder>` when both run on one machine). The copy lands in `home/sources/hermes/`, text only, and Ahab searches and reads it with its `sources` tool. See [docs/DESIGN_SOURCES.md](docs/DESIGN_SOURCES.md).
+
 ### Window screenshots (off unless you allow an app)
 
 `screenshot_window` lets Pip look at one app's window on your screen, for the apps you list by program name in `home/home.json`, e.g. `"screen_apps": ["Obsidian"]`. With no list it refuses everything. It never takes the whole screen, and it can't click or type. Windows only.
@@ -170,6 +180,7 @@ The pairing lives in `home/telegram.json`. Delete that file and pair again to sw
 - `python3 scripts/install_mac.py` — the Mac equivalent: launchd agents for the heartbeat and, once it's paired, the Telegram bridge, running with no window, at every login, restarted after a crash (`--with-backup` adds the backup, `--remove` uninstalls, `--dry-run` shows the files). Run it from a terminal where Ahab already works, after stopping any copy running there with Ctrl+C: it copies that terminal's keys, settings and PATH into the agents, since launchd doesn't read `~/.zshrc`. Run it again after changing a key.
 - `sudo python3 scripts/install_linux.py --owner YOU` — the Linux equivalent, for a machine of Ahab's own: systemd services running as an `ahab` user, and a separate user for the agent's shell (see "On Linux" above; `--dry-run`, `--remove`). As `ahab`, `python3 -m ahab.heartbeat --restart` reloads the heartbeat and `journalctl -u ahab-heartbeat` shows its log.
 - `python3 -m ahab.console` — a live status screen: asleep or awake, the last messages, the recent log, the services and the machine, redrawn every 5 seconds, read-only (`--once` prints one frame). The Linux installer puts it on the machine's own screen in place of the login prompt (`--no-console` to skip); `"console": {"show_chat": false}` in `home.json` hides the conversation for a screen in a shared room.
+- `py -m ahab.sources` — each source and when it last arrived; `receive <name>` takes one delivery as a tar on stdin (what the forced-command key runs).
 - `py -m ahab.desktop --setup | --check | --watch | --stop` — the desktop box; `look`, `windows`, `click X Y`, `type TEXT`, `key KEYS`, `launch APP` and `shell CMD` drive it by hand.
 
 ## License

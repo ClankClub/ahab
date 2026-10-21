@@ -1,6 +1,6 @@
 # Design: sources (one memory across everything the owner uses)
 
-Drafted 2026-10-20 from the owner's brief; not yet agreed in detail. When it's built, the story goes into `BUILD_LOG.md`, the fences into `AGENTS.md` and the module docstrings, and this file is deleted. Background research: the owner's private notes on how Hermes and OpenClaw hand work around (`03-orchestration.md`), which aren't in this repo.
+Drafted 2026-10-20 from the owner's brief. Phase 1 (Hermes delivery) is built; the rest is still a draft. When it's all built, the story goes into `BUILD_LOG.md`, the fences into `AGENTS.md` and the module docstrings, and this file is deleted. Background research: the owner's private notes on how Hermes and OpenClaw hand work around (`03-orchestration.md`), which aren't in this repo.
 
 ## Why
 
@@ -42,18 +42,18 @@ Never copied, whatever the kind: keys, logins, tokens, config files, caches, dat
 
 ## Hermes, the first source
 
-**What Hermes has** (checked on the owner's install): the curated memory in `/opt/data/memories/` (`MEMORY.md`, `USER.md`), every conversation in `state.db`, learned skills in `/opt/data/skills/`, and workspaces at `/opt/data/workspace` and `/workspace`. It has a read-only export built in: `hermes sessions export <dir> --format md --redact` writes one Markdown file per conversation plus a manifest.
+**What Hermes has** (checked on the owner's install): the curated memory in `/opt/data/memories/` (`MEMORY.md`, `USER.md`), every conversation in `state.db`, learned skills in `/opt/data/skills/`, and workspaces at `/opt/data/workspace` and `/workspace`. It has a read-only export built in. Its Markdown format refuses a whole-history export without a filter, and the filters skip sessions still open, so the sender uses `hermes sessions export <file> --redact` (JSON lines, one session per line) and Ahab turns each session into Markdown on arrival, keeping what was said and the names of the tools used, never what the tools returned.
 
 **The sender** (`scripts/send_hermes.py`, standard library, runs where Hermes runs, so it needs nothing of Ahab installed) does this:
 1. runs the export inside the container (`docker exec <container> hermes sessions export ...`), which only reads;
-2. builds a tar of the export, the memory files, the skills' `SKILL.md` files and the workspaces' text files, streamed out over `docker exec ... tar c` (never `docker cp`, the same rule as the desktop box);
+2. builds a tar of the export, the memory files, the `SKILL.md` files of the skills Hermes made or changed (the stock ones it ships are told apart by the hashes in its `skills/.bundled_manifest`) and the workspaces' text files, inside the container by a small script fed in on stdin, streamed out over `docker exec` (never `docker cp`, the same rule as the desktop box);
 3. pipes it to the Ahab machine over SSH.
 
 It's scheduled with the platform's own scheduler (Task Scheduler on Windows, a systemd timer or cron elsewhere). Daily is enough; the digest only runs nightly anyway.
 
 **The receiving end** is a forced-command SSH key. On the Ahab machine, the service user's `authorized_keys` gets one line for that key:
 ```
-command="python3 -m ahab.sources receive hermes",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAA...
+command="cd /home/ahab/ahab && python3 -X utf8 -m ahab.sources receive hermes",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAA...
 ```
 That key can do exactly one thing: hand a tar stream to `receive`. It can't open a shell, pick a different command or forward anything. A stolen key can only deliver a bad tar, so `receive` checks the stream the way the desktop box checks its own: regular files only, relative paths, no `..`, the allowed extensions, size caps. It unpacks into a staging folder and swaps it in only when the whole stream checks out.
 
@@ -65,8 +65,10 @@ When Hermes and Ahab run on the same machine, there's no SSH: the sender's outpu
 
 ## What Pip can do with the archive
 
-- **Search it.** `recall` and `find` grow a `sources` scope: the archive is indexed in the same full-text index as Pip's log and memory, each hit labeled with its source and date.
-- **Read it.** `read_source(name, path)`, read-only, and every path has to resolve inside `sources/<name>/`, the same fence as the Obsidian vault's. No writes, no deletes: the source is the authority on its own history, and two writers on one memory is how you get mush.
+One tool, `sources` (built as one tool rather than two, with tool grouping coming):
+
+- **Search it.** `{"do": "search"}` searches every archive (or one) in its own full-text index, kept in step with the manifests, each hit labeled with its source.
+- **Read it.** `{"do": "read"}`, read-only, and every path has to resolve inside `sources/<name>/`, the same fence as the Obsidian vault's. `{"do": "list"}` shows each source and when it last arrived. No writes, no deletes: the source is the authority on its own history, and two writers on one memory is how you get mush.
 
 ## The digest: turning an archive into knowing
 
@@ -92,15 +94,14 @@ Search alone isn't knowing. Knowing means Pip already has a page on "the project
 
 ## Phases
 
-1. **Hermes delivery:** the sender script, `sources.py` (`receive`, the archive and manifest, a status command), the forced-command key, `read_source`, the search scope, and the console line. Pip can look things up; there's no digest yet. Tested offline with a fake Hermes export and hostile tars.
+1. **Hermes delivery (built 2026-10-20):** the sender script, `sources.py` (`receive`, the archive and manifest, a status command), the forced-command key, the `sources` tool, and the console line. Pip can look things up; there's no digest yet. Tested offline with a fake Hermes export and hostile tars.
 2. **The digest:** the sorting stage, the digest worker with its write fence, the dream's rule for carrying facts up, the staleness event. Tested with a fake archive containing a planted instruction.
 3. **Uploaded sources:** a ChatGPT unpacker built against a real export, `_incoming/`, the Telegram drop, the monthly nudge and the re-read. Muse and others follow the same way.
 4. **OpenClaw** as a delivered source, when it's installed: its memory is already Markdown, so its sender is the easy one.
 
 ## Placement and open questions
 
-- **Queue.** STATUS has tool grouping as the owner's current first priority. This adds two or three tools (`read_source`, a sources scope on search), so it doesn't fight tool grouping much, but it's worth deciding which goes first.
 - **Should the owner's own words in a transcript ever go straight into `USER.md`,** or always through the dream's judgment? This draft says through the dream.
 - **How much of the other agent's workspace to copy.** Text only and capped is the draft. Code projects could be large; maybe copy a project's tree and README and leave its full source in place.
-- **Hermes's skills:** worth copying (they're what it learned how to do), or noise? The draft copies the `SKILL.md` files only.
+- **Hermes's skills:** only the ones it made or changed, `SKILL.md` only. Whether even those are worth reading is for the digest to find out.
 - **Product defaults:** sources are off until listed in `home.json`, like every other outside connection.

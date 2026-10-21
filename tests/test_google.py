@@ -277,5 +277,5 @@ assert "daily limit" in run("delete_contact", {"id": "c2222222"}, (200, BOB)) an
 assert run("add_task", {"title": "Still fine"}, (200, {"id": "tasknew03"})).startswith("Added")
 print("delete tests passed")
 
-assert len(tools.TOOLS) == 85, len(tools.TOOLS)
+assert len(tools.TOOLS) == 86, len(tools.TOOLS)
 print(f"tool descriptions: {len(tools.describe())} chars")
