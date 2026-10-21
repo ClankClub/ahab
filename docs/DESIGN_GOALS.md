@@ -1,6 +1,6 @@
 # Design: goals
 
-Agreed in outline with the owner on 2026-10-21. Nothing is built yet. When it's done, the story goes into `BUILD_LOG.md`, the fences into `AGENTS.md` and the module docstring, Pip's side into `ABOUT_YOURSELF.md`, and this file is deleted. The research behind it is genre 3 of the second comparative study (`02-shared-genres.md` in the owner's reference folder, outside the repo), checked against the goal code in Hermes and OpenClaw and against a long-running Muse install's goal folders.
+Agreed in outline with the owner on 2026-10-21. Phase 1 is built (see BUILD_LOG); phases 2 and 3 are still to come. When it's done, the story goes into `BUILD_LOG.md`, the fences into `AGENTS.md` and the module docstring, Pip's side into `ABOUT_YOURSELF.md`, and this file is deleted. The research behind it is genre 3 of the second comparative study (`02-shared-genres.md` in the owner's reference folder, outside the repo), checked against the goal code in Hermes and OpenClaw and against a long-running Muse install's goal folders.
 
 ## Why
 

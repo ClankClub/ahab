@@ -255,6 +255,33 @@ def helpers(home: Path, now: float, show_chat: bool, c, width: int) -> list[str]
     return lines
 
 
+def goals_line(home: Path, now: float, show_chat: bool, c, width: int) -> list[str]:
+    """One line of the open goals: number, objective (unless the chat is hidden), share of the
+    budget spent, and a word when one isn't simply active. Nothing when there are none."""
+    db = _db(home)
+    if db is None:
+        return []
+    try:
+        rows = db.execute("SELECT id, objective, spent, budget, status, waiting_until FROM goals WHERE status IN "
+                          "('active', 'paused', 'blocked', 'budget_limited') ORDER BY id").fetchall()
+    except sqlite3.Error:
+        return []                                     # the table appears with the first goal
+    finally:
+        db.close()
+    if not rows:
+        return []
+    parts, bad = [], False
+    for goal_id, objective, spent, budget, status, waiting_until in rows:
+        until = _when(waiting_until) if waiting_until else None
+        word = ("waiting" if status == "active" and until and until.timestamp() > now
+                else {"active": "", "paused": "paused", "blocked": "blocked", "budget_limited": "out of budget"}[status])
+        bad = bad or status in ("blocked", "budget_limited")
+        title = " ".join(objective.split()[:5]) + " " if show_chat else ""
+        parts.append(f"#{goal_id} {title}{spent * 100 // max(1, budget)}%" + (f" {word}" if word else ""))
+    text = _clip(" · ".join(parts), width - 6)
+    return [c(YELLOW, "goals") + " " + (c(RED, text) if bad else text)]
+
+
 def frame(home: Path, width: int = 80, height: int = 24, now: float | None = None, color: bool = True) -> list[str]:
     """The screen as lines of text, at most `height` of them."""
     now = time.time() if now is None else now
@@ -283,6 +310,7 @@ def frame(home: Path, width: int = 80, height: int = 24, now: float | None = Non
 
     foot = [rule,
             *helpers(home, now, show_chat, c, width),
+            *goals_line(home, now, show_chat, c, width),
             "  ".join([ok(alive(home, "heartbeat", now), "heartbeat"), ok(alive(home, "telegram", now), "bridge"),
                        f"backup {last_backup(home)}", *source_ages(home, c)]),
             c(DIM, _clip(machine(home), width))]

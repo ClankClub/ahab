@@ -10,8 +10,9 @@ next to the heartbeat. It does two things, over and over:
   out  Ahab's replies (message_owner) -> your Telegram chat, with any
        files it attached
 
-One command is handled here instead of passed on: /talk lifts the brakes
-on Ahab's email with other AI agents (see mail.py).
+A few commands are handled here instead of passed on: /talk lifts the
+brakes on Ahab's email with other AI agents (see mail.py), and /goal and
+/goals show and steer Ahab's goals (see goals.py).
 
 It also carries approvals (see approvals.py): each request Ahab files
 arrives as a card with Approve and Deny buttons, your tap is recorded as
@@ -51,7 +52,7 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ahab import approvals, inbox, mail, senses, tools, watchdog
+from ahab import approvals, goals, inbox, mail, senses, tools, watchdog
 from ahab.memory import DEFAULT_HOME, Memory
 
 TOKEN_ENV = "AHAB_TELEGRAM_TOKEN"
@@ -211,6 +212,13 @@ def handle_update(update: dict, state: dict, memory: Memory, bot: Bot) -> None:
     text = message.get("text")
     if not text:
         handle_media(message, state, memory, bot)
+        return
+    answer = goals.telegram_command(memory, text)
+    if answer is not None:
+        # The owner's goal controls are done here, in code, like /talk: Ahab moves goals
+        # forward, but only the owner moves the target (see goals.py).
+        bot.send(state["owner_chat_id"], answer[:TELEGRAM_CHAR_LIMIT])
+        print(f"[{_now()}] The owner ran {text.split()[0]}.")
         return
     if text.strip().lower() in TALK_COMMANDS:
         # Lifting the email brakes is the owner's call, so it's done here, in

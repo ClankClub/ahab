@@ -75,8 +75,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ahab import (agents, alarms, browser, desktop, github, google, hostshell, inbox, intents, mail, n8n, notion,
-                   obsidian,
+from ahab import (agents, alarms, browser, desktop, github, goals, google, hostshell, inbox, intents, mail, n8n,
+                   notion, obsidian,
                    screen,
                    search, senses, sources, vercel, watches, web, workers, workshop)
 from ahab.memory import Memory
@@ -433,11 +433,57 @@ def cancel_watch(memory: Memory, id: int) -> str:
 
 # --- workers (the logic lives in workers.py) -----------------------------
 
-def start_worker(memory: Memory, task: str, model: str | None = None, max_calls=None) -> str:
+def _for_goal(memory: Memory, goal) -> int | None:
+    """The goal a worker or crew task is started for, checked before anything starts."""
+    if goal in (None, ""):
+        return None
     try:
-        return workers.start(memory, task, model, max_calls)
+        return goals.require_active(memory, goal).id
+    except goals.GoalError as e:
+        raise ToolError(str(e)) from None
+
+
+def _newest(memory: Memory, table: str) -> int:
+    # Read straight after the insert, in this same process, so it's the row just made.
+    return memory.db.execute(f"SELECT MAX(id) FROM {table}").fetchone()[0]
+
+
+def start_worker(memory: Memory, task: str, model: str | None = None, max_calls=None, goal=None) -> str:
+    goal_id = _for_goal(memory, goal)
+    try:
+        result = workers.start(memory, task, model, max_calls)
     except workers.WorkerError as e:
         raise ToolError(str(e)) from None
+    if goal_id is not None:
+        goals.link(memory, goal_id, "worker", _newest(memory, "workers"))
+        result += f" Its tokens count toward goal #{goal_id}."
+    return result
+
+
+def ask_agent(memory: Memory, agent, task, follow_up=None, wake=None, goal=None) -> str:
+    goal_id = _for_goal(memory, goal)
+    try:
+        result = agents.ask(memory, agent, task, follow_up, wake)
+    except agents.AgentError as e:
+        raise ToolError(str(e)) from None
+    if goal_id is not None:
+        if result.startswith("Gave "):
+            goals.link(memory, goal_id, "agent", _newest(memory, "agent_tasks"))
+            result += f" Its tokens count toward goal #{goal_id}."
+        else:
+            result += " (A task that waits on approval isn't linked to a goal.)"
+    return result
+
+
+# --- goals (the logic lives in goals.py) ------------------------------------
+
+def _goal_tool(function):
+    def tool(memory: Memory, **args) -> str:
+        try:
+            return function(memory, **args)
+        except goals.GoalError as e:
+            raise ToolError(str(e)) from None
+    return tool
 
 
 def check_worker(memory: Memory, id: int | None = None) -> str:
@@ -891,6 +937,52 @@ TOOLS = {
         cancel_watch,
         'Stop a watch. Args: {"id": <watch number>}',
     ),
+    "start_goal": (
+        _goal_tool(goals.start),
+        'Open a goal: an objective you work toward across wake-ups, with what done looks like, a '
+        'token budget and a deadline that code keeps. A small one (up to '
+        f'{goals.compact(goals.OWN_BUDGET)} tokens and {goals.OWN_DAYS} days, {goals.MAX_OWN_OPEN} of '
+        'yours open at once) opens now and shows in your owner\'s record of your goals; anything '
+        'bigger is filed for their approval. "pace_hours": how long it may sit untouched before it '
+        f'wakes you (default {goals.DEFAULT_PACE_HOURS}; short for a job to keep at, long for a slow '
+        'one). Use it for work that spans wake-ups, not for a single task. Args: {"objective": "<what>", '
+        '"done_when": "<concretely, what done looks like>", "stop_when": "<when to stop and ask>", '
+        '"budget": "200k", "days": <n>, "pace_hours": <n>, "note": "<for the card>"} '
+        '(all but objective and done_when optional)',
+    ),
+    "goal_progress": (
+        _goal_tool(goals.progress),
+        'Log what you did on a goal, in a line; do it each wake-up you work on one. It resets the '
+        'goal\'s pace and charges this wake-up\'s tokens to it. "done_when" fills in what done '
+        'means, only if the goal doesn\'t say yet. Args: {"id": <goal number>, "note": "<what you '
+        'did or found>", "done_when": "<text>"} (done_when optional)',
+    ),
+    "goal_wait": (
+        _goal_tool(goals.wait),
+        'Set a goal waiting on something outside (a reply, a release, DNS), so it doesn\'t wake you '
+        'before then; it wakes you when the wait is over. Args: {"id": <goal number>, "hours": <n>, '
+        '"why": "<what you\'re waiting for>"}',
+    ),
+    "finish_goal": (
+        _goal_tool(goals.finish),
+        'Close a goal. "done" needs "evidence": where the result is (a file, a link, a page, a '
+        'commit); a budget running out doesn\'t make unfinished work done. "blocked" needs a '
+        '"reason" and stops it waking you; tell your owner what you need. "dropped" (your own goals '
+        'only) needs a "reason". You can\'t change a goal\'s objective, budget or deadline; your '
+        'owner can. Args: {"id": <goal number>, "how": "done" | "blocked" | "dropped", '
+        '"evidence": "<text>", "reason": "<text>"}',
+    ),
+    "request_goal_budget": (
+        _goal_tool(goals.request_budget),
+        'Ask your owner for more tokens or more days on a goal; it goes to them as an approval card '
+        'with what\'s been spent and done. Args: {"id": <goal number>, "more": "500k", "days": <n>, '
+        '"why": "<text>"} (more or days, or both)',
+    ),
+    "check_goal": (
+        _goal_tool(goals.check),
+        'No id: your open goals and the last few that ended. An id: that goal\'s whole log. '
+        'Args: {"id": <goal number>} (optional)',
+    ),
     "start_worker": (
         start_worker,
         'Hand a self-contained job to a worker: a helper running in the background on its own, '
@@ -902,8 +994,9 @@ TOOLS = {
         'writes a report for you, and you\'re woken with it (unless it judges, as the task may '
         'tell it, that it can wait for your next wake-up). You decide what your owner hears. '
         f'Models: {workers.model_list()}. At most {workers.MAX_RUNNING} at once and '
-        f'{workers.DAILY_LIMIT} a day. Args: {{"task": "<the job>", "model": "<model>", '
-        '"max_calls": <n>} (model and max_calls optional)',
+        f'{workers.DAILY_LIMIT} a day. "goal": the goal it works for, whose budget its tokens count '
+        'against. Args: {"task": "<the job>", "model": "<model>", "max_calls": <n>, "goal": <goal number>} '
+        '(all but task optional)',
     ),
     "check_worker": (
         check_worker,
@@ -921,8 +1014,7 @@ TOOLS = {
         'tools, whether its tasks need your owner\'s approval, and your recent tasks. Args: {}',
     ),
     "ask_agent": (
-        _agent_tool(lambda memory, agent, task, follow_up=None, wake=None:
-                    agents.ask(memory, agent, task, follow_up, wake)),
+        ask_agent,
         'Hand a task to one of your agents. Unlike a worker, an agent has a lane of its own, keeps '
         'notes and files between tasks, and may have tools you\'d rather not spend your own calls '
         'on; pick a worker for a one-off read, an agent for work in its lane. It knows only its '
@@ -932,8 +1024,9 @@ TOOLS = {
         f'task of the same agent\'s to continue (up to {agents.THREAD_LIMIT} in a thread). An agent '
         'with outward powers gets the task only once your owner approves it, word for word, so '
         f'keep those under {agents.OUTWARD_TASK_CHAR_LIMIT} chars. One task at a time per agent, '
-        f'{agents.MAX_RUNNING} at once, {agents.DAILY_LIMIT} a day. Args: {{"agent": "<name>", '
-        '"task": "<the task>", "follow_up": <task number>, "wake": true} (follow_up and wake optional)',
+        f'{agents.MAX_RUNNING} at once, {agents.DAILY_LIMIT} a day. "goal": the goal it works for, whose '
+        'budget its tokens count against. Args: {"agent": "<name>", "task": "<the task>", '
+        '"follow_up": <task number>, "wake": true, "goal": <goal number>} (follow_up, wake and goal optional)',
     ),
     "check_agent_task": (
         _agent_tool(lambda memory, id: agents.check(memory, id)),
@@ -1443,6 +1536,8 @@ GROUPS = {
     "vault": ("the Obsidian vault of notes", ("vault_search", "vault_read", "vault_write", "vault_move",
                                               "vault_delete"), _always),
     "watches": ("watching a web page for a change", ("watch_page", "cancel_watch"), _always),
+    "goals": ("objectives you work toward across wake-ups, on a budget", ("start_goal", "goal_progress",
+              "goal_wait", "finish_goal", "request_goal_budget", "check_goal"), _always),
     "workers": ("helpers that research or read in the background and report to you",
                 ("start_worker", "check_worker", "cancel_worker"), _always),
     "agents": ("your crew: named agents with lanes of their own, which report to you",
@@ -1500,6 +1595,11 @@ def describe(memory: Memory | None = None) -> str:
     grouped = {n for _, names, _ in GROUPS.values() for n in names}
     lines = [f"- {name}: {desc}" for name, (_, desc) in TOOLS.items() if name not in grouped]
     used, short, missing = recently_used(memory), [], []
+    try:
+        if goals.open_goals(memory):   # an open goal keeps its tools in full, even one the owner just set
+            used |= set(GROUPS["goals"][1])
+    except Exception:
+        pass
     for key, (about, names, _) in GROUPS.items():
         if not _available(memory, key):
             missing.append(key)

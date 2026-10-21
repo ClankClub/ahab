@@ -28,8 +28,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ahab import (agents, alarms, approvals, desktop, digest, dream, identity, inbox, intents, mail, n8n, senses, skills, tools,
-                   watchdog, watches, workers, workshop)
+from ahab import (agents, alarms, approvals, desktop, digest, dream, goals, identity, inbox, intents, mail, n8n, senses,
+                   skills, tools, watchdog, watches, workers, workshop)
 from ahab.memory import DEFAULT_HOME, NOTES_CHAR_LIMIT, Memory
 from ahab.model import ModelClient, ModelError
 
@@ -164,6 +164,11 @@ How to work:
   comes up", a watch (watch_page) for a page, or a task in your notes
   with a wake-up that gets you there.
   If nothing would notice, say that instead of promising.
+- Work that spans wake-ups (a big job, a project waiting on others, a habit
+  to keep up) is a goal (start_goal): it keeps what done looks like, and
+  code keeps its budget and wakes you for it. Log progress (goal_progress)
+  each wake-up you work on one. Close it done only with evidence of the
+  result; if you're stuck, mark it blocked and tell your owner what you need.
 - Your owner does things you don't see. A missing reply or an unanswered
   suggestion doesn't mean it's still undone, so don't nag; make it easy for
   them to say they've handled it.
@@ -464,6 +469,10 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
     workers.report_finished(memory)
     # And the crew's (agents.py).
     agents.report_finished(memory)
+    # Goals (goals.py): helpers' tokens are charged to the goals they worked for, anything past
+    # its deadline expires, and each goal that's due rings into the log, like an alarm.
+    goals.charge_helpers(memory)
+    goals.ring_due(memory)
     # And email from the people on its list that's done waiting (see mail.py).
     mail.deliver(memory)
     # Standing intents listen to what just came in (the owner's messages, new
@@ -490,6 +499,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
                                     f"## Your alarms\n{alarms.describe_pending(memory)}\n\n"
                                     f"## Your standing intents\n{intents.describe(memory)}\n\n"
                                     f"## Your watches\n{watches.describe(memory)}\n\n"
+                                    f"## Your goals\n{goals.describe(memory)}\n\n"
                                     + (f"{asking}\n\n" if asking else "") +
                                     f"## Your skills\n{skills.describe(memory)}"},
     ]
@@ -594,6 +604,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
         # the reply itself was the problem, keep it: it may hold real words.
         detail = f" Reply was: {reply.text[:2000]}" if isinstance(e, json.JSONDecodeError) else ""
         memory.record("error", f"Beat failed: {type(e).__name__}: {e}.{detail}")
+        goals.charge_wake(memory, now, tokens_in + tokens_out)
         return RETRY_MINUTES
 
     message = decision.get("message")
@@ -619,6 +630,7 @@ def beat(memory: Memory, client: ModelClient, prompt: str = SYSTEM_PROMPT,
             memory.record("error", str(e))
 
     clamped = max(MIN_WAKE_MINUTES, min(MAX_WAKE_MINUTES, minutes))
+    goals.charge_wake(memory, now, tokens_in + tokens_out)
     memory.record(
         "sleep",
         f"Sleeping {clamped} min"
@@ -816,6 +828,9 @@ def main() -> None:
                 alarm_at = alarms.next_due(memory)
                 if alarm_at is not None and alarm_at < wake_at:
                     wake_at, why = alarm_at, " (for an alarm)"
+                goal_at = goals.next_due(memory)
+                if goal_at is not None and goal_at < wake_at:
+                    wake_at, why = goal_at, " (for a goal)"
                 watch_at = watches.next_due(memory)
                 watching = watch_at is not None and watch_at < wake_at
                 if watching:
@@ -833,7 +848,7 @@ def main() -> None:
                 if sleep_until(wake_at, interrupt=lambda: inbox.knocked(memory)
                                or approvals.waiting(memory) or workshop.waiting(memory)
                                or workers.waiting(memory) or agents.waiting(memory)
-                               or mail.waiting(memory)):
+                               or mail.waiting(memory) or goals.due_now(memory)):
                     print("--- knock: a message, an approval, a finished build, worker or agent"
                           " task, or an email; waking early. ---\n")
                     break
