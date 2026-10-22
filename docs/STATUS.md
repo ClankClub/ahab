@@ -29,6 +29,7 @@ The laptop (2026-10-20): the code is Ahab throughout (`ahab` package, `AHAB_*` v
 - Sources (new): whether Pip looks in the Hermes copy when the owner mentions it, and how fast the archive grows.
 - Model fallback (2026-10-21): set on the laptop (`"fallback": "claude-sonnet"`); watch for `model_fallback` lines in the log.
 - Sessions (new, 2026-10-21): the page is one running conversation, folded into a summary past 100,000 tokens. Watch the daily token total against the old page's (5.1M on 2026-10-20, mostly exploration wakes and restarts), how often it folds and what the summaries keep, and whether Pip still writes lasting things to MEMORY.md now that the conversation stays in view. The status screen's footer shows the session's size.
+- Prompt cache on `codex-luna` (investigated 2026-10-21): the first call of every wake misses the cache, though Ahab's page is stable between wakes. The cause is Codex: each `codex exec` gets a fresh session id, which is also its cache key, so the backend routes it anywhere. A patched Codex with a fixed key hit 98-99% within a wake and on repeats, and partly (0 to about 40%) on the next wake's first call. The fix planned is a direct ChatGPT backend (next list); calls inside a wake already hit 50-90%.
 - A real email waking Pip through the mail watch hasn't been seen yet.
 - Which sites the browser's no-sending rule breaks (Google Maps half-loads).
 - Making a GitHub repository public through the approval hasn't been tried live.
@@ -46,7 +47,8 @@ The laptop (2026-10-20): the code is Ahab throughout (`ahab` package, `AHAB_*` v
 8. **Sources phase 3 (parked 2026-10-20, the owner's call):** uploaded exports like ChatGPT's, built against a real export, with the monthly nudge and re-read; see [DESIGN_SOURCES.md](DESIGN_SOURCES.md). Phases 1 and 2 are built: Hermes's record delivered daily, searchable by Pip, and distilled each morning by the digest into pages under `memory/sources/hermes/`. The digest's first live run read and wrote nothing (fixed in `ddc7030`); check the next morning runs actually write pages.
 9. **More search providers:** `brave` and `searxng` in `ahab/search.py`, for homes on an API.
 10. **Backend bake-off:** replay real owner messages through copies of the home on `codex-luna`, `claude-haiku` and DeepSeek, scoring JSON slips, tool choices, finishing the job, voice, time and tokens.
-11. **Small gaps:** find-and-replace in Docs; Notion restore from trash and moving into a database (both want a newer Notion API version).
-12. **Mail off the list,** if wanted, through the approval step.
-13. **A reply form for API backends** (`response_format: json_schema`), if an OpenAI or OpenRouter backend is used.
-14. **Later:** a Windows `install.ps1`; browser sign-in to Pip's own accounts through approvals; a model ladder and a spend cap.
+11. **A direct ChatGPT backend (researched 2026-10-21, parked for usage limits):** call the Codex responses endpoint from Ahab with a stable cache key and `session_id` per Ahab session, the way Hermes and OpenClaw do, keeping `codex exec` as the fallback. Standard library only (urllib and a small SSE reader). The care is in the login: refresh tokens are single-use, so Ahab must own its Codex profile's `auth.json` and be its only refresher. Add per-call cache counts to the log with it, to measure the first-call gap.
+12. **Small gaps:** find-and-replace in Docs; Notion restore from trash and moving into a database (both want a newer Notion API version).
+13. **Mail off the list,** if wanted, through the approval step.
+14. **A reply form for API backends** (`response_format: json_schema`), if an OpenAI or OpenRouter backend is used.
+15. **Later:** a Windows `install.ps1`; browser sign-in to Pip's own accounts through approvals; a model ladder and a spend cap.
