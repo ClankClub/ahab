@@ -29,4 +29,5 @@ The fences exist because Ahab reads strangers' text all day, not because of the 
 - Standard library by default; check with the owner before adding a dependency.
 - Run `py tests/run.py` before committing and add a test with each new piece. Tests stay offline and generic, since the repo is public.
 - The code is `ClankClub/ahab` (public: no secrets or personal details). Pip's live home is on the laptop, in its own private repo (`silascroe/pip-backup`) that the backup task commits every 6 hours, so don't commit there by hand while Ahab is awake. The `home/` folder here is the retired PC copy (`silascroe/retired-pip-home-1`). Commit and push finished, tested code; ask first for history rewrites, force pushes or visibility changes.
+- The owner's Notion has an Ahab project page for what outlives a session: decisions, investigation results, handoffs. Write there as those land and keep it organized, editing existing pages before adding new ones.
 - When a piece lands, describe it in `docs/BUILD_LOG.md` and update `docs/STATUS.md`. If it changes what Ahab can do, update `docs/ABOUT_YOURSELF.md` too (Ahab reads it to describe itself); keep it generic.
